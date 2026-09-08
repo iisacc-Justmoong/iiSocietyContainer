@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleIdentifier</key><string>@SOCIETY_IOS_APP_IDENTIFIER@</string>
+    <key>CFBundleExecutable</key><string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+    <key>CFBundleName</key><string>@SOCIETY_IOS_DISPLAY_NAME@</string>
+    <key>CFBundleDisplayName</key><string>@SOCIETY_IOS_DISPLAY_NAME@</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleVersion</key><string>@SOCIETY_IOS_VERSION@</string>
+    <key>CFBundleShortVersionString</key><string>@SOCIETY_IOS_VERSION@</string>
+    <key>MinimumOSVersion</key><string>@SOCIETY_IOS_MINIMUM@</string>
+    <key>LSRequiresIPhoneOS</key><true/>
+    <key>UILaunchScreen</key><dict/>
+    <key>UISupportedInterfaceOrientations</key><array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key><array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>SocietyAppGroup</key><string>@SOCIETY_IOS_GROUP@</string>
+    <key>UIFileSharingEnabled</key><false/>
+    <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+    <key>UTImportedTypeDeclarations</key><array><dict>
+        <key>UTTypeIdentifier</key><string>com.iisacc.safetensors</string>
+        <key>UTTypeDescription</key><string>Safetensors model</string>
+        <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+        <key>UTTypeTagSpecification</key><dict>
+            <key>public.filename-extension</key><array>
+                <string>safetensor</string><string>safetensors</string>
+            </array>
+        </dict>
+    </dict></array>
+</dict></plist>

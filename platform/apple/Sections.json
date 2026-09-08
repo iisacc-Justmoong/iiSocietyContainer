@@ -1,0 +1,42 @@
+[
+    {
+        "id": "asset-library",
+        "name": "Asset Library",
+        "path": "Asset Library"
+    },
+    {
+        "id": "deleted",
+        "name": "Deleted",
+        "path": "Deleted"
+    },
+    {
+        "id": "files",
+        "name": "Files",
+        "path": "Files"
+    },
+    {
+        "id": "forked",
+        "name": "Forked",
+        "path": "Forked"
+    },
+    {
+        "id": "generation-history",
+        "name": "Generation History",
+        "path": "Generation History"
+    },
+    {
+        "id": "models",
+        "name": "Models",
+        "path": "Models"
+    },
+    {
+        "id": "published",
+        "name": "Published",
+        "path": "Published"
+    },
+    {
+        "id": "thinking-space",
+        "name": "Thinking Space",
+        "path": "Thinking Space"
+    }
+]
