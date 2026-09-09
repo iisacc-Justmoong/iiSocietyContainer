@@ -1,4 +1,4 @@
-# macOS Society Container
+# macOS Society
 
 Apple의 [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)로 Society 드라이브를 Finder와 파일 대화상자에 제공한다. 최소 macOS 15이다. Foundation·FileProvider·UniformTypeIdentifiers·CryptoKit·CoreServices는 운영체제에 포함된 프레임워크이며 FUSE, 외부 드라이버, 유료 클라우드 서비스를 추가하지 않는다. Swift 컴파일러는 Xcode Command Line Tools, 번들 생성은 Python 3을 사용한다. Apple 프레임워크의 사용 조건은 Apple SDK 라이선스를 따른다.
 
@@ -21,17 +21,17 @@ Society 앱의 `Connect to Finder`는 설치된 어댑터를 등록하고 SDK �
 ```sh
 build/iiSocietyContainerDriveTool create "/path/to/existing/source"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-  -f "$PWD/build/native/Society Container.app"
-pluginkit -a "$PWD/build/native/Society Container.app/Contents/PlugIns/SocietyContainerProvider.appex"
-open -W -g -a "$PWD/build/native/Society Container.app" --args list
-"build/native/Society Container.app/Contents/MacOS/SocietyContainerDrive" register "/path/to/existing/source"
-"build/native/Society Container.app/Contents/MacOS/SocietyContainerDrive" list
-"build/native/Society Container.app/Contents/MacOS/SocietyContainerDrive" path "<drive-id>"
-"build/native/Society Container.app/Contents/MacOS/SocietyContainerDrive" refresh "<drive-id>"
-"build/native/Society Container.app/Contents/MacOS/SocietyContainerDrive" unregister "<drive-id>"
+  -f "$PWD/build/native/Society.app"
+pluginkit -a "$PWD/build/native/Society.app/Contents/PlugIns/SocietyContainerProvider.appex"
+open -W -g -a "$PWD/build/native/Society.app" --args list
+"build/native/Society.app/Contents/MacOS/SocietyContainerDrive" register "/path/to/existing/source"
+"build/native/Society.app/Contents/MacOS/SocietyContainerDrive" list
+"build/native/Society.app/Contents/MacOS/SocietyContainerDrive" path "<drive-id>"
+"build/native/Society.app/Contents/MacOS/SocietyContainerDrive" refresh "<drive-id>"
+"build/native/Society.app/Contents/MacOS/SocietyContainerDrive" unregister "<drive-id>"
 ```
 
-호스트는 JSON과 실패 시 0이 아닌 종료 코드를 반환한다. 반복 등록은 같은 도메인을 사용하며 같은 ID를 가진 다른 원본 경로의 중복 연결은 거부한다. 연결 해제는 `preserveDownloadedUserData`로 다운로드된 데이터를 보존하고 보존 경로를 반환한다. 원본은 삭제하지 않는다. 로컬 개발 번들은 타임스탬프·공증·다른 컴퓨터용 배포 패키지를 포함하지 않는다.
+호스트는 JSON과 실패 시 0이 아닌 종료 코드를 반환한다. 반복 등록은 같은 도메인을 사용하며 표시 이름을 갱신한다. 응답의 `enabled`는 시스템에서 등록된 도메인을 다시 조회한 상태이다. 같은 ID를 가진 다른 원본 경로의 중복 연결은 거부한다. 연결 해제는 `preserveDownloadedUserData`로 다운로드된 데이터를 보존하고 보존 경로를 반환한다. 원본은 삭제하지 않는다. 로컬 개발 번들은 타임스탬프·공증·다른 컴퓨터용 배포 패키지를 포함하지 않는다.
 
 ## 파일 계약
 

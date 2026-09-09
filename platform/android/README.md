@@ -1,6 +1,6 @@
 # Android Society 파일 시스템
 
-Android 9(API 28)+에서 Society 앱은 앱 전용 `files/Society`에 같은 UUID 매니페스트와 8개 영역을 유지한다. 시스템 파일 앱과 파일 열기·저장 선택기에는 `Society Container` 위치 하나를 제공하며, 그 루트는 **Files의 내용**이다. Models 등 다른 7개 영역은 문서 제공자에 등록하지 않는다. 앱이 종료되어도 Android가 필요할 때 provider 프로세스를 시작한다. 항상 실행되는 사용자 데몬이나 외부 저장소 전체 권한은 요구하지 않는다.
+Android 9(API 28)+에서 Society 앱은 앱 전용 `files/Society`에 같은 UUID 매니페스트와 8개 영역을 유지한다. 시스템 파일 앱과 파일 열기·저장 선택기에는 `Society` 위치 하나를 제공하며, 그 루트는 **Files의 내용**이다. Models 등 다른 7개 영역은 문서 제공자에 등록하지 않는다. 앱이 종료되어도 Android가 필요할 때 provider 프로세스를 시작한다. 항상 실행되는 사용자 데몬이나 외부 저장소 전체 권한은 요구하지 않는다.
 
 ## Society 앱 패키지
 

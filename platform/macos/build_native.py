@@ -25,7 +25,7 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     catalog = subprocess.check_output([args.catalog_tool, "catalog"])
     (output / "Sections.json").write_bytes(catalog)
-    app = output / "Society Container.app"
+    app = output / "Society.app"
     provider = app / "Contents/PlugIns/SocietyContainerProvider.appex"
     identifier = "com.iisacc.society.container.drive"
     for bundle, executable, bundle_id, package_type in [
@@ -36,7 +36,7 @@ def main():
         (bundle / "Contents/Resources").mkdir(parents=True, exist_ok=True)
         (bundle / "Contents/Resources/Sections.json").write_bytes(catalog)
         info = dict(CFBundleIdentifier=bundle_id, CFBundleExecutable=executable,
-                    CFBundleName="Society Container", CFBundleDisplayName="Society Container",
+                    CFBundleName="Society", CFBundleDisplayName="Society",
                     CFBundlePackageType=package_type, CFBundleVersion=args.version,
                     CFBundleShortVersionString=args.version, LSMinimumSystemVersion="15.0")
         if bundle == app:

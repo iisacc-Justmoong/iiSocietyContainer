@@ -1,6 +1,6 @@
-# iOS / iPadOS Society Container
+# iOS / iPadOS Society
 
-iOS 16 이상에서 Apple의 [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)를 사용한다. Society 앱에 `SocietyFileProvider.appex`를 포함하며, 파일 앱과 다른 앱의 문서 선택기에 `Society Container` 위치를 제공한다. macOS와 `platform/apple/FilesDriveStore.swift`, `LocalDriveStore.swift`, `FileProviderExtension.swift`를 공유한다. 별도 드라이버나 유료 서비스는 추가하지 않는다. Foundation, FileProvider, CryptoKit, UIKit은 Apple SDK의 프레임워크이며 해당 SDK의 사용 조건을 따른다.
+iOS 16 이상에서 Apple의 [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)를 사용한다. Society 앱에 `SocietyFileProvider.appex`를 포함하며, 파일 앱과 다른 앱의 문서 선택기에 `Society` 위치를 제공한다. macOS와 `platform/apple/FilesDriveStore.swift`, `LocalDriveStore.swift`, `FileProviderExtension.swift`를 공유한다. 별도 드라이버나 유료 서비스는 추가하지 않는다. Foundation, FileProvider, CryptoKit, UIKit은 Apple SDK의 프레임워크이며 해당 SDK의 사용 조건을 따른다.
 
 ## 저장 위치와 노출 범위
 
@@ -8,8 +8,8 @@ iOS 16 이상에서 Apple의 [replicated File Provider](https://developer.apple.
 
 | 접근 경로 | 실제 내용 |
 | --- | --- |
-| 파일 앱 → Society Container → `/` | 원본 `Society/Files/`의 자식 |
-| 파일 앱 → Society Container → `/Example.txt` | 원본 `Society/Files/Example.txt` |
+| 파일 앱 → Society → `/` | 원본 `Society/Files/`의 자식 |
+| 파일 앱 → Society → `/Example.txt` | 원본 `Society/Files/Example.txt` |
 | Society 앱 → 컨테이너 홈 | 8개 영역 전체 |
 | Society 앱 → Models | 원본 `Society/Models/` |
 
@@ -23,7 +23,7 @@ C++ 컨테이너 API는 기존처럼 전달된 디렉터리를 판정한다. iOS
 
 Society의 iOS 시작 흐름은 공유 경로 준비 → C++ 드라이브 열기 → UUID 기반 도메인 등록 순서이다. iOS에서는 `QProcess`, `pluginkit`, macOS 보안 범위 북마크, `domain.userInfo`, FSEvents를 사용하지 않는다. `IosDriveBridge.swift`가 앱 프로세스에서 FileProvider API를 호출하고 Qt 컨트롤러에 결과를 전달한다. App Group을 얻지 못하면 오류를 표시하며, 다른 저장 위치로 우회하지 않는다.
 
-등록된 위치는 파일 앱의 Locations에서 선택한다. OS가 초기 활성화를 요구하면 Locations에서 Society Container를 활성화한다. 앱의 `Open in Files`는 공개 루트 URL로 시작하는 표준 [UIDocumentPickerViewController](https://developer.apple.com/documentation/uikit/uidocumentpickerviewcontroller)를 연다. 비공개 URL이나 문서화되지 않은 Files 앱 URL scheme을 사용하지 않는다. 아직 위치가 비활성화된 경우 위치를 선택할 수 있는 문서 탐색기를 연다.
+등록된 위치는 파일 앱의 Locations에서 선택한다. OS가 초기 활성화를 요구하면 Locations에서 Society를 활성화한다. 앱의 `Open in Files`는 공개 루트 URL로 시작하는 표준 [UIDocumentPickerViewController](https://developer.apple.com/documentation/uikit/uidocumentpickerviewcontroller)를 연다. 비공개 URL이나 문서화되지 않은 Files 앱 URL scheme을 사용하지 않는다. 아직 위치가 비활성화된 경우 위치를 선택할 수 있는 문서 탐색기를 연다.
 
 공개 URL의 내용을 확인할 때는 [getUserVisibleURL의 접근 계약](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/getuservisibleurl(for:completionhandler:))에 따라 security-scoped 접근을 시작하고 끝낸다. 문서 선택기의 표시 대상은 활성 scene 또는 Qt 6.8의 기존 UIApplication 윈도우에서 찾는다. key window가 지정되지 않은 경우 표시 중인 일반 윈도우를 사용한다.
 

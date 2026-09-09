@@ -264,8 +264,8 @@ NTSTATUS DOKAN_CALLBACK diskSpace(PULONGLONG available, PULONGLONG total, PULONG
 NTSTATUS DOKAN_CALLBACK volumeInfo(LPWSTR label, DWORD labelSize, LPDWORD serial, LPDWORD componentLength,
     LPDWORD flags, LPWSTR fileSystem, DWORD fileSystemSize, PDOKAN_FILE_INFO info)
 {
-    if (labelSize < 18 || fileSystemSize < 8) return STATUS_BUFFER_TOO_SMALL;
-    wcscpy_s(label, labelSize, L"Society Container");
+    if (labelSize < 8 || fileSystemSize < 8) return STATUS_BUFFER_TOO_SMALL;
+    wcscpy_s(label, labelSize, L"Society");
     wcscpy_s(fileSystem, fileSystemSize, L"Society");
     const auto digest = QCryptographicHash::hash(DokanMount::self(info).view.drive().identifier().toUtf8(), QCryptographicHash::Sha256);
     memcpy(serial, digest.constData(), sizeof(*serial));
@@ -287,7 +287,7 @@ std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &point, QS
     static std::once_flag initialized;
     std::call_once(initialized, [] { DokanInit(); });
     if (DokanDriverVersion() < DOKAN_MINIMUM_COMPATIBLE_VERSION) {
-        if (error) *error = "Install the signed Dokan 2 driver before connecting Society Container.";
+        if (error) *error = "Install the signed Dokan 2 driver before connecting Society.";
         return {};
     }
     if (point.size() != 2 || point[1] != ':' || point[0] < 'D' || point[0] > 'Z'
@@ -318,9 +318,10 @@ std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &point, QS
 bool installMountAutostart(const QString &executable, QString *error)
 {
     QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+    // Retain the registration key so existing users do not get a second daemon.
     settings.setValue("Society Container", '"' + QDir::toNativeSeparators(executable) + "\" serve");
     settings.sync();
-    if (settings.status() != QSettings::NoError) { if (error) *error = "Could not register Society Container for this login session."; return false; }
+    if (settings.status() != QSettings::NoError) { if (error) *error = "Could not register Society for this login session."; return false; }
     return true;
 }
 }

@@ -45,6 +45,7 @@ def main():
         assert 'com.apple.security.files.bookmarks.app-scope' not in rights
     extension = provider['NSExtension']
     assert app['CFBundleDisplayName'] == 'Society'
+    assert provider['CFBundleName'] == provider['CFBundleDisplayName'] == 'Society'
     assert extension['NSExtensionPointIdentifier'] == 'com.apple.fileprovider-nonui'
     assert extension['NSExtensionPrincipalClass'] == 'SocietyContainerFileProvider'
     assert extension['NSExtensionFileProviderSupportsEnumeration'] is True

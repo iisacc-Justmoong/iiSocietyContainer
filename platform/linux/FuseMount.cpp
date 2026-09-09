@@ -195,7 +195,8 @@ bool prepareMountPoint(const FilesView &view, const QString &point, QString *err
             if (encoded != entry->mnt_dir) continue;
             mounted = true;
             const QByteArray user = QByteArray("user_id=") + QByteArray::number(::geteuid());
-            ours = !strcmp(entry->mnt_type, "fuse.society") && !strcmp(entry->mnt_fsname, "Society Container")
+            ours = !strcmp(entry->mnt_type, "fuse.society")
+                && (!strcmp(entry->mnt_fsname, "Society") || !strcmp(entry->mnt_fsname, "Society Container"))
                 && QByteArray(entry->mnt_opts).split(',').contains(user)
                 && QFileInfo(point).fileName() == view.drive().identifier();
         }
@@ -271,9 +272,9 @@ std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &point, QS
         return &FuseMount::self();
     };
     fuse_args args = FUSE_ARGS_INIT(0, nullptr);
-    fuse_opt_add_arg(&args, "Society Container");
+    fuse_opt_add_arg(&args, "Society");
     fuse_opt_add_arg(&args, "-o");
-    fuse_opt_add_arg(&args, "fsname=Society Container,subtype=society,default_permissions,auto_unmount");
+    fuse_opt_add_arg(&args, "fsname=Society,subtype=society,default_permissions,auto_unmount");
     mount->instance = fuse_new(&args, &operations, sizeof(operations), mount.get());
     fuse_opt_free_args(&args);
     if (!mount->instance || fuse_mount(mount->instance, QFile::encodeName(point).constData()) != 0) {
@@ -294,7 +295,7 @@ bool installMountAutostart(const QString &executable, QString *error)
     QString quoted = executable;
     quoted.replace('\\', "\\\\").replace('"', "\\\"").replace('`', "\\`").replace('$', "\\$").replace('%', "%%");
     QSaveFile file(QDir(directory).filePath("com.iisacc.society.files.desktop"));
-    const auto bytes = QString("[Desktop Entry]\nType=Application\nName=Society Container\nExec=\"%1\" serve\nTerminal=false\nNoDisplay=true\n").arg(quoted).toUtf8();
+    const auto bytes = QString("[Desktop Entry]\nType=Application\nName=Society\nExec=\"%1\" serve\nTerminal=false\nNoDisplay=true\n").arg(quoted).toUtf8();
     if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
         if (error) *error = file.errorString(); return false;
     }

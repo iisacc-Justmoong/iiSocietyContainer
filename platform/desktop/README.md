@@ -32,7 +32,7 @@ iiSocietyContainerMount unregister <container-uuid>
 
 명령은 JSON을 반환한다. 성공 시 `identifier`, `sourcePath`, `systemPath`, `enabled`, 실패 시 `error`를 포함한다. 첫 명령은 필요할 때 사용자 세션 서비스를 시작한다. OS 사용자 전용 로컬 소켓과 잠금 파일로 단일 인스턴스 및 요청 접근을 제한한다. 등록 정보는 사용자 설정의 `iisacc/Society/mounts/drives.json`에 저장한다. 컨테이너 UUID가 바뀌면 기존 등록은 새 원본을 자동으로 수용하지 않는다.
 
-Windows는 S:부터 사용 가능한 드라이브 문자를 선택하고 현재 세션에 `Society Container` 볼륨을 만든다. Linux 기본 마운트 위치는 `$XDG_DATA_HOME/iisacc/Society/Drives/<uuid>`이며, 기본 XDG 위치를 지원한다. Linux에서 `..`는 일반 마운트처럼 외부 마운트 부모로 이동할 뿐 비공개 Society 원본 루트로 연결되지 않는다.
+Windows는 S:부터 사용 가능한 드라이브 문자를 선택하고 현재 세션에 `Society` 볼륨을 만든다. Linux 기본 마운트 위치는 `$XDG_DATA_HOME/iisacc/Society/Drives/<uuid>`이며, 기본 XDG 위치를 지원한다. Linux에서 `..`는 일반 마운트처럼 외부 마운트 부모로 이동할 뿐 비공개 Society 원본 루트로 연결되지 않는다.
 
 최초 등록 시 Windows HKCU Run 또는 Linux XDG autostart에 `serve` 명령을 기록한다. 서비스 재시작 시 저장된 등록을 복원하며 Society 창이 닫혀도 마운트는 유지된다. Linux에서는 auto_unmount를 요청하고, 비정상 종료 후 남은 연결 끊긴 마운트도 재연결 때 복구한다. 이 복구는 현재 사용자 소유·Society 파일 시스템·UUID가 맞는 마운트만 해제하며 활성 마운트나 다른 파일 시스템은 건드리지 않는다. 원본이 없거나 드라이브 문자가 점유된 경우 오류를 반환하거나 빈 문자를 선택한다. `SOCIETY_MOUNT_STATE_DIRECTORY`는 격리된 테스트용 설정 경로이며, `SOCIETY_MOUNT_AUTOSTART=0`은 테스트에서 로그인 등록을 생략한다.
 

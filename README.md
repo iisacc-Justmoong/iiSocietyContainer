@@ -1,6 +1,12 @@
 # iiSocietyContainer
 
-C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.9.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 8개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 8개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
+드라이브 표시 이름은 `Society`이다. 0.9.1부터 새 매니페스트에도 이 이름을 기록하며, 기존 `Society Container` 매니페스트는 UUID와 파일을 수정하지 않고 열어 `Society`로 표시한다. C++·Apple·Android의 읽기 경계는 두 이름을 허용한다. Windows 볼륨 이름, Linux FUSE 이름, Android 문서 루트, Apple File Provider 루트도 같은 표시 이름을 사용한다.
+
+macOS에서 기존 원본으로 `register`를 다시 호출하면 동일한 File Provider 도메인 ID로 표시 이름을 갱신한다. 도메인을 제거하지 않는다. 설치된 Apple SDK의 `NSFileProviderManager.addDomain` 계약을 사용하며 [Apple 도메인 API](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/add(_:completionhandler:))를 따른다. 어댑터 번들 이름도 `Society.app`으로 변경하여 Finder 사이드바에 같은 이름을 표시한다. CMake의 `iiSocietyContainer_NATIVE_APP`이 새 경로를 제공하며, 실행 파일·번들 ID와 Windows 자동 실행 등록 키는 기존 연동을 위한 내부 식별자로 유지한다.
+
+`iiSocietyContainer.drive`와 `native_store`는 새 이름, 이전 이름의 호환성, UUID 및 기존 매니페스트 보존을 검증한다. iOS 패키지 테스트와 Android 제공자 테스트는 시스템에 표시되는 이름을 검사한다.
+
+C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.9.1 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 8개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 8개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
 
 ## 공개 API
 
@@ -95,11 +101,11 @@ auto reopened = iiSocietyContainer::SocietyDrive::open("/data/MyLibrary", &error
 
 `create()`는 **이미 존재하는 디렉터리**에 8개 영역 이름과 정확히 일치하는 하위 디렉터리와 `.society-drive.json`을 생성한다. 기존의 정상 영역 디렉터리와 내용은 보존한다. 같은 이름의 파일·심볼릭 링크·정션이나 잘못된 기존 매니페스트는 덮어쓰지 않고 오류를 반환한다. 초기화 잠금과 원자적 매니페스트 저장을 사용하며 실패 시 이번 호출이 생성한 빈 디렉터리만 정리한다. 유효한 기존 드라이브는 같은 ID로 연다. `open()`은 파일을 생성하지 않으며 매니페스트, 버전, ID, 전체 영역 배치를 검증한다.
 
-매니페스트 버전은 `schemaVersion: 1`, 종류는 `type: "SocietyDrive"`, 표시 이름은 `Society Container`이다. 식별자는 UUID이며 영역 항목은 `id`, `name`, `path`를 가진다. `storeSectionKey()`가 반환하는 영속 키는 순서대로 `asset-library`, `deleted`, `files`, `forked`, `generation-history`, `models`, `published`, `thinking-space`이다. 표시 이름과 디렉터리명은 위 표와 같다. 네이티브 영역 카탈로그는 C++ 도구의 `catalog` 출력으로 생성하여 중복 정의하지 않는다.
+매니페스트 버전은 `schemaVersion: 1`, 종류는 `type: "SocietyDrive"`, 표시 이름은 `Society`이다. 식별자는 UUID이며 영역 항목은 `id`, `name`, `path`를 가진다. `storeSectionKey()`가 반환하는 영속 키는 순서대로 `asset-library`, `deleted`, `files`, `forked`, `generation-history`, `models`, `published`, `thinking-space`이다. 표시 이름과 디렉터리명은 위 표와 같다. 네이티브 영역 카탈로그는 C++ 도구의 `catalog` 출력으로 생성하여 중복 정의하지 않는다.
 
 `sectionForPath()`는 실제 존재하는 경로의 정규화된 대상을 기준으로 영역을 반환한다. 루트 자체, 영역 외 루트 항목, 없는 항목, 외부 경로는 `std::nullopt`이다. 기존 루트의 미분류 파일은 보존하며 어느 영역으로도 임의 이동하지 않는다. `Deleted`를 포함한 모든 영역은 동일한 일반 폴더이며 휴지통·게시·생성 이력 등의 업무 규칙은 아직 부여하지 않는다.
 
-macOS 15 이상에서는 네이티브 어댑터를 함께 빌드한다. 설치 위치는 `share/iiSocietyContainer/Society Container.app`이고 CMake 패키지의 `iiSocietyContainer_NATIVE_APP`으로 제공한다. SDK의 `iiSocietyContainerDriveTool create|open <path>`는 같은 API를 CLI로 제공한다. Finder 등록, 서명, 파일 반영 방식과 범위는 [macOS 어댑터 문서](platform/macos/README.md)를 따른다. [Windows·Linux 마운트](platform/desktop/README.md)와 [Android 문서 제공자·앱 간 공유](platform/android/README.md)는 별도 플랫폼 문서에 정의한다.
+macOS 15 이상에서는 네이티브 어댑터를 함께 빌드한다. 설치 위치는 `share/iiSocietyContainer/Society.app`이고 CMake 패키지의 `iiSocietyContainer_NATIVE_APP`으로 제공한다. SDK의 `iiSocietyContainerDriveTool create|open <path>`는 같은 API를 CLI로 제공한다. Finder 등록, 서명, 파일 반영 방식과 범위는 [macOS 어댑터 문서](platform/macos/README.md)를 따른다. [Windows·Linux 마운트](platform/desktop/README.md)와 [Android 문서 제공자·앱 간 공유](platform/android/README.md)는 별도 플랫폼 문서에 정의한다.
 
 시스템 드라이브에서 `Example.txt`를 열거나 저장하면 원본의 `Files/Example.txt`에 대응한다. 별도의 `Files` 폴더 단계를 표시하지 않는다. 나머지 7개 영역과 컨테이너 메타데이터는 시스템 드라이브의 목록·검색용 working set·파일 ID 접근에서 제외하며 Society 앱의 영역 탐색으로 제공한다. 이것은 File Provider의 노출 범위이며 원본 디렉터리의 운영체제 권한이나 암호화를 변경하지 않는다.
 
@@ -198,7 +204,7 @@ target_link_libraries(your_app PRIVATE iiSocietyContainer::iiSocietyContainer)
 - `lib/cmake/iiSocietyContainer/`: Config, ConfigVersion 및 Targets 패키지
 - `share/iiSocietyContainer/README.md`: 이 문서
 - `bin/iiSocietyContainerDriveTool`: 드라이브 초기화·조회·영역 카탈로그 CLI
-- macOS의 `share/iiSocietyContainer/Society Container.app`: 네이티브 호스트와 File Provider 확장
+- macOS의 `share/iiSocietyContainer/Society.app`: 네이티브 호스트와 File Provider 확장
 
 드라이브 테스트는 초기화·재열기·ID 보존·8개 폴더·충돌 시 원본 보존·매니페스트 오류·영역 경계를 원본과 설치 소비자에서 검증한다. macOS 네이티브 테스트는 전체 원본의 파일 연산과 별도로 `Files/`의 루트 노출·비공개 ID 접근 거부·루트 파일 CRUD·버전 충돌·앱 접근 유지·재시작·기존 8개 영역 노출의 제거를 검증한다. 실제 Finder 연결 테스트는 일반 CTest와 분리하여 명시적으로 등록한 검증용 드라이브에서 수행한다.
 

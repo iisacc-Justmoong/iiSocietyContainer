@@ -12,7 +12,7 @@ struct DriveManifest: Codable {
     let type: String
     let schemaVersion: Int
     let identifier: String
-    let displayName: String
+    var displayName: String
     let sections: [DriveSection]
 }
 
@@ -81,13 +81,16 @@ final class LocalDriveStore {
         }
         let data = try Data(contentsOf: manifestURL)
         guard data.count <= 65536 else { throw DriveStoreError.invalid("Drive manifest is too large.") }
-        manifest = try JSONDecoder().decode(DriveManifest.self, from: data)
-        guard manifest.type == "SocietyDrive", manifest.schemaVersion == 1,
-              let uuid = UUID(uuidString: manifest.identifier), uuid != UUID(uuid: (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),
-              manifest.displayName == "Society Container",
-              manifest.sections == catalog, catalog.count == 8 else {
+        var loadedManifest = try JSONDecoder().decode(DriveManifest.self, from: data)
+        guard loadedManifest.type == "SocietyDrive", loadedManifest.schemaVersion == 1,
+              let uuid = UUID(uuidString: loadedManifest.identifier), uuid != UUID(uuid: (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),
+              ["Society", "Society Container"].contains(loadedManifest.displayName),
+              loadedManifest.sections == catalog, catalog.count == 8 else {
             throw DriveStoreError.invalid("Invalid or unsupported Society drive manifest.")
         }
+        // Normalize presentation without rewriting an existing source manifest.
+        loadedManifest.displayName = "Society"
+        manifest = loadedManifest
         for section in catalog {
             try Self.validateName(section.path)
             let url = self.root.appendingPathComponent(section.path)

@@ -16,6 +16,7 @@ import java.util.*;
 
 /** Private eight-area source. DocumentsProvider receives only Files-relative IDs. */
 public final class DriveStore {
+    public static final String DISPLAY_NAME = "Society";
     private static DriveStore instance;
     private final File root;
     private final String identity;
@@ -42,7 +43,7 @@ public final class DriveStore {
                     checkFile(section);
                 }
                 JSONObject data = new JSONObject().put("type", "SocietyDrive").put("schemaVersion", 1)
-                    .put("identifier", UUID.randomUUID().toString()).put("displayName", "Society Container")
+                    .put("identifier", UUID.randomUUID().toString()).put("displayName", DISPLAY_NAME)
                     .put("sections", catalog);
                 AtomicFile atomic = new AtomicFile(manifest);
                 FileOutputStream output = atomic.startWrite();
@@ -83,7 +84,8 @@ public final class DriveStore {
             checkFile(root);
             JSONObject data = manifest();
             if (!data.getString("identifier").equals(identity) || !data.getString("type").equals("SocietyDrive")
-                || data.getInt("schemaVersion") != 1 || !data.getString("displayName").equals("Society Container"))
+                || data.getInt("schemaVersion") != 1
+                || !(data.getString("displayName").equals(DISPLAY_NAME) || data.getString("displayName").equals("Society Container")))
                 throw new IOException("The original Society container was replaced");
             JSONArray sections = data.getJSONArray("sections");
             if (sections.length() != catalog.length()) throw new IOException("Society areas changed");

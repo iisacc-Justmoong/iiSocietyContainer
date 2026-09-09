@@ -70,18 +70,31 @@ enum DriveHost {
                     }
                 }
                 if command == "register", let domain = registration {
+                    let reportRegistration: (Error?) -> Void = { error in
+                        if let error = error { finish(nil, error); return }
+                        // The newly constructed domain does not carry the system's
+                        // userEnabled state; read back the registered domain.
+                        NSFileProviderManager.getDomainsWithCompletionHandler { registered, error in
+                            if let error = error { finish(nil, error); return }
+                            guard let current = registered.first(where: {
+                                $0.userInfo?["societyDriveIdentifier"] as? String == driveID
+                            }) else { finish(nil, NSFileProviderError(.providerNotFound)); return }
+                            report(current)
+                        }
+                    }
                     if let existing = existing {
                         guard existing.userInfo?["sourcePath"] as? String == domain.userInfo?["sourcePath"] as? String else {
                             finish(nil, DriveStoreError.invalid("This drive ID is already connected to a different source folder.")); return
                         }
-                        existing.userInfo = domain.userInfo
-                        NSFileProviderManager.add(existing) { error in
-                            if let error = error { finish(nil, error) } else { report(existing) }
-                        }
+                        // Re-adding the same domain ID updates its display name
+                        // without removing the domain or its downloaded files.
+                        let updated = NSFileProviderDomain(identifier: existing.identifier, displayName: domain.displayName)
+                        updated.userInfo = domain.userInfo
+                        updated.isHidden = existing.isHidden
+                        updated.supportsSyncingTrash = false
+                        NSFileProviderManager.add(updated, completionHandler: reportRegistration)
                     } else {
-                        NSFileProviderManager.add(domain) { error in
-                            if let error = error { finish(nil, error) } else { report(domain) }
-                        }
+                        NSFileProviderManager.add(domain, completionHandler: reportRegistration)
                     }
                 } else if let domain = existing {
                     if command == "unregister" {

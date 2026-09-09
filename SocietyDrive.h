@@ -21,6 +21,7 @@ public:
         const QString& directoryPath, QString* error = nullptr);
 
     [[nodiscard]] QString identifier() const;
+    /// Public drive label is Society, including when opening a legacy manifest.
     [[nodiscard]] QString displayName() const;
     [[nodiscard]] QString rootPath() const;
     [[nodiscard]] bool isValid() const;

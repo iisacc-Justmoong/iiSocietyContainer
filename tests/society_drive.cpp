@@ -3,6 +3,8 @@
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
 #include <QtCore/QTemporaryDir>
 #include <QtCore/qscopeguard.h>
 #include <QtTest/QTest>
@@ -29,7 +31,7 @@ private slots:
         QVERIFY(error.isEmpty());
         QVERIFY(drive->isValid());
         QVERIFY(!drive->identifier().isEmpty());
-        QCOMPARE(drive->displayName(), QStringLiteral("Society Container"));
+        QCOMPARE(drive->displayName(), QStringLiteral("Society"));
         QCOMPARE(drive->sections(), allStoreSections());
         for (const auto section : drive->sections()) {
             const auto path = drive->sectionPath(section);
@@ -44,6 +46,30 @@ private slots:
         const auto repeated = SocietyDrive::create(workspace->path(), &error);
         QVERIFY(repeated.has_value());
         QCOMPARE(repeated->identifier(), drive->identifier());
+    }
+
+    void legacyNameKeepsIdentityAndSourceData()
+    {
+        const auto created = SocietyDrive::create(workspace->path());
+        QVERIFY(created);
+        QFile manifest(workspace->filePath(".society-drive.json"));
+        QVERIFY(manifest.open(QIODevice::ReadOnly));
+        auto data = QJsonDocument::fromJson(manifest.readAll()).object(); manifest.close();
+        QCOMPARE(data.value("displayName").toString(), QString("Society"));
+        data["displayName"] = "Society Container";
+        const auto legacy = QJsonDocument(data).toJson();
+        QVERIFY(manifest.open(QIODevice::WriteOnly)); QCOMPARE(manifest.write(legacy), legacy.size()); manifest.close();
+        QFile file(workspace->filePath("Files/keep.txt")); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("keep"); file.close();
+        const auto reopened = SocietyDrive::open(workspace->path());
+        QVERIFY(reopened); QCOMPARE(reopened->identifier(), created->identifier());
+        QCOMPARE(reopened->displayName(), QString("Society"));
+        QVERIFY(SocietyDrive::create(workspace->path()));
+        QVERIFY(manifest.open(QIODevice::ReadOnly)); QCOMPARE(manifest.readAll(), legacy); manifest.close();
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), QByteArray("keep"));
+        data["displayName"] = "Unrelated drive";
+        QVERIFY(manifest.open(QIODevice::WriteOnly)); manifest.write(QJsonDocument(data).toJson()); manifest.close();
+        QVERIFY(!SocietyDrive::open(workspace->path()));
     }
 
     void keepsExistingContentAndRejectsDirectoryConflictsBeforeCreation()

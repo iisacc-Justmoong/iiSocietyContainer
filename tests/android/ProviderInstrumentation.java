@@ -67,12 +67,34 @@ public final class ProviderInstrumentation extends Instrumentation {
                 try (Cursor rows = resolver.query(DocumentsContract.buildRootsUri(SocietyDocumentsProvider.AUTHORITY), null, null, null, null)) {
                     check(rows.getCount() == 1 && rows.moveToFirst(), "Exactly one public drive is required");
                     root = string(rows, Root.COLUMN_DOCUMENT_ID);
-                    check(string(rows, Root.COLUMN_TITLE).equals("Society Container"), "Drive label changed");
+                    check(string(rows, Root.COLUMN_TITLE).equals("Society"), "Drive label must be Society");
                 }
                 List<String> visible = children(resolver, root);
                 for (String hidden : new String[]{"Models", "Asset Library", "Deleted", "Files", "Forked", "Generation History", "Published", "Thinking Space", ".society-drive.json"})
                     check(!visible.contains(hidden), "Private source layout leaked: " + hidden);
                 Uri rootUri = document(root);
+                try (Cursor rows = resolver.query(rootUri, null, null, null, null)) {
+                    check(rows.moveToFirst() && string(rows, Document.COLUMN_DISPLAY_NAME).equals("Society"), "Root name must be Society");
+                }
+                File manifest = new File(source, ".society-drive.json");
+                byte[] originalManifest;
+                try (InputStream input = new FileInputStream(manifest)) {
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[1024]; int count;
+                    while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                    originalManifest = bytes.toByteArray();
+                }
+                try {
+                    org.json.JSONObject legacy = new org.json.JSONObject(new String(originalManifest, StandardCharsets.UTF_8));
+                    legacy.put("displayName", "Society Container");
+                    try (OutputStream output = new FileOutputStream(manifest)) { output.write(legacy.toString().getBytes(StandardCharsets.UTF_8)); }
+                    check(DriveStore.get(getTargetContext()).identifier().equals(store.identifier()), "Legacy labels must retain identity");
+                    try (Cursor rows = resolver.query(rootUri, null, null, null, null)) {
+                        check(rows.moveToFirst() && string(rows, Document.COLUMN_DISPLAY_NAME).equals("Society"), "Legacy roots must display Society");
+                    }
+                } finally {
+                    try (OutputStream output = new FileOutputStream(manifest)) { output.write(originalManifest); }
+                }
                 Uri folder = DocumentsContract.createDocument(resolver, rootUri, Document.MIME_TYPE_DIR, "테스트 folder");
                 Uri file = DocumentsContract.createDocument(resolver, folder, "text/plain", "hello.txt");
                 String fileId = DocumentsContract.getDocumentId(file);

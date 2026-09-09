@@ -25,6 +25,18 @@ enum LocalDriveStoreTests {
         try check(process.terminationStatus == 0, "SDK drive creation failed")
         let catalog = try JSONDecoder().decode([DriveSection].self, from: Data(contentsOf: base.appendingPathComponent("Sections.json")))
         let store = try LocalDriveStore(root: root, catalog: catalog)
+        try check(store.manifest.displayName == "Society", "The native drive name must be Society")
+        let manifestURL = root.appendingPathComponent(".society-drive.json")
+        let originalManifest = try Data(contentsOf: manifestURL)
+        var legacyManifest = try JSONSerialization.jsonObject(with: originalManifest) as! [String: Any]
+        legacyManifest["displayName"] = "Society Container"
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyManifest, options: .sortedKeys)
+        try legacyData.write(to: manifestURL, options: .atomic)
+        let legacyStore = try LocalDriveStore(root: root, catalog: catalog)
+        try check(legacyStore.manifest.identifier == store.manifest.identifier, "Renaming must preserve the drive ID")
+        try check(legacyStore.manifest.displayName == "Society" && legacyStore.item("root").name == "Society", "Legacy roots must display Society")
+        try check(Data(contentsOf: manifestURL) == legacyData, "Reading a legacy drive must not rewrite its manifest")
+        try originalManifest.write(to: manifestURL, options: .atomic)
         for options: URL.BookmarkCreationOptions in [.minimalBookmark, .withSecurityScope] {
             let bookmark = try root.bookmarkData(options: options, includingResourceValuesForKeys: nil, relativeTo: nil)
             var stale = false

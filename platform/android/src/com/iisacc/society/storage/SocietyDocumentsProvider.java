@@ -55,7 +55,7 @@ public final class SocietyDocumentsProvider extends DocumentsProvider {
         MatrixCursor result = new MatrixCursor(projection == null ? ROOT_COLUMNS : projection);
         MatrixCursor.RowBuilder row = result.newRow();
         row.add(Root.COLUMN_ROOT_ID, store.identifier()).add(Root.COLUMN_DOCUMENT_ID, store.rootId())
-            .add(Root.COLUMN_TITLE, "Society Container").add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_CREATE | Root.FLAG_SUPPORTS_IS_CHILD)
+            .add(Root.COLUMN_TITLE, DriveStore.DISPLAY_NAME).add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_CREATE | Root.FLAG_SUPPORTS_IS_CHILD)
             .add(Root.COLUMN_MIME_TYPES, "*/*").add(Root.COLUMN_AVAILABLE_BYTES, store.files().getUsableSpace());
         result.setNotificationUri(getContext().getContentResolver(), DocumentsContract.buildRootsUri(AUTHORITY));
         return result;
@@ -71,7 +71,7 @@ public final class SocietyDocumentsProvider extends DocumentsProvider {
         int flags = file.isDirectory() ? Document.FLAG_DIR_SUPPORTS_CREATE : Document.FLAG_SUPPORTS_WRITE;
         if (!id.equals(store.rootId())) flags |= Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME | Document.FLAG_SUPPORTS_MOVE;
         result.newRow().add(Document.COLUMN_DOCUMENT_ID, id)
-            .add(Document.COLUMN_DISPLAY_NAME, id.equals(store.rootId()) ? "Society Container" : file.getName())
+            .add(Document.COLUMN_DISPLAY_NAME, id.equals(store.rootId()) ? DriveStore.DISPLAY_NAME : file.getName())
             .add(Document.COLUMN_MIME_TYPE, mime(file)).add(Document.COLUMN_FLAGS, flags)
             .add(Document.COLUMN_SIZE, file.isDirectory() ? null : file.length()).add(Document.COLUMN_LAST_MODIFIED, file.lastModified());
     }

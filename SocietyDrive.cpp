@@ -129,7 +129,7 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
         {"type", "SocietyDrive"},
         {"schemaVersion", 1},
         {"identifier", identifier},
-        {"displayName", "Society Container"},
+        {"displayName", "Society"},
         {"sections", sectionDefinitions()}
     });
     const QByteArray data = document.toJson();
@@ -172,7 +172,8 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
         || data.value("type") != QJsonValue("SocietyDrive")
         || data.value("schemaVersion") != QJsonValue(1)
         || QUuid(identifier).isNull()
-        || data.value("displayName") != QJsonValue("Society Container")
+        || (data.value("displayName") != QJsonValue("Society")
+            && data.value("displayName") != QJsonValue("Society Container"))
         || data.value("sections") != QJsonValue(sectionDefinitions())) {
         setError(error, QStringLiteral("The Society drive manifest is invalid or unsupported."));
         return std::nullopt;
@@ -188,7 +189,7 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
 }
 
 QString SocietyDrive::identifier() const { return m_identifier; }
-QString SocietyDrive::displayName() const { return QStringLiteral("Society Container"); }
+QString SocietyDrive::displayName() const { return QStringLiteral("Society"); }
 QString SocietyDrive::rootPath() const { return m_rootPath; }
 
 bool SocietyDrive::isValid() const
