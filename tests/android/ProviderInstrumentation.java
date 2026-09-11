@@ -95,6 +95,25 @@ public final class ProviderInstrumentation extends Instrumentation {
                 } finally {
                     try (OutputStream output = new FileOutputStream(manifest)) { output.write(originalManifest); }
                 }
+                try {
+                    org.json.JSONObject mirror = new org.json.JSONObject(new String(originalManifest, StandardCharsets.UTF_8));
+                    String hostID = UUID.randomUUID().toString();
+                    mirror.put("identifier", hostID).put("localIdentifier", store.identifier()).put("replicaReady", false);
+                    try (OutputStream output = new FileOutputStream(manifest)) { output.write(mirror.toString().getBytes(StandardCharsets.UTF_8)); }
+                    check(DriveStore.get(getTargetContext()).identifier().equals(hostID), "Managed storage must reopen the host identity");
+                    check(new org.json.JSONObject(SocietyStorage.request(getTargetContext(), "default", "", "")).has("sourcePath"), "Interrupted mirrors must retain their managed source path");
+                    rejected(() -> DriveStore.get(getTargetContext()).requireReady());
+                    mirror.put("replicaReady", true);
+                    try (OutputStream output = new FileOutputStream(manifest)) { output.write(mirror.toString().getBytes(StandardCharsets.UTF_8)); }
+                    DriveStore.get(getTargetContext()).requireReady();
+                    rejected(() -> resolver.openFileDescriptor(document(store.identifier() + ":root"), "r"));
+                    try (Cursor rows = resolver.query(DocumentsContract.buildRootsUri(SocietyDocumentsProvider.AUTHORITY), null, null, null, null)) {
+                        check(rows.moveToFirst() && string(rows, Root.COLUMN_ROOT_ID).equals(hostID), "The OS must expose the adopted logical drive");
+                    }
+                } finally {
+                    try (OutputStream output = new FileOutputStream(manifest)) { output.write(originalManifest); }
+                    DriveStore.get(getTargetContext()).requireReady();
+                }
                 Uri folder = DocumentsContract.createDocument(resolver, rootUri, Document.MIME_TYPE_DIR, "테스트 folder");
                 Uri file = DocumentsContract.createDocument(resolver, folder, "text/plain", "hello.txt");
                 String fileId = DocumentsContract.getDocumentId(file);

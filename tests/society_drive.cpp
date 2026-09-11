@@ -6,6 +6,7 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QTemporaryDir>
+#include <QtCore/QUuid>
 #include <QtCore/qscopeguard.h>
 #include <QtTest/QTest>
 
@@ -70,6 +71,36 @@ private slots:
         data["displayName"] = "Unrelated drive";
         QVERIFY(manifest.open(QIODevice::WriteOnly)); manifest.write(QJsonDocument(data).toJson()); manifest.close();
         QVERIFY(!SocietyDrive::open(workspace->path()));
+    }
+
+    void adoptsHostIdentityWithoutMovingSectionsOrLosingData()
+    {
+        const auto original = SocietyDrive::create(workspace->path()); QVERIFY(original);
+        const auto host = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        QFile file(workspace->filePath("Files/keep.txt")); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("keep"); file.close();
+        QString error;
+        QVERIFY(!SocietyDrive::adoptReplicaIdentity(workspace->path(), original->identifier(), "invalid", &error));
+        QVERIFY(!error.isEmpty());
+        QVERIFY(!SocietyDrive::adoptReplicaIdentity(workspace->path(), "wrong", host, &error));
+        QVERIFY(original->isValid());
+        const auto mirror = SocietyDrive::adoptReplicaIdentity(workspace->path(), original->identifier(), host, &error);
+        QVERIFY2(mirror, qPrintable(error)); QCOMPARE(mirror->identifier(), host);
+        QCOMPARE(mirror->rootPath(), original->rootPath());
+        QVERIFY(!original->isValid()); QVERIFY(mirror->isValid());
+        QCOMPARE(SocietyDrive::create(workspace->path())->identifier(), host);
+        QVERIFY(SocietyDrive::adoptReplicaIdentity(workspace->path(), original->identifier(), host));
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), QByteArray("keep"));
+        QCOMPARE(mirror->sections(), allStoreSections());
+        QVERIFY(!SocietyDrive::completeReplica(workspace->path(), original->identifier(), &error));
+        QVERIFY(SocietyDrive::completeReplica(workspace->path(), host, &error));
+        QFile manifest(workspace->filePath(".society-drive.json")); QVERIFY(manifest.open(QIODevice::ReadOnly));
+        const auto data = QJsonDocument::fromJson(manifest.readAll()).object();
+        QCOMPARE(data.value("localIdentifier").toString(), original->identifier());
+        QVERIFY(data.value("replicaReady").toBool());
+        const auto repeatedAdoption = SocietyDrive::adoptReplicaIdentity(workspace->path(), host, host);
+        QVERIFY(repeatedAdoption); QVERIFY(!repeatedAdoption->isReady());
+        QVERIFY(SocietyDrive::completeReplica(workspace->path(), host));
     }
 
     void keepsExistingContentAndRejectsDirectoryConflictsBeforeCreation()

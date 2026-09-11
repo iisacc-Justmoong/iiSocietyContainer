@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(iiSocietyContainer VERSION 0.9.1 LANGUAGES CXX)
+project(iiSocietyContainer VERSION 0.10.0 LANGUAGES CXX)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_language(OBJCXX)

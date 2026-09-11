@@ -20,6 +20,8 @@ public:
     static QString settingsPath();
     static bool setDefaultContainer(const QString &path, QString *error = nullptr);
     static std::optional<SharedStorage> open(const QString &path = {}, QString *error = nullptr);
+    /// Storage-owner bootstrap only. Consumer operations still require isReady().
+    static std::optional<SharedStorage> open(const QString &path, QString *error, bool allowIncompleteReplica);
 
     const SocietyDrive &drive() const;
     QList<StoredModel> models(QString *error = nullptr) const;

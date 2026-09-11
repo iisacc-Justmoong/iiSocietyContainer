@@ -120,6 +120,10 @@ bool SharedStorage::setDefaultContainer(const QString &path, QString *error)
 }
 std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *error)
 {
+    return open(path, error, false);
+}
+std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *error, bool allowIncompleteReplica)
+{
     if (error) error->clear();
     QString selected = path;
     QString expectedId;
@@ -158,7 +162,16 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
     if (!drive)
         return {};
     if (!expectedId.isEmpty() && drive->identifier() != expectedId) {
-        fail(error, QStringLiteral("The configured Society container identity changed. Reopen it in Society."));
+        QFile manifest(QDir(drive->rootPath()).filePath(".society-drive.json"));
+        QJsonObject identity;
+        if (manifest.open(QIODevice::ReadOnly) && manifest.size() <= 65536) identity = QJsonDocument::fromJson(manifest.readAll()).object();
+        if (identity.value("localIdentifier") != expectedId && identity.value("previousIdentifier") != expectedId) {
+            fail(error, QStringLiteral("The configured Society container identity changed. Reopen it in Society."));
+            return {};
+        }
+    }
+    if (!allowIncompleteReplica && !drive->isReady()) {
+        fail(error, QStringLiteral("The host drive's initial mirror is not ready."));
         return {};
     }
     return SharedStorage(*drive);
@@ -167,6 +180,7 @@ SharedStorage::SharedStorage(SocietyDrive drive) : m_drive(std::move(drive)) {}
 const SocietyDrive &SharedStorage::drive() const { return m_drive; }
 QList<StoredModel> SharedStorage::models(QString *error) const
 {
+    if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society mirror is not ready.")); return {}; }
     if (error) error->clear();
     QList<StoredModel> result;
     const auto base = m_drive.sectionPath(StoreSection::Models);
@@ -192,6 +206,7 @@ QList<StoredModel> SharedStorage::models(QString *error) const
 }
 QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error) const
 {
+    if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society mirror is not ready.")); return {}; }
     if (error) error->clear();
     const auto id = reference.value("path").toString();
     const auto base = m_drive.sectionPath(StoreSection::Models);
@@ -217,6 +232,7 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
 }
 QString SharedStorage::filePath(StoreSection section, const QString &relativePath, QString *error) const
 {
+    if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society mirror is not ready.")); return {}; }
     if (error) error->clear();
     auto current = m_drive.sectionPath(section);
     if (current.isEmpty() || (!relativePath.isEmpty() && !relative(relativePath, true))) {
@@ -246,6 +262,7 @@ QString SharedStorage::filePath(StoreSection section, const QString &relativePat
 }
 QString SharedStorage::ensureDirectory(StoreSection section, const QString &relativePath, QString *error) const
 {
+    if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society mirror is not ready.")); return {}; }
     if (error) error->clear();
     auto current = m_drive.sectionPath(section);
     if (current.isEmpty() || !relative(relativePath, true)) {

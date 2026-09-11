@@ -25,7 +25,16 @@ public final class DriveStore {
 
     public static synchronized DriveStore get(Context context) throws IOException {
         if (instance == null) instance = new DriveStore(context.getApplicationContext());
-        instance.validate();
+        synchronized (instance) {
+            try {
+                if (!instance.manifest().getString("identifier").equals(instance.identity)) {
+                    // Construct and validate first. Existing operations retain
+                    // their old store and fail its identity check safely.
+                    instance = new DriveStore(context.getApplicationContext());
+                }
+            } catch (Exception error) { throw failure(error); }
+            instance.validate();
+        }
         return instance;
     }
 
@@ -99,13 +108,21 @@ public final class DriveStore {
             }
         } catch (Exception error) { throw failure(error); }
     }
+    public synchronized void requireReady() throws IOException {
+        validate();
+        try {
+            JSONObject data = manifest();
+            if (data.has("localIdentifier") && !data.optBoolean("replicaReady", false))
+                throw new IOException("The initial Society mirror is not ready");
+        } catch (Exception error) { throw failure(error); }
+    }
     public String rootPath() { return root.getAbsolutePath(); }
     public String identifier() { return identity; }
     public String rootId() { return identity + ":root"; }
     File files() { return new File(root, "Files"); }
 
     synchronized File internal(String key, String path, boolean missingLeaf) throws IOException {
-        validate();
+        requireReady();
         String area = null;
         try {
             for (int i = 0; i < catalog.length(); ++i)
@@ -173,7 +190,7 @@ public final class DriveStore {
         return path.substring(base.length() + 1);
     }
     synchronized File document(String id) throws IOException {
-        validate();
+        requireReady();
         if (rootId().equals(id)) return files();
         if (id == null || !id.startsWith(identity + ":")) throw new FileNotFoundException("Unknown Society document");
         try (Cursor rows = index.query("documents", new String[]{"path", "device", "inode"}, "id=? AND drive=?", new String[]{id, identity}, null, null, null)) {

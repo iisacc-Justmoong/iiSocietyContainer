@@ -14,6 +14,9 @@ struct DriveManifest: Codable {
     let identifier: String
     var displayName: String
     let sections: [DriveSection]
+    var localIdentifier: String? = nil
+    var replicaReady: Bool? = nil
+    var providerIdentifier: String { localIdentifier ?? identifier }
 }
 
 struct DriveRecord: Codable, Equatable {
@@ -90,6 +93,11 @@ final class LocalDriveStore {
         }
         // Normalize presentation without rewriting an existing source manifest.
         loadedManifest.displayName = "Society"
+        if let local = loadedManifest.localIdentifier {
+            guard UUID(uuidString: local) != nil, loadedManifest.replicaReady == true else {
+                throw DriveStoreError.invalid("The initial Society mirror is not ready.")
+            }
+        }
         manifest = loadedManifest
         for section in catalog {
             try Self.validateName(section.path)
@@ -106,12 +114,13 @@ final class LocalDriveStore {
                 throw DriveStoreError.invalid("The drive index must not be a symbolic link.")
             }
             index = try JSONDecoder().decode(DriveIndex.self, from: Data(contentsOf: indexURL))
-            guard index.schemaVersion == 1, index.driveIdentifier == manifest.identifier else {
+            guard index.schemaVersion == 1, index.driveIdentifier == manifest.identifier || manifest.localIdentifier != nil else {
                 throw DriveStoreError.invalid("Invalid or unsupported drive index.")
             }
         } else {
             index = DriveIndex(schemaVersion: 1, driveIdentifier: manifest.identifier, snapshots: [])
         }
+        index = DriveIndex(schemaVersion: 1, driveIdentifier: manifest.identifier, snapshots: index.snapshots)
     }
 
     // The extension and the containing app can hold separate store instances.
@@ -120,6 +129,14 @@ final class LocalDriveStore {
         lock.lock(); defer { lock.unlock() }
         if accessDepth > 0 { return try work() }
         try Self.validateSourceLocation(root)
+        let currentURL = root.appendingPathComponent(".society-drive.json")
+        guard try currentURL.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+            throw DriveStoreError.invalid("The manifest must not be redirected.")
+        }
+        let current = try JSONDecoder().decode(DriveManifest.self, from: Data(contentsOf: currentURL))
+        guard current.identifier == manifest.identifier, current.replicaReady != false else {
+            throw DriveStoreError.invalid("The Society mirror changed; reopen this drive.")
+        }
         var coordinationError: NSError?
         var result: Result<T, Error>?
         NSFileCoordinator().coordinate(writingItemAt: indexURL, options: .forMerging, error: &coordinationError) { _ in
@@ -131,10 +148,10 @@ final class LocalDriveStore {
                         throw DriveStoreError.invalid("The drive index must not be a symbolic link.")
                     }
                     let latest = try JSONDecoder().decode(DriveIndex.self, from: Data(contentsOf: indexURL))
-                    guard latest.schemaVersion == 1, latest.driveIdentifier == manifest.identifier else {
+                    guard latest.schemaVersion == 1, latest.driveIdentifier == manifest.identifier || manifest.localIdentifier != nil else {
                         throw DriveStoreError.invalid("Invalid or unsupported drive index.")
                     }
-                    index = latest
+                    index = DriveIndex(schemaVersion: 1, driveIdentifier: manifest.identifier, snapshots: latest.snapshots)
                 }
                 return try work()
             }

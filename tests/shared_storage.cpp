@@ -7,6 +7,7 @@
 #include <QSaveFile>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QUuid>
 
 using namespace iiSocietyContainer;
 
@@ -23,6 +24,32 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void defaultSelectionFollowsHostAdoptionAndConsumersWaitForReadiness()
+    {
+        QTemporaryDir fixture(QDir::current().filePath("shared-mirror-XXXXXX"));
+        const auto original = SocietyDrive::create(fixture.path()); QVERIFY(original);
+        qputenv("SOCIETY_STORAGE_SETTINGS_PATH", fixture.filePath("settings.json").toUtf8());
+        qunsetenv("SOCIETY_CONTAINER_PATH");
+        QVERIFY(SharedStorage::setDefaultContainer(fixture.path()));
+        const auto consumer = SharedStorage::open(); QVERIFY(consumer);
+        const auto host = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const auto mirror = SocietyDrive::adoptReplicaIdentity(fixture.path(), original->identifier(), host); QVERIFY(mirror);
+        QVERIFY(mirror->isValid()); QVERIFY(!mirror->isReady());
+        QVERIFY(!SharedStorage::open());
+        const auto owner = SharedStorage::open({}, nullptr, true); QVERIFY(owner);
+        QCOMPARE(owner->drive().identifier(), host);
+        QVERIFY(owner->filePath(StoreSection::Files, "pending").isEmpty());
+        QVERIFY(owner->ensureDirectory(StoreSection::Files, "pending").isEmpty());
+        QVERIFY(consumer->filePath(StoreSection::Files, "stale").isEmpty());
+        QVERIFY(SocietyDrive::completeReplica(fixture.path(), host));
+        const auto reopened = SharedStorage::open(); QVERIFY(reopened); QCOMPARE(reopened->drive().identifier(), host);
+        QVERIFY(SharedStorage::setDefaultContainer(fixture.path()));
+        const auto replacement = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        QVERIFY(SocietyDrive::adoptReplicaIdentity(fixture.path(), host, replacement));
+        QVERIFY(SharedStorage::open({}, nullptr, true));
+        QVERIFY(SocietyDrive::completeReplica(fixture.path(), replacement));
+        QCOMPARE(SharedStorage::open()->drive().identifier(), replacement);
+    }
     void rejectsMisplacedContainersWithoutReplacingSharedSettings()
     {
         QTemporaryDir fixture(QDir::current().filePath("shared-nested-XXXXXX"));

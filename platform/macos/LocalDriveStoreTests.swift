@@ -126,6 +126,26 @@ enum LocalDriveStoreTests {
         try check(store.item(file.id).path == "Published/external.txt", "External moves must preserve identity")
         try store.remove(file.id, baseContentVersion: nil, baseMetadataVersion: nil)
         try check(store.snapshot().records[file.id] == nil, "Deletion must reach enumeration")
+        // One native domain survives a logical host adoption and retains old
+        // anchors so the OS can reconcile its previously cached file listing.
+        let beforeMirror = try store.snapshot()
+        var mirrorManifest = try JSONSerialization.jsonObject(with: originalManifest) as! [String: Any]
+        let hostIdentifier = UUID().uuidString.lowercased()
+        mirrorManifest["identifier"] = hostIdentifier
+        mirrorManifest["localIdentifier"] = store.manifest.identifier
+        mirrorManifest["replicaReady"] = false
+        try JSONSerialization.data(withJSONObject: mirrorManifest).write(to: manifestURL, options: .atomic)
+        try rejects("An old source instance must stop when logical identity changes") { _ = try store.snapshot() }
+        try rejects("An incomplete mirror must not be exposed by a native adapter") { _ = try LocalDriveStore(root: root, catalog: catalog) }
+        mirrorManifest["replicaReady"] = true
+        try JSONSerialization.data(withJSONObject: mirrorManifest).write(to: manifestURL, options: .atomic)
+        let mirrorStore = try LocalDriveStore(root: root, catalog: catalog)
+        try check(mirrorStore.manifest.identifier == hostIdentifier, "The logical drive must match its host")
+        try check(mirrorStore.manifest.providerIdentifier == store.manifest.identifier, "The native domain must stay stable")
+        try check(mirrorStore.snapshot(at: beforeMirror.anchor) != nil, "Native history must survive identity adoption")
+        _ = try mirrorStore.snapshot()
+        let mirrorAgain = try LocalDriveStore(root: root, catalog: catalog)
+        try check(mirrorAgain.manifest.identifier == hostIdentifier, "The adopted native drive must survive reopening")
         try manager.removeItem(at: root.appendingPathComponent("Files"))
         try manager.createSymbolicLink(at: root.appendingPathComponent("Files"), withDestinationURL: base)
         try rejects("Redirected section accepted after initialization") { _ = try store.snapshot() }

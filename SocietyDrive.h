@@ -20,11 +20,23 @@ public:
     [[nodiscard]] static std::optional<SocietyDrive> open(
         const QString& directoryPath, QString* error = nullptr);
 
+    /// After authenticated host selection, adopt its logical drive identity.
+    /// The caller owns migration of contents; the eight section paths stay local.
+    /// expectedIdentifier prevents overwriting a concurrently replaced drive.
+    [[nodiscard]] static std::optional<SocietyDrive> adoptReplicaIdentity(
+        const QString& directoryPath, const QString& expectedIdentifier,
+        const QString& hostIdentifier, QString* error = nullptr);
+    /// Publish a fully downloaded mirror to local native adapters.
+    [[nodiscard]] static bool completeReplica(const QString& directoryPath,
+        const QString& expectedIdentifier, QString* error = nullptr);
+
     [[nodiscard]] QString identifier() const;
     /// Public drive label is Society, including when opening a legacy manifest.
     [[nodiscard]] QString displayName() const;
     [[nodiscard]] QString rootPath() const;
     [[nodiscard]] bool isValid() const;
+    /// False while the first host snapshot is being applied, or after replacement.
+    [[nodiscard]] bool isReady() const;
     [[nodiscard]] QList<StoreSection> sections() const;
     [[nodiscard]] QString sectionPath(StoreSection section) const;
     [[nodiscard]] std::optional<StoreSection> sectionForPath(const QString& path) const;

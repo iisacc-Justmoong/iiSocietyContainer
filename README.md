@@ -6,7 +6,7 @@ macOS에서 기존 원본으로 `register`를 다시 호출하면 동일한 File
 
 `iiSocietyContainer.drive`와 `native_store`는 새 이름, 이전 이름의 호환성, UUID 및 기존 매니페스트 보존을 검증한다. iOS 패키지 테스트와 Android 제공자 테스트는 시스템에 표시되는 이름을 검사한다.
 
-C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.9.1 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 8개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 8개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
+C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.10.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 8개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 8개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
 
 ## 공개 API
 
@@ -223,3 +223,22 @@ Qt를 포함한 외부 라이브러리와 별도 고지가 있는 서드파티 �
 ## iOS / iPadOS 통합
 
 iOS 16 이상에서는 Society 앱과 내장 File Provider 확장이 같은 App Group의 원본을 사용한다. 앱에서 8개 영역을 탐색하고 파일 앱에서는 Files 내용만 직접 노출한다. 공통 Swift 저장소와 공개 경계는 `platform/apple/`에 있으며, iOS 도메인 등록·번들·권한·설치 구성은 [iOS 문서](platform/ios/README.md)에 정의한다. iOS 기기 및 시뮬레이터별 빌드 preset은 Society 앱에서 제공한다.
+
+### Shared logical drive identity (0.10)
+
+`SocietyDrive::adoptReplicaIdentity(root, expectedId, hostId)` atomically adopts
+an authenticated host's UUID under the drive lock. The existing eight section
+paths remain unchanged; stale drive objects become invalid and must be reopened.
+iiSocietySync owns host selection, private recovery of a former independent
+container, and initial mirroring before uploads. A device's replica journal and
+credentials remain local. This API alone does not copy or merge files.
+
+`completeReplica(root, hostId)` marks the downloaded mirror ready. `isValid()`
+checks structure and identity; `isReady()` additionally checks publication state.
+The manifest retains `localIdentifier` for a stable native registration and
+`previousIdentifier` for recovering the selected drive across another host-drive
+change. Apple retains provider history and reopens the adopted identity; Android
+reopens its cached store. Consumer `SharedStorage::open()` and file/model access
+reject incomplete mirrors. The storage owner can resolve their location through
+`open(path, error, true)` to resume initialization, while consumer operations on
+that handle remain gated. No credentials or account models enter this manifest.

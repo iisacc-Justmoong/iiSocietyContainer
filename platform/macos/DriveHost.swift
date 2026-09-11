@@ -43,7 +43,7 @@ enum DriveHost {
                 // App-scoped bookmarks cannot be resolved by a different process identity.
                 // Transfer an implicit grant; the extension persists its own scoped bookmark.
                 let bookmark = try root.bookmarkData(options: [.minimalBookmark], includingResourceValuesForKeys: nil, relativeTo: nil)
-                let domain = NSFileProviderDomain(identifier: .init(rawValue: selectedID), displayName: store.manifest.displayName)
+                let domain = NSFileProviderDomain(identifier: .init(rawValue: store.manifest.providerIdentifier), displayName: store.manifest.displayName)
                 domain.userInfo = [
                     "societyDriveIdentifier": selectedID, "sourceBookmark": bookmark, "sourcePath": root.path
                 ]
@@ -60,7 +60,17 @@ enum DriveHost {
                                                      "sourcePath": $0.userInfo?["sourcePath"] as? String ?? ""] }], nil)
                     return
                 }
-                let existing = domains.first { $0.userInfo?["societyDriveIdentifier"] as? String == driveID }
+                let existing = domains.first {
+                    if $0.userInfo?["societyDriveIdentifier"] as? String == driveID { return true }
+                    if let registration = registration, $0.identifier == registration.identifier { return true }
+                    // add(domain) may retain the system's original userInfo.
+                    // The stable registration can still resolve the current
+                    // logical identity of the same selected source.
+                    guard let path = $0.userInfo?["sourcePath"] as? String,
+                          let data = try? Data(contentsOf: URL(fileURLWithPath: path).appendingPathComponent(".society-drive.json")),
+                          data.count <= 65536, let manifest = try? JSONDecoder().decode(DriveManifest.self, from: data) else { return false }
+                    return manifest.identifier == driveID && manifest.providerIdentifier == $0.identifier.rawValue
+                }
                 let report: (NSFileProviderDomain) -> Void = { domain in
                     guard let manager = NSFileProviderManager(for: domain) else { finish(nil, NSFileProviderError(.providerNotFound)); return }
                     manager.getUserVisibleURL(for: .rootContainer) { url, error in
@@ -77,7 +87,7 @@ enum DriveHost {
                         NSFileProviderManager.getDomainsWithCompletionHandler { registered, error in
                             if let error = error { finish(nil, error); return }
                             guard let current = registered.first(where: {
-                                $0.userInfo?["societyDriveIdentifier"] as? String == driveID
+                                $0.identifier == domain.identifier
                             }) else { finish(nil, NSFileProviderError(.providerNotFound)); return }
                             report(current)
                         }

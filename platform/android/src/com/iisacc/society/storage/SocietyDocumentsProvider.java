@@ -21,7 +21,7 @@ public final class SocietyDocumentsProvider extends DocumentsProvider {
         Root.COLUMN_FLAGS, Root.COLUMN_MIME_TYPES, Root.COLUMN_AVAILABLE_BYTES};
     private final ArrayList<FileObserver> observers = new ArrayList<>();
     private DriveStore store() throws FileNotFoundException {
-        try { return DriveStore.get(getContext()); } catch (IOException error) { throw missing(error); }
+        try { DriveStore store = DriveStore.get(getContext()); store.requireReady(); return store; } catch (IOException error) { throw missing(error); }
     }
     private static FileNotFoundException missing(Exception error) {
         return new FileNotFoundException(error.getMessage());

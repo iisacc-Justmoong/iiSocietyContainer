@@ -172,6 +172,7 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
         || data.value("type") != QJsonValue("SocietyDrive")
         || data.value("schemaVersion") != QJsonValue(1)
         || QUuid(identifier).isNull()
+        || (data.contains("localIdentifier") && (QUuid(data.value("localIdentifier").toString()).isNull() || !data.value("replicaReady").isBool()))
         || (data.value("displayName") != QJsonValue("Society")
             && data.value("displayName") != QJsonValue("Society Container"))
         || data.value("sections") != QJsonValue(sectionDefinitions())) {
@@ -188,6 +189,76 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
     return SocietyDrive(root.path(), identifier);
 }
 
+std::optional<SocietyDrive> SocietyDrive::adoptReplicaIdentity(
+    const QString& directoryPath, const QString& expectedIdentifier,
+    const QString& hostIdentifier, QString* error)
+{
+    setError(error, {});
+    if (QUuid(hostIdentifier).isNull()
+        || QUuid(hostIdentifier).toString(QUuid::WithoutBraces) != hostIdentifier) {
+        setError(error, QStringLiteral("The host drive identifier is invalid."));
+        return std::nullopt;
+    }
+    const auto current = open(directoryPath, error);
+    if (!current) return std::nullopt;
+    const QDir root(current->rootPath());
+    QLockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
+    if (!lock.tryLock()) {
+        setError(error, QStringLiteral("The drive is being changed by another process."));
+        return std::nullopt;
+    }
+    const auto checked = open(root.path(), error);
+    if (!checked) return std::nullopt;
+    if (checked->identifier() != expectedIdentifier && checked->identifier() != hostIdentifier) {
+        setError(error, QStringLiteral("The drive identity changed before adoption."));
+        return std::nullopt;
+    }
+    QFile input(root.filePath(QLatin1String(manifestName)));
+    if (!input.open(QIODevice::ReadOnly)) {
+        setError(error, input.errorString()); return std::nullopt;
+    }
+    auto manifest = QJsonDocument::fromJson(input.readAll()).object();
+    input.close();
+    manifest.insert(QStringLiteral("identifier"), hostIdentifier);
+    // Native provider domains keep one stable device-local registration while
+    // the logical identifier follows the host on every client.
+    if (!manifest.contains("localIdentifier")) manifest.insert("localIdentifier", checked->identifier());
+    if (checked->identifier() != hostIdentifier || !manifest.contains("previousIdentifier"))
+        manifest.insert("previousIdentifier", checked->identifier());
+    manifest.insert("replicaReady", false);
+    const auto bytes = QJsonDocument(manifest).toJson();
+    QSaveFile output(input.fileName());
+    if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
+        setError(error, output.errorString()); return std::nullopt;
+    }
+    return open(root.path(), error);
+}
+
+bool SocietyDrive::completeReplica(const QString& directoryPath, const QString& expectedIdentifier, QString* error)
+{
+    const auto drive = open(directoryPath, error);
+    if (!drive) return false;
+    const QDir root(drive->rootPath());
+    QLockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
+    if (!lock.tryLock()) { setError(error, QStringLiteral("The drive is being changed by another process.")); return false; }
+    const auto checked = open(root.path(), error);
+    if (!checked || checked->identifier() != expectedIdentifier) {
+        setError(error, QStringLiteral("The replica identity changed.")); return false;
+    }
+    QFile input(root.filePath(QLatin1String(manifestName)));
+    if (!input.open(QIODevice::ReadOnly)) { setError(error, input.errorString()); return false; }
+    auto manifest = QJsonDocument::fromJson(input.readAll()).object(); input.close();
+    if (QUuid(manifest.value("localIdentifier").toString()).isNull()) {
+        setError(error, QStringLiteral("The drive is not a replica.")); return false;
+    }
+    manifest.insert("replicaReady", true);
+    const auto bytes = QJsonDocument(manifest).toJson(); QSaveFile output(input.fileName());
+    if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
+        setError(error, output.errorString()); return false;
+    }
+    setError(error, {}); return true;
+}
+
 QString SocietyDrive::identifier() const { return m_identifier; }
 QString SocietyDrive::displayName() const { return QStringLiteral("Society"); }
 QString SocietyDrive::rootPath() const { return m_rootPath; }
@@ -196,6 +267,15 @@ bool SocietyDrive::isValid() const
 {
     const auto current = open(m_rootPath);
     return current && current->rootPath() == m_rootPath && current->identifier() == m_identifier;
+}
+
+bool SocietyDrive::isReady() const
+{
+    if (!isValid()) return false;
+    QFile file(QDir(m_rootPath).filePath(QLatin1String(manifestName)));
+    if (!file.open(QIODevice::ReadOnly) || file.size() > 65536) return false;
+    const auto manifest = QJsonDocument::fromJson(file.readAll()).object();
+    return manifest.value("identifier") == m_identifier && manifest.value("replicaReady") != QJsonValue(false);
 }
 
 QList<StoreSection> SocietyDrive::sections() const

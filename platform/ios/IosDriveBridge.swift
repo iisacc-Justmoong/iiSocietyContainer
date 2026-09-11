@@ -37,7 +37,7 @@ public func societyIosDriveRequest(_ action: UnsafePointer<CChar>, _ root: Unsaf
             guard store.manifest.identifier == identifier else {
                 throw DriveStoreError.invalid("The source does not match this drive.")
             }
-            let domain = NSFileProviderDomain(identifier: .init(rawValue: identifier), displayName: store.manifest.displayName)
+            let domain = NSFileProviderDomain(identifier: .init(rawValue: store.manifest.providerIdentifier), displayName: store.manifest.displayName)
             if #available(iOS 18.0, *) {
                 domain.supportsSyncingTrash = false
             }

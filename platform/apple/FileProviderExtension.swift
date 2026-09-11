@@ -64,11 +64,11 @@ private func providerError(_ error: Error) -> Error {
 }
 
 final class DriveEnumerator: NSObject, NSFileProviderEnumerator {
-    private let store: FilesDriveStore
+    private let source: () throws -> FilesDriveStore
     private let identifier: NSFileProviderItemIdentifier
     private var current: DriveSnapshot?
-    init(store: FilesDriveStore, identifier: NSFileProviderItemIdentifier) {
-        self.store = store; self.identifier = identifier
+    init(source: @escaping () throws -> FilesDriveStore, identifier: NSFileProviderItemIdentifier) {
+        self.source = source; self.identifier = identifier
     }
     func invalidate() { current = nil }
     private func items(in snapshot: DriveSnapshot) -> [DriveRecord] {
@@ -79,7 +79,7 @@ final class DriveEnumerator: NSObject, NSFileProviderEnumerator {
     }
     func enumerateItems(for observer: NSFileProviderEnumerationObserver, startingAt page: NSFileProviderPage) {
         do {
-            let snapshot = try store.snapshot()
+            let snapshot = try source().snapshot()
             current = snapshot
             observer.didEnumerate(items(in: snapshot).map(DriveItem.init))
             observer.finishEnumerating(upTo: nil)
@@ -87,6 +87,7 @@ final class DriveEnumerator: NSObject, NSFileProviderEnumerator {
     }
     func enumerateChanges(for observer: NSFileProviderChangeObserver, from anchor: NSFileProviderSyncAnchor) {
         do {
+            let store = try source()
             guard let anchorString = String(data: anchor.rawValue, encoding: .utf8), let previous = store.previousSnapshot(forChangesFrom: anchorString) else {
                 throw NSFileProviderError(.syncAnchorExpired)
             }
@@ -103,7 +104,7 @@ final class DriveEnumerator: NSObject, NSFileProviderEnumerator {
         } catch { observer.finishEnumeratingWithError(providerError(error)) }
     }
     func currentSyncAnchor(completionHandler: @escaping (NSFileProviderSyncAnchor?) -> Void) {
-        let snapshot = current ?? (try? store.snapshot())
+        let snapshot = current ?? (try? source().snapshot())
         completionHandler(snapshot.map { NSFileProviderSyncAnchor(Data($0.anchor.utf8)) })
     }
 }
@@ -160,8 +161,10 @@ private final class SourceWatcher: NSObject, NSFilePresenter {
 
 @objc(SocietyContainerFileProvider)
 final class SocietyContainerFileProvider: NSObject, NSFileProviderReplicatedExtension {
-    private var store: FilesDriveStore?
     private var initializationError: Error?
+    private var sourceRoot: URL?
+    private var sourceCatalog: [DriveSection] = []
+    private var providerIdentifier = ""
     private var scopedURL: URL?
     private let manager: NSFileProviderManager?
     private let queue = DispatchQueue(label: "com.iisacc.society.container.files")
@@ -199,13 +202,14 @@ final class SocietyContainerFileProvider: NSObject, NSFileProviderReplicatedExte
             UserDefaults.standard.set(persistent, forKey: key)
 #endif
             let catalog = try JSONDecoder().decode([DriveSection].self, from: Data(contentsOf: catalogURL))
-            let source = try FilesDriveStore(root: root, catalog: catalog)
-            guard source.manifest.identifier == driveID else {
-                throw DriveStoreError.invalid("The source does not match this drive.")
-            }
-            store = source
-            watcher = SourceWatcher(paths: [source.root.path]) { [weak self] in
+            sourceRoot = root; sourceCatalog = catalog; providerIdentifier = domain.identifier.rawValue
+            watcher = SourceWatcher(paths: [root.appendingPathComponent("Files").path]) { [weak self] in
                 self?.signalChanges()
+            }
+            let source = try FilesDriveStore(root: root, catalog: catalog)
+            guard source.manifest.providerIdentifier == domain.identifier.rawValue
+                    || source.manifest.identifier == driveID else {
+                throw DriveStoreError.invalid("The source does not match this drive.")
             }
         } catch {
             initializationError = error
@@ -220,8 +224,14 @@ final class SocietyContainerFileProvider: NSObject, NSFileProviderReplicatedExte
         scopedURL = nil
     }
     private func source() throws -> FilesDriveStore {
-        guard let store = store else { throw initializationError ?? NSFileProviderError(.serverUnreachable) }
-        return store
+        guard let root = sourceRoot else { throw initializationError ?? NSFileProviderError(.serverUnreachable) }
+        // Native domains are device-local registrations. Reopen the current
+        // logical mirror instead of retaining its former manifest forever.
+        let current = try FilesDriveStore(root: root, catalog: sourceCatalog)
+        guard current.manifest.providerIdentifier == providerIdentifier else {
+            throw DriveStoreError.invalid("The native source registration changed.")
+        }
+        return current
     }
     private func signalChanges() { manager?.signalEnumerator(for: .workingSet) { _ in } }
 
@@ -309,7 +319,10 @@ final class SocietyContainerFileProvider: NSObject, NSFileProviderReplicatedExte
             if identifier != .workingSet && identifier != .trashContainer {
                 _ = try store.item(storeID(identifier))
             }
-            return DriveEnumerator(store: store, identifier: identifier)
+            return DriveEnumerator(source: { [weak self] in
+                guard let owner = self else { throw NSFileProviderError(.serverUnreachable) }
+                return try owner.source()
+            }, identifier: identifier)
         } catch { throw providerError(error) }
     }
 }

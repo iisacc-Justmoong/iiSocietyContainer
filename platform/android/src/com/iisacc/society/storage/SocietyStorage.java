@@ -20,6 +20,7 @@ public final class SocietyStorage {
                 throw new IllegalArgumentException("The Society container identity changed");
             if (!action.equals("default") && !action.equals("register") && !action.equals("refresh") && !action.equals("path"))
                 throw new IllegalArgumentException("Unknown Society drive action");
+            if (!action.equals("default")) store.requireReady();
             Uri root = DocumentsContract.buildRootUri(SocietyDocumentsProvider.AUTHORITY, store.identifier());
             if (action.equals("path")) {
                 Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(root, DocumentsContract.Root.MIME_TYPE_ITEM)

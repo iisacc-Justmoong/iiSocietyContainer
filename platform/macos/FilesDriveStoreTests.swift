@@ -71,9 +71,9 @@ enum FilesDriveStoreTests {
         try check(store.previousSnapshot(forChangesFrom: "unknown") == nil, "Unknown anchors must expire")
         let rootEnumeration = EnumerationResult()
         let firstPage = NSFileProviderPage(NSFileProviderPage.initialPageSortedByName as Data)
-        DriveEnumerator(store: store, identifier: .rootContainer).enumerateItems(for: rootEnumeration, startingAt: firstPage)
+        DriveEnumerator(source: { try FilesDriveStore(root: root, catalog: catalog) }, identifier: .rootContainer).enumerateItems(for: rootEnumeration, startingAt: firstPage)
         try check(rootEnumeration.finished && rootEnumeration.error == nil && Set(rootEnumeration.items.map { $0.filename }) == ["Example.txt", "Nested"], "Finder root enumeration must contain Files children directly")
-        let workingSet = DriveEnumerator(store: store, identifier: .workingSet)
+        let workingSet = DriveEnumerator(source: { try FilesDriveStore(root: root, catalog: catalog) }, identifier: .workingSet)
         let changes = ChangeResult()
         workingSet.enumerateChanges(for: changes, from: NSFileProviderSyncAnchor(Data(legacy.anchor.utf8)))
         try check(changes.error == nil && changes.anchor != nil && Set(changes.deleted.map { $0.rawValue }) == retired, "The provider must send all legacy private IDs as deletions")
@@ -141,6 +141,25 @@ enum FilesDriveStoreTests {
         try check(store.item(publicFile.id).path == "Restored.txt", "Publishing back to Files must retain identity")
         let reopened = try FilesDriveStore(root: root, catalog: catalog)
         try check(reopened.item(publicFile.id).path == "Restored.txt", "Public identity must survive provider restart")
+        let oldAnchor = try reopened.snapshot().anchor
+        let manifestURL = root.appendingPathComponent(".society-drive.json")
+        var manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as! [String: Any]
+        manifest["localIdentifier"] = store.manifest.identifier
+        manifest["identifier"] = UUID().uuidString.lowercased()
+        manifest["replicaReady"] = false
+        try JSONSerialization.data(withJSONObject: manifest).write(to: manifestURL, options: .atomic)
+        let pending = EnumerationResult()
+        workingSet.enumerateItems(for: pending, startingAt: firstPage)
+        try check(pending.error != nil && pending.items.isEmpty, "Existing enumerators must withhold incomplete mirrors")
+        try manager.removeItem(at: root.appendingPathComponent("Files/Restored.txt"))
+        try Data("host bytes".utf8).write(to: root.appendingPathComponent("Files/Host.txt"))
+        manifest["replicaReady"] = true
+        try JSONSerialization.data(withJSONObject: manifest).write(to: manifestURL, options: .atomic)
+        let adoptedChanges = ChangeResult()
+        workingSet.enumerateChanges(for: adoptedChanges, from: NSFileProviderSyncAnchor(Data(oldAnchor.utf8)))
+        try check(adoptedChanges.error == nil, "Existing enumerators must reopen an adopted mirror")
+        try check(adoptedChanges.deleted.contains { $0.rawValue == publicFile.id }, "The old independent file must leave the native replica")
+        try check(adoptedChanges.items.contains { $0.filename == "Host.txt" }, "Host files must enter the existing native domain")
         let appStore = try LocalDriveStore(root: root, catalog: catalog)
         try check(appStore.children("root").count == 8, "Society must retain all eight logical areas")
         for section in catalog where section.id != "files" {
