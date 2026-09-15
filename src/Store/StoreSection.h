@@ -20,10 +20,11 @@ enum class StoreSection {
     GenerationHistory,
     Models,
     Published,
-    ThinkingSpace
+    ThinkingSpace,
+    Photos
 };
 
-/// Returns exactly the eight supported sections in their declared display order.
+/// Returns the supported sections in their declared display order.
 [[nodiscard]] IISOCIETYCONTAINER_EXPORT QList<StoreSection> allStoreSections();
 
 /// Returns the section's display name, or an empty string for an unknown value.

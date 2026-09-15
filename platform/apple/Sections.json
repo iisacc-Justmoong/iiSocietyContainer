@@ -30,6 +30,11 @@
         "path": "Models"
     },
     {
+        "id": "photos",
+        "name": "Photos",
+        "path": "Photos"
+    },
+    {
         "id": "published",
         "name": "Published",
         "path": "Published"

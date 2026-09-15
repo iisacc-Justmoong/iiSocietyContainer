@@ -108,7 +108,7 @@ int openEntry(const char *path, fuse_file_info *file)
 }
 int createEntry(const char *path, mode_t mode, fuse_file_info *file)
 {
-    if (!strcmp(path, "/")) return -EACCES;
+    if (FilesView::isProtectedPath(QString::fromUtf8(path + 1))) return -EACCES;
     const int fd = FuseMount::self().open(path, file->flags | O_CREAT | O_NONBLOCK, mode & 0777);
     if (fd < 0) return fd;
     struct stat status{};
@@ -149,7 +149,7 @@ int listEntries(const char *path, void *buffer, fuse_fill_dir_t fill, off_t offs
 }
 int makeDirectory(const char *path, mode_t mode)
 {
-    if (!strcmp(path, "/")) return -EEXIST;
+    if (FilesView::isProtectedPath(QString::fromUtf8(path + 1))) return -EEXIST;
     QByteArray leaf; const int parent = FuseMount::self().parent(path, leaf);
     if (parent < 0) return parent;
     const int result = ::mkdirat(parent, leaf.constData(), mode & 0777) ? -errno : 0;
@@ -157,7 +157,7 @@ int makeDirectory(const char *path, mode_t mode)
 }
 int removeEntry(const char *path, int flags)
 {
-    if (!strcmp(path, "/")) return -EACCES;
+    if (FilesView::isProtectedPath(QString::fromUtf8(path + 1))) return -EACCES;
     QByteArray leaf; const int parent = FuseMount::self().parent(path, leaf);
     if (parent < 0) return parent;
     const int result = ::unlinkat(parent, leaf.constData(), flags) ? -errno : 0;
@@ -165,7 +165,8 @@ int removeEntry(const char *path, int flags)
 }
 int renameEntry(const char *from, const char *to, unsigned flags)
 {
-    if (!strcmp(from, "/") || !strcmp(to, "/")) return -EACCES;
+    if (FilesView::isProtectedPath(QString::fromUtf8(from + 1))
+        || FilesView::isProtectedPath(QString::fromUtf8(to + 1))) return -EACCES;
     if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE)) return -EINVAL;
     QByteArray oldLeaf, newLeaf;
     const int oldParent = FuseMount::self().parent(from, oldLeaf);

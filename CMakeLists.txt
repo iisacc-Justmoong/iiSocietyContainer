@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(iiSocietyContainer VERSION 0.10.0 LANGUAGES CXX)
+project(iiSocietyContainer VERSION 0.13.0 LANGUAGES CXX)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_language(OBJCXX)
@@ -31,7 +31,11 @@ add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyCo
         iiSocietyContainerExport.h
         SocietyDrive.h SocietyDrive.cpp
         FilesView.h FilesView.cpp
+        FileDirectory.h FileDirectory.cpp FilesLayout.h FilesLayout.cpp
+        PhotosLayout.h PhotosLayout.cpp
         SharedStorage.h SharedStorage.cpp
+        ModelType.h ModelType.cpp ModelClassifier.h ModelClassifier.cpp ModelStore.h ModelStore.cpp
+        ModelLayout.h ModelLayout.cpp
         src/Store/AssetLibrary/iiGE.cpp
         src/Store/AssetLibrary/iiGE.h
         src/Store/AssetLibrary/iiSC.cpp
@@ -215,6 +219,11 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(iiSocietyContainerSharedStorageTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
     set_target_properties(iiSocietyContainerSharedStorageTests PROPERTIES AUTOMOC ON)
     add_test(NAME iiSocietyContainer.shared_storage COMMAND iiSocietyContainerSharedStorageTests)
+    add_executable(iiSocietyContainerModelStoreTests tests/model_store.cpp)
+    target_link_libraries(iiSocietyContainerModelStoreTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
+    target_compile_definitions(iiSocietyContainerModelStoreTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
+    set_target_properties(iiSocietyContainerModelStoreTests PROPERTIES AUTOMOC ON)
+    add_test(NAME iiSocietyContainer.model_store COMMAND iiSocietyContainerModelStoreTests)
     add_executable(iiSocietyContainerFilesViewTests tests/files_view.cpp)
     target_link_libraries(iiSocietyContainerFilesViewTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
     target_compile_definitions(iiSocietyContainerFilesViewTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
@@ -230,10 +239,12 @@ install(TARGETS iiSocietyContainer EXPORT iiSocietyContainerTargets
 if(TARGET iiSocietyContainerDriveTool)
     install(TARGETS iiSocietyContainerDriveTool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-install(FILES iiSocietyContainer.h iiSocietyContainerExport.h SocietyDrive.h SharedStorage.h FilesView.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES iiSocietyContainer.h iiSocietyContainerExport.h SocietyDrive.h SharedStorage.h FilesView.h
+    FileDirectory.h ModelType.h ModelClassifier.h ModelStore.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
+install(FILES docs/Models.md docs/Files.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
 install(DIRECTORY platform/apple platform/ios platform/android DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform
     PATTERN "*Tests.swift" EXCLUDE PATTERN "._*" EXCLUDE PATTERN ".DS_Store" EXCLUDE)
 install(FILES platform/macos/README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform/macos)

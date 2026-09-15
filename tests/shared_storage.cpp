@@ -111,7 +111,8 @@ private slots:
             QVERIFY(!error.isEmpty());
             QVERIFY(storage->ensureDirectory(StoreSection::Models, path, &error).isEmpty());
         }
-        QVERIFY(QDir(fixture.filePath("Models")).isEmpty());
+        QCOMPARE(QDir(fixture.filePath("Models")).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 23);
+        QVERIFY(QDir(fixture.filePath("Models")).entryList(QDir::Files | QDir::Hidden).isEmpty());
         QVERIFY(storage->filePath(StoreSection::Models, "missing/child").isEmpty());
         QVERIFY(storage->filePath(static_cast<StoreSection>(-1), {}).isEmpty());
         write(fixture.filePath("Models/regular"), "file");
@@ -121,7 +122,7 @@ private slots:
         QVERIFY(QFile::link(fixture.filePath("not-present"), fixture.filePath("Models/dangling")));
         for (const auto &path : {"redirect", "redirect/escape", "dangling"})
             QVERIFY(storage->filePath(StoreSection::Models, path).isEmpty());
-        QVERIFY(QDir(fixture.filePath("Files")).isEmpty());
+        QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 3);
 #endif
     }
 
@@ -213,7 +214,7 @@ private slots:
         QVERIFY(client->ensureDirectory(StoreSection::Models, "../Files/escape").isEmpty());
         QVERIFY(QFile::link(fixture.filePath("Files"), fixture.filePath("Asset Library/redirect")));
         QVERIFY(client->ensureDirectory(StoreSection::AssetLibrary, "redirect/job").isEmpty());
-        QVERIFY(QDir(fixture.filePath("Files")).isEmpty());
+        QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 3);
     }
 };
 

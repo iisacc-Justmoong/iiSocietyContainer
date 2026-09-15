@@ -6,7 +6,7 @@
 
 namespace iiSocietyContainer {
 
-/// A persistent drive with eight independent, ordinary directory sections.
+/// A persistent drive with nine independent, ordinary directory sections.
 /// Native system adapters and application browsers share this same layout.
 class IISOCIETYCONTAINER_EXPORT SocietyDrive
 {
@@ -17,11 +17,13 @@ public:
     /// before initialization; open() enforces the same source-location boundary.
     [[nodiscard]] static std::optional<SocietyDrive> create(
         const QString& directoryPath, QString* error = nullptr);
+    /// Opening a ready drive creates any missing fixed Files directories.
+    /// Existing contents and the manifest are preserved; conflicting entries fail.
     [[nodiscard]] static std::optional<SocietyDrive> open(
         const QString& directoryPath, QString* error = nullptr);
 
     /// After authenticated host selection, adopt its logical drive identity.
-    /// The caller owns migration of contents; the eight section paths stay local.
+    /// The caller owns migration of contents; the section paths stay local.
     /// expectedIdentifier prevents overwriting a concurrently replaced drive.
     [[nodiscard]] static std::optional<SocietyDrive> adoptReplicaIdentity(
         const QString& directoryPath, const QString& expectedIdentifier,

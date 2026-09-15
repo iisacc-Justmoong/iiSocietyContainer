@@ -73,6 +73,31 @@ public final class ProviderInstrumentation extends Instrumentation {
                 for (String hidden : new String[]{"Models", "Asset Library", "Deleted", "Files", "Forked", "Generation History", "Published", "Thinking Space", ".society-drive.json"})
                     check(!visible.contains(hidden), "Private source layout leaked: " + hidden);
                 Uri rootUri = document(root);
+                Set<String> fixed = new HashSet<>(Arrays.asList("Documents", "Audios", "3D objects"));
+                check(visible.containsAll(fixed), "Four default directories must be visible");
+                Uri movable = DocumentsContract.createDocument(resolver, rootUri, Document.MIME_TYPE_DIR, "fixed-test-" + UUID.randomUUID());
+                try (Cursor rows = resolver.query(DocumentsContract.buildChildDocumentsUri(SocietyDocumentsProvider.AUTHORITY, root), null, null, null, null)) {
+                    while (rows.moveToNext()) {
+                        String name = string(rows, Document.COLUMN_DISPLAY_NAME);
+                        if (!fixed.contains(name)) continue;
+                        final Uri directory = document(string(rows, Document.COLUMN_DOCUMENT_ID));
+                        int flags = rows.getInt(rows.getColumnIndexOrThrow(Document.COLUMN_FLAGS));
+                        check((flags & Document.FLAG_DIR_SUPPORTS_CREATE) != 0, "Fixed directory must allow children");
+                        check((flags & (Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME | Document.FLAG_SUPPORTS_MOVE)) == 0, "Fixed directory exposed destructive capabilities");
+                        rejected(() -> DocumentsContract.deleteDocument(resolver, directory));
+                        rejected(() -> DocumentsContract.renameDocument(resolver, directory, "renamed-fixed"));
+                        rejected(() -> DocumentsContract.moveDocument(resolver, directory, rootUri, movable));
+                        for (String childName : new String[]{"photo.jpg", "video.mp4"}) {
+                            Uri child = DocumentsContract.createDocument(resolver, directory, "application/octet-stream", childName);
+                            write(resolver, child, "manual content", "w");
+                            check(read(resolver, child).equals("manual content"), "Fixed directory child content failed");
+                            DocumentsContract.deleteDocument(resolver, child);
+                        }
+                        Uri nested = DocumentsContract.createDocument(resolver, directory, Document.MIME_TYPE_DIR, "Photos");
+                        DocumentsContract.deleteDocument(resolver, nested);
+                    }
+                }
+                DocumentsContract.deleteDocument(resolver, movable);
                 try (Cursor rows = resolver.query(rootUri, null, null, null, null)) {
                     check(rows.moveToFirst() && string(rows, Document.COLUMN_DISPLAY_NAME).equals("Society"), "Root name must be Society");
                 }

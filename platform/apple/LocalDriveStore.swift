@@ -2,6 +2,41 @@ import Foundation
 import CryptoKit
 import Darwin
 
+enum FilesDirectory: String, CaseIterable {
+    case documents = "Documents", audios = "Audios", objects3D = "3D objects"
+
+    static func isFixed(_ name: String) -> Bool {
+        allCases.contains { $0.rawValue.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    static func ensure(in root: URL) throws {
+        let files = root.appendingPathComponent("Files", isDirectory: true)
+        let values = try files.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isDirectory == true, values.isSymbolicLink != true,
+              files.resolvingSymlinksInPath().path == files.path else {
+            throw DriveStoreError.invalid("The Files section is missing or redirected.")
+        }
+        let directories = allCases.map { files.appendingPathComponent($0.rawValue, isDirectory: true) }
+        func exists(_ url: URL) throws -> Bool {
+            var info = stat()
+            if url.withUnsafeFileSystemRepresentation({ lstat($0!, &info) }) != 0 {
+                if errno == ENOENT { return false }
+                throw CocoaError(.fileReadUnknown)
+            }
+            guard (info.st_mode & S_IFMT) == S_IFDIR, url.resolvingSymlinksInPath().path == url.path else {
+                throw DriveStoreError.invalid("A fixed Files directory conflicts with an existing entry: \(url.lastPathComponent)")
+            }
+            return true
+        }
+        // Validate every name before creating any folders; preserve collisions.
+        for url in directories { _ = try exists(url) }
+        for url in directories where try !exists(url) {
+            do { try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false) }
+            catch { if try !exists(url) { throw error } }
+        }
+    }
+}
+
 struct DriveSection: Codable, Equatable {
     let id: String
     let name: String
@@ -31,7 +66,11 @@ struct DriveRecord: Codable, Equatable {
     let created: Double
     let generation: String
 
-    var protected: Bool { id == "root" || id.hasPrefix("section:") }
+    var protected: Bool {
+        id == "root" || id.hasPrefix("section:")
+            || (directory && path.hasPrefix("Files/") && FilesDirectory.isFixed(String(path.dropFirst(6))))
+            || (directory && parent == "root" && FilesDirectory.isFixed(path))
+    }
     // Directories have no fetched file content. Their children carry their own
     // versions; child writes must not invalidate a queued directory operation.
     var contentVersion: Data { Data((directory ? "\(identity):directory" : "\(identity):\(size):\(generation)").utf8) }
@@ -58,14 +97,14 @@ enum DriveStoreError: Error, LocalizedError {
         case .invalid(let message): return message
         case .missing: return "The drive item no longer exists."
         case .conflict: return "An item with that name already exists."
-        case .protectedItem: return "The drive root and section roots are fixed."
+        case .protectedItem: return "The drive root, section roots, and default Files directories are fixed."
         case .staleVersion: return "The source item has changed since it was last read."
         }
     }
 }
 
 /// The local source is separate from File Provider's system-managed replica.
-/// All eight sections use identical filesystem operations.
+/// All sections use identical filesystem operations.
 final class LocalDriveStore {
     let root: URL
     let manifest: DriveManifest
@@ -88,7 +127,7 @@ final class LocalDriveStore {
         guard loadedManifest.type == "SocietyDrive", loadedManifest.schemaVersion == 1,
               let uuid = UUID(uuidString: loadedManifest.identifier), uuid != UUID(uuid: (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),
               ["Society", "Society Container"].contains(loadedManifest.displayName),
-              loadedManifest.sections == catalog, catalog.count == 8 else {
+              loadedManifest.sections == catalog, catalog.count == 9 else {
             throw DriveStoreError.invalid("Invalid or unsupported Society drive manifest.")
         }
         // Normalize presentation without rewriting an existing source manifest.
@@ -108,6 +147,7 @@ final class LocalDriveStore {
                 throw DriveStoreError.invalid("A drive section is missing or redirected: \(section.name)")
             }
         }
+        try FilesDirectory.ensure(in: self.root)
         indexURL = self.root.appendingPathComponent(".society-drive-provider.json")
         if manager.fileExists(atPath: indexURL.path) {
             guard try indexURL.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
@@ -153,6 +193,7 @@ final class LocalDriveStore {
                     }
                     index = DriveIndex(schemaVersion: 1, driveIdentifier: manifest.identifier, snapshots: latest.snapshots)
                 }
+                try FilesDirectory.ensure(in: root)
                 return try work()
             }
         }
@@ -337,6 +378,7 @@ final class LocalDriveStore {
             try Self.validateName(name)
             let parentItem = try item(parent)
             guard parentItem.directory, parent != "root" else { throw DriveStoreError.protectedItem }
+            if parentItem.path == "Files" && FilesDirectory.isFixed(name) { throw DriveStoreError.conflict }
             let target = try sourceURL(parentItem).appendingPathComponent(name)
             guard !existsIncludingSymlink(target) else { throw DriveStoreError.conflict }
             if directory {
@@ -370,6 +412,7 @@ final class LocalDriveStore {
             try Self.validateName(nextName)
             let nextParent = try item(parent ?? original.parent)
             guard nextParent.directory, nextParent.id != "root" else { throw DriveStoreError.protectedItem }
+            if nextParent.path == "Files" && FilesDirectory.isFixed(nextName) { throw DriveStoreError.protectedItem }
             let oldURL = try sourceURL(original)
             let nextURL = try sourceURL(nextParent).appendingPathComponent(nextName)
             guard nextURL.path != oldURL.path, !existsIncludingSymlink(nextURL) else {

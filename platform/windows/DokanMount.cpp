@@ -54,6 +54,7 @@ std::wstring native(const QString &path)
 }
 FileHandle *context(PDOKAN_FILE_INFO info) { return reinterpret_cast<FileHandle *>(info->Context); }
 bool isRoot(LPCWSTR name) { return DokanMount::relative(name).isEmpty(); }
+bool isProtected(LPCWSTR name) { return FilesView::isProtectedPath(DokanMount::relative(name)); }
 bool regularHandle(HANDLE handle, const QString &expected)
 {
     BY_HANDLE_FILE_INFORMATION data{};
@@ -70,7 +71,7 @@ NTSTATUS DOKAN_CALLBACK createEntry(LPCWSTR name, PDOKAN_IO_SECURITY_CONTEXT, AC
     if (source.isEmpty()) return STATUS_OBJECT_NAME_NOT_FOUND;
     ACCESS_MASK requested; DWORD flags, creation;
     DokanMapKernelToUserCreateFileFlags(access, attributes, options, disposition, &requested, &flags, &creation);
-    if (isRoot(name) && ((access & DELETE) || (options & FILE_DELETE_ON_CLOSE) || creation == CREATE_ALWAYS
+    if (isProtected(name) && ((access & DELETE) || (options & FILE_DELETE_ON_CLOSE) || creation == CREATE_ALWAYS
                          || creation == CREATE_NEW || creation == TRUNCATE_EXISTING)) return STATUS_ACCESS_DENIED;
     auto diskPath = native(source);
     DWORD existingAttributes = GetFileAttributesW(diskPath.c_str());
@@ -200,7 +201,7 @@ NTSTATUS DOKAN_CALLBACK listEntries(LPCWSTR name, PFillFindData fill, PDOKAN_FIL
 NTSTATUS markDeletion(LPCWSTR name, PDOKAN_FILE_INFO info, bool directory)
 {
     const auto source = DokanMount::self(info).source(name);
-    if (source.isEmpty() || isRoot(name)) return STATUS_ACCESS_DENIED;
+    if (source.isEmpty() || isProtected(name)) return STATUS_ACCESS_DENIED;
     if (QFileInfo(source).isDir() != directory) return directory ? STATUS_NOT_A_DIRECTORY : STATUS_FILE_IS_A_DIRECTORY;
     if (directory && !QDir(source).isEmpty(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot)) return STATUS_DIRECTORY_NOT_EMPTY;
     auto *file = context(info);
@@ -215,7 +216,7 @@ NTSTATUS DOKAN_CALLBACK moveEntry(LPCWSTR from, LPCWSTR to, BOOL replace, PDOKAN
 {
     const auto source = DokanMount::self(info).source(from);
     const auto target = DokanMount::self(info).source(to, true);
-    if (source.isEmpty() || target.isEmpty() || isRoot(from) || isRoot(to)) return STATUS_ACCESS_DENIED;
+    if (source.isEmpty() || target.isEmpty() || isProtected(from) || isProtected(to)) return STATUS_ACCESS_DENIED;
     auto *file = context(info);
     if (!file) return STATUS_INVALID_HANDLE;
     const auto destination = native(target);

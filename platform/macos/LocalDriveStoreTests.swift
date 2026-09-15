@@ -71,8 +71,9 @@ enum LocalDriveStoreTests {
         }
         try LocalDriveStore.validateSourceLocation(fakeHome.appendingPathComponent("Library/CloudStorage-backup"), home: fakeHome)
         let initial = try store.snapshot()
-        try check(initial.records.count == 9, "The root must contain exactly eight sections")
-        try check(store.children("root").count == 8, "Eight section directories must be enumerable")
+        try check(initial.records.count == 9 + 23 + 4, "The working set must include four fixed Files directories")
+        try check(store.children("root").count == 9, "Nine section directories must be enumerable")
+        try check(store.children("section:models").count == 23, "Models must contain all 23 category directories")
         for section in catalog {
             let folder = try store.create(parent: "section:" + section.id, name: "Example", directory: true, contents: nil)
             try check(folder.parent == "section:" + section.id, "Every section must support identical operations")
@@ -149,6 +150,6 @@ enum LocalDriveStoreTests {
         try manager.removeItem(at: root.appendingPathComponent("Files"))
         try manager.createSymbolicLink(at: root.appendingPathComponent("Files"), withDestinationURL: base)
         try rejects("Redirected section accepted after initialization") { _ = try store.snapshot() }
-        print("PASS: native source creation, eight sections, CRUD, stable identity, restart, versions, anchors, boundaries and data preservation")
+        print("PASS: native source creation, nine sections, CRUD, stable identity, restart, versions, anchors, boundaries and data preservation")
     }
 }

@@ -199,7 +199,7 @@ private slots:
 #endif
     }
 
-    void exposesExactlyTheEightLogicalSections()
+    void exposesExactlyTheNineLogicalSections()
     {
         const QList<StoreSection> expectedSections{
             StoreSection::AssetLibrary,
@@ -208,6 +208,7 @@ private slots:
             StoreSection::Forked,
             StoreSection::GenerationHistory,
             StoreSection::Models,
+            StoreSection::Photos,
             StoreSection::Published,
             StoreSection::ThinkingSpace
         };
@@ -218,6 +219,7 @@ private slots:
             QStringLiteral("Forked"),
             QStringLiteral("Generation History"),
             QStringLiteral("Models"),
+            QStringLiteral("Photos"),
             QStringLiteral("Published"),
             QStringLiteral("Thinking Space")
         };
@@ -271,7 +273,7 @@ private slots:
     void rejectsUnknownSectionIdentifiers()
     {
         const SocietyContainer container(root);
-        for (const int value : {-1, 8, 1000}) {
+        for (const int value : {-1, 9, 1000}) {
             const auto unknown = static_cast<StoreSection>(value);
             QVERIFY(storeSectionName(unknown).isEmpty());
             QVERIFY(!container.hasSection(unknown));

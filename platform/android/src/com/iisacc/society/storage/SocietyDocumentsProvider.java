@@ -69,7 +69,7 @@ public final class SocietyDocumentsProvider extends DocumentsProvider {
     private void row(MatrixCursor result, DriveStore store, String id) throws IOException {
         File file = store.document(id);
         int flags = file.isDirectory() ? Document.FLAG_DIR_SUPPORTS_CREATE : Document.FLAG_SUPPORTS_WRITE;
-        if (!id.equals(store.rootId())) flags |= Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME | Document.FLAG_SUPPORTS_MOVE;
+        if (!store.protectedDocument(id)) flags |= Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME | Document.FLAG_SUPPORTS_MOVE;
         result.newRow().add(Document.COLUMN_DOCUMENT_ID, id)
             .add(Document.COLUMN_DISPLAY_NAME, id.equals(store.rootId()) ? DriveStore.DISPLAY_NAME : file.getName())
             .add(Document.COLUMN_MIME_TYPE, mime(file)).add(Document.COLUMN_FLAGS, flags)

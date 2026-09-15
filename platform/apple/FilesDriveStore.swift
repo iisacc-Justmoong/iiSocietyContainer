@@ -7,7 +7,7 @@ final class FilesDriveStore {
     var manifest: DriveManifest { source.manifest }
     private let source: LocalDriveStore
     private let section: DriveSection
-    private let anchorPrefix = "files-v3:"
+    private let anchorPrefix = "files-v4:"
 
     init(root: URL, catalog: [DriveSection]) throws {
         source = try LocalDriveStore(root: root, catalog: catalog)
@@ -28,7 +28,7 @@ final class FilesDriveStore {
                                created: record.created, generation: "root")
         }
         let prefix = section.path + "/"
-        guard record.path.hasPrefix(prefix), !record.protected else { return nil }
+        guard record.path.hasPrefix(prefix), !record.id.hasPrefix("section:") else { return nil }
         return DriveRecord(id: record.id, parent: record.parent == sectionID ? "root" : record.parent,
                            name: record.name, path: String(record.path.dropFirst(prefix.count)),
                            directory: record.directory, identity: record.identity, size: record.size,

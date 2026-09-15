@@ -1,16 +1,20 @@
 # iiSocietyContainer
 
+0.13.0은 최상위 `Photos/` 영역을 추가하고 기존 `Files/Photos/`를 데이터 보존을 확인하며 이전한다. `Files/Documents`, `Files/Audios`, `Files/3D objects`를 삭제·이름 변경·이동할 수 없는 실제 기본 디렉터리로 제공한다. `FileDirectory` 객체와 `FilesView::directories()`로 접근하며 Photos는 사진과 비디오를 함께 보관한다. 자동 분류는 수행하지 않는다. [Files 계약](docs/Files.md)에 기존 컨테이너 보완과 플랫폼별 보호 범위를 설명한다.
+
 드라이브 표시 이름은 `Society`이다. 0.9.1부터 새 매니페스트에도 이 이름을 기록하며, 기존 `Society Container` 매니페스트는 UUID와 파일을 수정하지 않고 열어 `Society`로 표시한다. C++·Apple·Android의 읽기 경계는 두 이름을 허용한다. Windows 볼륨 이름, Linux FUSE 이름, Android 문서 루트, Apple File Provider 루트도 같은 표시 이름을 사용한다.
 
 macOS에서 기존 원본으로 `register`를 다시 호출하면 동일한 File Provider 도메인 ID로 표시 이름을 갱신한다. 도메인을 제거하지 않는다. 설치된 Apple SDK의 `NSFileProviderManager.addDomain` 계약을 사용하며 [Apple 도메인 API](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/add(_:completionhandler:))를 따른다. 어댑터 번들 이름도 `Society.app`으로 변경하여 Finder 사이드바에 같은 이름을 표시한다. CMake의 `iiSocietyContainer_NATIVE_APP`이 새 경로를 제공하며, 실행 파일·번들 ID와 Windows 자동 실행 등록 키는 기존 연동을 위한 내부 식별자로 유지한다.
 
 `iiSocietyContainer.drive`와 `native_store`는 새 이름, 이전 이름의 호환성, UUID 및 기존 매니페스트 보존을 검증한다. iOS 패키지 테스트와 Android 제공자 테스트는 시스템에 표시되는 이름을 검사한다.
 
-C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.10.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 8개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 8개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
+C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.13.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 9개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 9개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
+
+`Models/`는 23개 모델 유형 폴더를 제공한다. `ModelStore`가 목록·자동 분류·수동 유형 수정·이전 경로 해석을 담당하고 `ModelClassifier`가 제한된 메타데이터를 읽는다. 0.11.1의 `metadata()`는 소비 앱의 카드에 표시할 아키텍처·정밀도·명시적 미디어 분류를 조회한다. 0.11.2는 Anima 체크포인트 구조 판별과 Safetensors 텐서 차원·자료형·바이트 범위 검증을 추가한다. 생성·레거시 정리·판정 규칙·이동 기록·CLI 계약은 [Models 관리 문서](docs/Models.md)에 설명한다.
 
 ## 공개 API
 
-`SocietyDrive::create()`·`open()`은 다른 Society 컨테이너 내부를 원본으로 받지 않는다. macOS에서는 `~/Library/CloudStorage/`의 Finder 복제본도 거부한다. 경로를 실제 위치로 판정하고 파일 생성 전에 검증하므로 `Files/` 안에 8개 앱 영역이 다시 만들어지는 것을 방지한다. 공통 저장 설정과 Helper 파일 시스템 접근도 같은 경계를 적용한다. 원본에는 8개 영역을 유지하고 시스템 드라이브에는 원본 `Files/`의 내용만 제공한다. 복구 절차는 [macOS 파일 계약](platform/macos/README.md#파일-계약)에 설명한다.
+`SocietyDrive::create()`·`open()`은 다른 Society 컨테이너 내부를 원본으로 받지 않는다. macOS에서는 `~/Library/CloudStorage/`의 Finder 복제본도 거부한다. 경로를 실제 위치로 판정하고 파일 생성 전에 검증하므로 `Files/` 안에 8개 앱 영역이 다시 만들어지는 것을 방지한다. 공통 저장 설정과 Helper 파일 시스템 접근도 같은 경계를 적용한다. 원본에는 9개 영역을 유지하고 시스템 드라이브에는 원본 `Files/`의 내용만 제공한다. 복구 절차는 [macOS 파일 계약](platform/macos/README.md#파일-계약)에 설명한다.
 
 ```cpp
 #include <iiSocietyContainer.h>
@@ -67,7 +71,7 @@ const auto outside = container.classifyPath(QStringLiteral("../OtherLibrary"));
 using iiSocietyContainer::StoreSection;
 using iiSocietyContainer::storeSectionName;
 
-const auto sections = container.sections(); // 유효한 컨테이너이면 8개 영역
+const auto sections = container.sections(); // 유효한 컨테이너이면 9개 영역
 for (const StoreSection section : sections) {
     const QString name = storeSectionName(section);
     // section으로 영역을 식별하고 name을 화면에 표시한다.
@@ -76,9 +80,9 @@ for (const StoreSection section : sections) {
 const bool hasModels = container.hasSection(StoreSection::Models);
 ```
 
-`allStoreSections()`는 컨테이너 상태와 무관하게 지원되는 8개 영역의 목록을 반환한다. `container.sections()`와 `container.hasSection()`은 해당 컨테이너의 현재 유효성을 반영한다. 컨테이너가 무효이면 각각 빈 목록과 `false`를 반환한다. 정의되지 않은 열거형 값에 대해서는 `storeSectionName()`이 빈 문자열을, `hasSection()`이 `false`를 반환한다.
+`allStoreSections()`는 컨테이너 상태와 무관하게 지원되는 9개 영역의 목록을 반환한다. `container.sections()`와 `container.hasSection()`은 해당 컨테이너의 현재 유효성을 반영한다. 컨테이너가 무효이면 각각 빈 목록과 `false`를 반환한다. 정의되지 않은 열거형 값에 대해서는 `storeSectionName()`이 빈 문자열을, `hasSection()`이 `false`를 반환한다.
 
-`SocietyContainer`의 영역 조회는 식별과 분리만 담당한다. 빈 디렉터리를 지정해도 8개 영역을 반환하지만 조회만으로 물리 디렉터리를 생성하거나 기존 파일을 변경하지 않는다. 모든 영역은 같은 방식으로 제공되며 영역별 데이터 형식, 보관 정책, 권한을 정의하지 않는다. `classifyPath()`는 기존의 컨테이너 경계 판정을 유지한다. 드라이브의 실제 디렉터리 배치는 `SocietyDrive::create()`에서 명시적으로 초기화한다.
+`SocietyContainer`의 영역 조회는 식별과 분리만 담당한다. 빈 디렉터리를 지정해도 9개 영역을 반환하지만 조회만으로 물리 디렉터리를 생성하거나 기존 파일을 변경하지 않는다. 모든 영역은 같은 방식으로 제공되며 영역별 데이터 형식, 보관 정책, 권한을 정의하지 않는다. `classifyPath()`는 기존의 컨테이너 경계 판정을 유지한다. 드라이브의 실제 디렉터리 배치는 `SocietyDrive::create()`에서 명시적으로 초기화한다.
 
 영역 정의와 이름 목록은 `src/Store/StoreSection.h`와 `src/Store/StoreSection.cpp`가 담당한다. 이 하위 모듈은 컨테이너 구현을 참조하지 않고, 상위 `SocietyContainer`가 영역 모델을 사용한다.
 
@@ -99,7 +103,7 @@ auto reopened = iiSocietyContainer::SocietyDrive::open("/data/MyLibrary", &error
 // reopened->identifier() == id
 ```
 
-`create()`는 **이미 존재하는 디렉터리**에 8개 영역 이름과 정확히 일치하는 하위 디렉터리와 `.society-drive.json`을 생성한다. 기존의 정상 영역 디렉터리와 내용은 보존한다. 같은 이름의 파일·심볼릭 링크·정션이나 잘못된 기존 매니페스트는 덮어쓰지 않고 오류를 반환한다. 초기화 잠금과 원자적 매니페스트 저장을 사용하며 실패 시 이번 호출이 생성한 빈 디렉터리만 정리한다. 유효한 기존 드라이브는 같은 ID로 연다. `open()`은 파일을 생성하지 않으며 매니페스트, 버전, ID, 전체 영역 배치를 검증한다.
+`create()`는 **이미 존재하는 디렉터리**에 9개 영역 이름과 정확히 일치하는 하위 디렉터리와 `.society-drive.json`을 생성한다. 기존의 정상 영역 디렉터리와 내용은 보존한다. 같은 이름의 파일·심볼릭 링크·정션이나 잘못된 기존 매니페스트는 덮어쓰지 않고 오류를 반환한다. 초기화 잠금과 원자적 매니페스트 저장을 사용하며 실패 시 이번 호출이 생성한 빈 디렉터리만 정리한다. 유효한 기존 드라이브는 같은 ID로 연다. `open()`은 파일을 생성하지 않으며 매니페스트, 버전, ID, 전체 영역 배치를 검증한다.
 
 매니페스트 버전은 `schemaVersion: 1`, 종류는 `type: "SocietyDrive"`, 표시 이름은 `Society`이다. 식별자는 UUID이며 영역 항목은 `id`, `name`, `path`를 가진다. `storeSectionKey()`가 반환하는 영속 키는 순서대로 `asset-library`, `deleted`, `files`, `forked`, `generation-history`, `models`, `published`, `thinking-space`이다. 표시 이름과 디렉터리명은 위 표와 같다. 네이티브 영역 카탈로그는 C++ 도구의 `catalog` 출력으로 생성하여 중복 정의하지 않는다.
 
@@ -142,7 +146,7 @@ iOS에서는 앱별 Documents 대신 Society와 동일한 App Group의 `Library/
 
 공통 스토리지 테스트와 설치 소비자는 앱 이름이 달라도 같은 UUID를 찾는지, 설정된 드라이브 교체 감지, 원본 모델 경로 해석, 패키지 중복 제외, 모델 변경 감지, 내부 출력 디렉터리 경계를 검증한다. iOS 패키지 검사는 Society와 Dreamscapes의 실제 생성 plist·그룹 권한 일치를 검사하며 기기 실행을 대신하지 않는다.
 
-0.8.0의 `SharedStorage::filePath(section, relativePath, error)`는 일반 파일 I/O용 절대 경로를 반환한다. 빈 상대 경로는 영역 디렉터리이고 마지막 이름만 존재하지 않아도 새 파일 경로를 반환한다. 부모는 먼저 `ensureDirectory()`로 준비한다. 경로 조회는 파일을 만들지 않는다. 각 요청은 원본 경로·UUID와 경로 요소를 검증하고 루트·하위 경로의 심볼릭 링크 및 junction, 영역 이탈을 거부한다. 반환 뒤 동시 변경까지 잠그는 기능은 아니다. iiSocietyHelper 0.4.0의 `fileSystem`이 이 API를 재사용한다. 공통 스토리지 테스트와 설치 소비자가 8개 영역의 일반 읽기·쓰기 및 경계·원본 교체를 검사한다.
+0.8.0의 `SharedStorage::filePath(section, relativePath, error)`는 일반 파일 I/O용 절대 경로를 반환한다. 빈 상대 경로는 영역 디렉터리이고 마지막 이름만 존재하지 않아도 새 파일 경로를 반환한다. 부모는 먼저 `ensureDirectory()`로 준비한다. 경로 조회는 파일을 만들지 않는다. 각 요청은 원본 경로·UUID와 경로 요소를 검증하고 루트·하위 경로의 심볼릭 링크 및 junction, 영역 이탈을 거부한다. 반환 뒤 동시 변경까지 잠그는 기능은 아니다. iiSocietyHelper 0.4.0의 `fileSystem`이 이 API를 재사용한다. 공통 스토리지 테스트와 설치 소비자가 9개 영역의 일반 읽기·쓰기 및 경계·원본 교체를 검사한다.
 
 ## 의존성 검토
 
@@ -206,7 +210,7 @@ target_link_libraries(your_app PRIVATE iiSocietyContainer::iiSocietyContainer)
 - `bin/iiSocietyContainerDriveTool`: 드라이브 초기화·조회·영역 카탈로그 CLI
 - macOS의 `share/iiSocietyContainer/Society.app`: 네이티브 호스트와 File Provider 확장
 
-드라이브 테스트는 초기화·재열기·ID 보존·8개 폴더·충돌 시 원본 보존·매니페스트 오류·영역 경계를 원본과 설치 소비자에서 검증한다. macOS 네이티브 테스트는 전체 원본의 파일 연산과 별도로 `Files/`의 루트 노출·비공개 ID 접근 거부·루트 파일 CRUD·버전 충돌·앱 접근 유지·재시작·기존 8개 영역 노출의 제거를 검증한다. 실제 Finder 연결 테스트는 일반 CTest와 분리하여 명시적으로 등록한 검증용 드라이브에서 수행한다.
+드라이브 테스트는 초기화·재열기·ID 보존·8개 폴더·충돌 시 원본 보존·매니페스트 오류·영역 경계를 원본과 설치 소비자에서 검증한다. macOS 네이티브 테스트는 전체 원본의 파일 연산과 별도로 `Files/`의 루트 노출·비공개 ID 접근 거부·루트 파일 CRUD·버전 충돌·앱 접근 유지·재시작·기존 9개 영역 노출의 제거를 검증한다. 실제 Finder 연결 테스트는 일반 CTest와 분리하여 명시적으로 등록한 검증용 드라이브에서 수행한다.
 
 Qt 자체는 재설치하거나 번들링하지 않는다. 실행 환경에도 Qt 6.8.3 Core가 있어야 한다. 설치 RPATH에 링크 의존 경로를 반영한다. Qt 사용 조건은 기존 Qt 설치의 라이선스를 따른다.
 
@@ -222,12 +226,12 @@ Qt를 포함한 외부 라이브러리와 별도 고지가 있는 서드파티 �
 
 ## iOS / iPadOS 통합
 
-iOS 16 이상에서는 Society 앱과 내장 File Provider 확장이 같은 App Group의 원본을 사용한다. 앱에서 8개 영역을 탐색하고 파일 앱에서는 Files 내용만 직접 노출한다. 공통 Swift 저장소와 공개 경계는 `platform/apple/`에 있으며, iOS 도메인 등록·번들·권한·설치 구성은 [iOS 문서](platform/ios/README.md)에 정의한다. iOS 기기 및 시뮬레이터별 빌드 preset은 Society 앱에서 제공한다.
+iOS 16 이상에서는 Society 앱과 내장 File Provider 확장이 같은 App Group의 원본을 사용한다. 앱에서 9개 영역을 탐색하고 파일 앱에서는 Files 내용만 직접 노출한다. 공통 Swift 저장소와 공개 경계는 `platform/apple/`에 있으며, iOS 도메인 등록·번들·권한·설치 구성은 [iOS 문서](platform/ios/README.md)에 정의한다. iOS 기기 및 시뮬레이터별 빌드 preset은 Society 앱에서 제공한다.
 
 ### Shared logical drive identity (0.10)
 
 `SocietyDrive::adoptReplicaIdentity(root, expectedId, hostId)` atomically adopts
-an authenticated host's UUID under the drive lock. The existing eight section
+an authenticated host's UUID under the drive lock. The existing nine section
 paths remain unchanged; stale drive objects become invalid and must be reopened.
 iiSocietySync owns host selection, private recovery of a former independent
 container, and initial mirroring before uploads. A device's replica journal and
@@ -242,3 +246,5 @@ reopens its cached store. Consumer `SharedStorage::open()` and file/model access
 reject incomplete mirrors. The storage owner can resolve their location through
 `open(path, error, true)` to resume initialization, while consumer operations on
 that handle remain gated. No credentials or account models enter this manifest.
+
+Photos 경로·매니페스트 이전 계약은 [Photos.md](docs/Photos.md)를 따른다. `FileDirectoryKind::Photos`는 값 호환성만 유지하며 FilesView에서는 반환하지 않는다. `StoreSection::Photos`를 사용한다.

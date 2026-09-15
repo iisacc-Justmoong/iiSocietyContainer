@@ -13,6 +13,22 @@ std::optional<FilesView> FilesView::open(const QString &path, QString *error)
     return drive ? std::optional<FilesView>(FilesView(std::move(*drive))) : std::nullopt;
 }
 const SocietyDrive &FilesView::drive() const { return m_drive; }
+QList<FileDirectory> FilesView::directories() const
+{
+    QList<FileDirectory> result;
+    if (!m_drive.isReady()) return result;
+    for (const auto kind : allFileDirectoryKinds()) result.append(FileDirectory(m_drive, kind));
+    return result;
+}
+std::optional<FileDirectory> FilesView::directory(FileDirectoryKind kind) const
+{
+    if (!m_drive.isReady() || fileDirectoryName(kind).isEmpty()) return {};
+    return FileDirectory(m_drive, kind);
+}
+bool FilesView::isProtectedPath(const QString &relativePath)
+{
+    return relativePath.isEmpty() || isFixedFilesDirectory(relativePath);
+}
 bool FilesView::isValid() const { return m_drive.isValid(); }
 QString FilesView::rootPath() const { return m_drive.sectionPath(StoreSection::Files); }
 QString FilesView::resolve(const QString &relative, bool allowMissing, QString *error) const

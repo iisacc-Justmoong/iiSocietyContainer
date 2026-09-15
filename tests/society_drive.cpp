@@ -4,6 +4,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QJsonDocument>
+#include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 #include <QtCore/QTemporaryDir>
 #include <QtCore/QUuid>
@@ -24,7 +25,7 @@ private slots:
         QVERIFY(workspace->isValid());
     }
 
-    void createsAndReopensDriveWithEightIndependentRoots()
+    void createsAndReopensDriveWithNineIndependentRoots()
     {
         QString error;
         const auto drive = SocietyDrive::create(workspace->path(), &error);
@@ -47,6 +48,91 @@ private slots:
         const auto repeated = SocietyDrive::create(workspace->path(), &error);
         QVERIFY(repeated.has_value());
         QCOMPARE(repeated->identifier(), drive->identifier());
+    }
+
+    void migratesLegacyPhotosWithPreviewsAndIdentity()
+    {
+        const auto drive = SocietyDrive::create(workspace->path()); QVERIFY(drive);
+        QFile manifest(workspace->filePath(".society-drive.json"));
+        QVERIFY(manifest.open(QIODevice::ReadOnly));
+        auto data = QJsonDocument::fromJson(manifest.readAll()).object(); manifest.close();
+        QJsonArray legacySections;
+        for (const auto &section : data.value("sections").toArray())
+            if (section.toObject().value("id") != "photos") legacySections.append(section);
+        data["sections"] = legacySections;
+        QVERIFY(manifest.open(QIODevice::WriteOnly)); manifest.write(QJsonDocument(data).toJson()); manifest.close();
+        QDir().rmdir(workspace->filePath("Photos"));
+        QVERIFY(QDir().mkpath(workspace->filePath("Files/Photos/.previews")));
+        const QStringList names{"image.societyphoto", ".previews/image.jpg", "clip.mp4"};
+        for (const auto &name : names) {
+            QFile file(workspace->filePath("Files/Photos/" + name));
+            QVERIFY(file.open(QIODevice::WriteOnly)); file.write(name.toUtf8());
+        }
+        QString error;
+        const auto upgraded = SocietyDrive::open(workspace->path(), &error); QVERIFY2(upgraded, qPrintable(error));
+        QCOMPARE(upgraded->identifier(), drive->identifier());
+        QVERIFY(!QFileInfo::exists(workspace->filePath("Files/Photos")));
+        for (const auto &name : names) {
+            QFile file(workspace->filePath("Photos/" + name));
+            QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), name.toUtf8());
+        }
+        QVERIFY(manifest.open(QIODevice::ReadOnly));
+        const auto migrated = manifest.readAll(); manifest.close();
+        QCOMPARE(QJsonDocument::fromJson(migrated).object().value("sections").toArray().size(), 9);
+        QVERIFY(SocietyDrive::open(workspace->path()));
+        QVERIFY(manifest.open(QIODevice::ReadOnly)); QCOMPARE(manifest.readAll(), migrated);
+    }
+
+    void legacyPhotosMergePreservesConflictsAndReplicaState_data()
+    {
+        QTest::addColumn<bool>("conflict");
+        QTest::newRow("identical-duplicate") << false;
+        QTest::newRow("conflicting-content") << true;
+    }
+    void legacyPhotosMergePreservesConflictsAndReplicaState()
+    {
+        QFETCH(bool, conflict);
+        const auto drive = SocietyDrive::create(workspace->path()); QVERIFY(drive);
+        QFile manifest(workspace->filePath(".society-drive.json"));
+        QVERIFY(manifest.open(QIODevice::ReadOnly));
+        auto data = QJsonDocument::fromJson(manifest.readAll()).object(); manifest.close();
+        QJsonArray sections;
+        for (const auto &entry : data.value("sections").toArray())
+            if (entry.toObject().value("id") != "photos") sections.append(entry);
+        data["sections"] = sections;
+        data["localIdentifier"] = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        data["replicaReady"] = false;
+        const auto oldManifest = QJsonDocument(data).toJson();
+        QVERIFY(manifest.open(QIODevice::WriteOnly)); manifest.write(oldManifest); manifest.close();
+        QVERIFY(QDir().mkpath(workspace->filePath("Files/Photos/.previews")));
+        const auto write = [&](const QString &path, const QByteArray &bytes) {
+            QFile file(workspace->filePath(path)); return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
+        };
+        const auto read = [&](const QString &path) {
+            QFile file(workspace->filePath(path)); return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray{};
+        };
+        QVERIFY(write("Files/Photos/a.societyphoto", "original"));
+        QVERIFY(write("Files/Photos/.previews/a.jpg", "preview"));
+        QVERIFY(write("Photos/a.societyphoto", conflict ? "different" : "original"));
+        QVERIFY(write("Photos/new.jpg", "new"));
+        QString error; const auto upgraded = SocietyDrive::open(workspace->path(), &error);
+        if (conflict) {
+            QVERIFY(!upgraded); QVERIFY(!error.isEmpty());
+            QCOMPARE(read("Files/Photos/a.societyphoto"), "original");
+            QCOMPARE(read("Files/Photos/.previews/a.jpg"), "preview");
+            QCOMPARE(read("Photos/a.societyphoto"), "different");
+            QCOMPARE(read(".society-drive.json"), oldManifest);
+        } else {
+            QVERIFY2(upgraded, qPrintable(error)); QVERIFY(!upgraded->isReady());
+            QCOMPARE(upgraded->identifier(), drive->identifier());
+            QVERIFY(!QFileInfo::exists(workspace->filePath("Files/Photos")));
+            QCOMPARE(read("Photos/a.societyphoto"), "original");
+            QCOMPARE(read("Photos/.previews/a.jpg"), "preview");
+            const auto upgradedData = QJsonDocument::fromJson(read(".society-drive.json")).object();
+            QCOMPARE(upgradedData.value("localIdentifier"), data.value("localIdentifier"));
+            QCOMPARE(upgradedData.value("replicaReady"), QJsonValue(false));
+        }
+        QCOMPARE(read("Photos/new.jpg"), "new");
     }
 
     void legacyNameKeepsIdentityAndSourceData()
@@ -141,7 +227,8 @@ private slots:
         QString error;
         QVERIFY(!SocietyDrive::create(files, &error));
         QVERIFY(error.contains("source"));
-        QVERIFY(QDir(files).isEmpty());
+        QCOMPARE(QDir(files).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 3);
+        QVERIFY(!QFileInfo::exists(QDir(files).filePath(".society-drive.json")));
         QVERIFY(QDir().mkpath(QDir(files).filePath("Nested/Deep")));
         QVERIFY(!SocietyDrive::create(QDir(files).filePath("Nested/Deep"), &error));
         QVERIFY(QDir(QDir(files).filePath("Nested/Deep")).isEmpty());
@@ -222,7 +309,7 @@ private slots:
         const auto drive = SocietyDrive::create(workspace->path());
         QVERIFY(drive.has_value());
         QVERIFY(drive->sectionPath(static_cast<StoreSection>(-1)).isEmpty());
-        QVERIFY(QDir().rmdir(drive->sectionPath(StoreSection::Models)));
+        QVERIFY(QDir().rename(drive->sectionPath(StoreSection::Models), workspace->filePath("Models-original")));
         QVERIFY(!drive->isValid());
         QVERIFY(!SocietyDrive::open(workspace->path()));
     }

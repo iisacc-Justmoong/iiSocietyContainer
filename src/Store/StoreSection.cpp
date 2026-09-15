@@ -15,13 +15,14 @@ struct SectionDefinition {
     const char* key;
 };
 
-constexpr std::array<SectionDefinition, 8> sectionDefinitions{{
+constexpr std::array<SectionDefinition, 9> sectionDefinitions{{
     {StoreSection::AssetLibrary, "Asset Library", "asset-library"},
     {StoreSection::Deleted, "Deleted", "deleted"},
     {StoreSection::Files, "Files", "files"},
     {StoreSection::Forked, "Forked", "forked"},
     {StoreSection::GenerationHistory, "Generation History", "generation-history"},
     {StoreSection::Models, "Models", "models"},
+    {StoreSection::Photos, "Photos", "photos"},
     {StoreSection::Published, "Published", "published"},
     {StoreSection::ThinkingSpace, "Thinking Space", "thinking-space"}
 }};

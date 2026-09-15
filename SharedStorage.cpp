@@ -1,4 +1,5 @@
 #include "SharedStorage.h"
+#include "ModelStore.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -30,20 +31,23 @@ bool relative(const QString &path, bool allowHidden = false)
             return false;
     return true;
 }
-bool inventory(const QString &path, const QString &base, QCryptographicHash &hash)
+bool inventory(const QString &path, const QString &base, QCryptographicHash &hash,
+    const QString &physicalRoot = {}, const QString &logicalRoot = {})
 {
     const QFileInfo info(path);
     if (info.isSymLink() || !info.isReadable() || info.canonicalFilePath() != path)
         return false;
     if (info.isDir()) {
         for (const auto &entry : QDir(path).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name))
-            if (!inventory(entry.absoluteFilePath(), base, hash))
+            if (!inventory(entry.absoluteFilePath(), base, hash, physicalRoot, logicalRoot))
                 return false;
         return true;
     }
     if (!info.isFile())
         return false;
-    hash.addData(QDir(base).relativeFilePath(path).toUtf8());
+    const auto relative = logicalRoot.isEmpty() ? QDir(base).relativeFilePath(path)
+        : logicalRoot + (path == physicalRoot ? QString() : '/' + QDir(physicalRoot).relativeFilePath(path));
+    hash.addData(relative.toUtf8());
     hash.addData(QByteArray::number(info.size()));
     hash.addData(QByteArray::number(info.lastModified().toMSecsSinceEpoch()));
     QFile file(path);
@@ -52,7 +56,7 @@ bool inventory(const QString &path, const QString &base, QCryptographicHash &has
     hash.addData(file.read(65536));
     return file.error() == QFile::NoError;
 }
-std::optional<StoredModel> inspect(const QString &path, const QString &base)
+std::optional<StoredModel> inspect(const QString &path, const QString &base, const QString &previousId = {})
 {
     const QFileInfo info(path);
     const bool package = info.isDir() && QFileInfo::exists(QDir(path).filePath("model_index.json"));
@@ -60,9 +64,9 @@ std::optional<StoredModel> inspect(const QString &path, const QString &base)
     if (!package && (!info.isFile() || (extension != "safetensor" && extension != "safetensors")))
         return {};
     QCryptographicHash fingerprint(QCryptographicHash::Sha256);
-    if (!inventory(path, base, fingerprint))
+    if (!inventory(path, base, fingerprint, path, previousId))
         return {};
-    return StoredModel{QDir(base).relativeFilePath(path), info.fileName(),
+    return StoredModel{previousId.isEmpty() ? QDir(base).relativeFilePath(path) : previousId, info.fileName(),
         package ? QStringLiteral("diffusers") : QStringLiteral("safetensors"),
         QString::fromLatin1(fingerprint.result().toHex())};
 }
@@ -214,16 +218,12 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
         fail(error, QStringLiteral("The model reference does not belong to this Society container."));
         return {};
     }
-    QString current = base;
-    for (const auto &part : id.split('/')) {
-        current = QDir(current).filePath(part);
-        const QFileInfo info(current);
-        if (info.isSymLink() || info.canonicalFilePath() != current) {
-            fail(error, QStringLiteral("The Society model is missing or redirected."));
-            return {};
-        }
-    }
-    const auto model = inspect(current, base);
+    const auto store = ModelStore::open(m_drive.rootPath(), error);
+    if (!store) return {};
+    const auto current = store->resolve(id, error);
+    if (current.isEmpty()) return {};
+    // Classification changes the location, not the bytes or the original reference contract.
+    const auto model = inspect(current, base, id);
     if (!model || model->reference(m_drive.identifier()) != reference) {
         fail(error, QStringLiteral("The Society model changed after it was selected. Select it again."));
         return {};

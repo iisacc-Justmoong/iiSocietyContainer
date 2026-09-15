@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SocietyDrive.h"
+#include "FileDirectory.h"
 #include <QFileInfo>
 
 namespace iiSocietyContainer {
@@ -16,6 +16,11 @@ public:
     // An empty path selects the root. Only a missing final component is allowed.
     QString resolve(const QString &relativePath, bool allowMissing = false, QString *error = nullptr) const;
     QList<QFileInfo> entries(const QString &relativeDirectory = {}, QString *error = nullptr) const;
+    QList<FileDirectory> directories() const;
+    std::optional<FileDirectory> directory(FileDirectoryKind kind) const;
+    /// The public root and four fixed directory names cannot be deleted, moved,
+    /// renamed, or replaced. Native adapters must check both move endpoints.
+    static bool isProtectedPath(const QString &relativePath);
 
 private:
     explicit FilesView(SocietyDrive drive);

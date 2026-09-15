@@ -60,9 +60,9 @@ enum SharedDriveLocationTests {
         let publicID = first.id
         let reopened = try FilesDriveStore(root: location.existingRoot(), catalog: catalog)
         try check(reopened.item(publicID).id == publicID, "Extension restart must preserve public IDs")
-        try check(Set(reopened.children("root").map { $0.name }) == ["From Society.txt", "Models"],
+        try check(Set(reopened.children("root").map { $0.name }) == ["From Society.txt", "Models", "Documents", "Audios", "3D objects"],
                   "The iOS location must open directly in Files contents")
-        try check(app.children("root").count == 8, "Society must retain all eight sections")
+        try check(app.children("root").count == 9, "Society must retain all nine sections")
         try manager.removeItem(at: root)
         try manager.createSymbolicLink(at: root, withDestinationURL: group)
         try reject { _ = try location.prepareRoot() }
