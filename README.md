@@ -1,5 +1,9 @@
 # iiSocietyContainer
 
+0.14.0은 원본 파일과 호스트의 저장소 목록을 분리한다. `StorageMap`은 `.society-sync/catalog.json`의 논리 키·버전·크기·해시·로컬 보유 여부를 읽고, 특정 버전을 고정하는 다운로드 요청을 `.society-sync/requests/`에 원자적으로 기록한다. 내용이 없는 항목에는 빈 원본 파일을 만들지 않는다. `available(keys)`가 참이고 요청 상태가 `ready`인 이후 파일을 사용한다. 경로 이탈·리디렉션과 다른 컨테이너의 목록을 거부한다.
+
+`StorageDirectoryModel`은 실제 디렉터리와 호스트 목록을 작업 스레드에서 합쳐 이름·크기·프리뷰·보유 여부를 제공한다. 현재 폴더의 직계 자식만 골라 경로를 검증하며, 변경되지 않은 저장소 맵은 파싱 결과를 재사용한다. `setFolder()`·`refresh()`는 GUI 호출을 기다리게 하지 않고, 이전 폴더의 늦은 결과를 폐기한다. 빈 폴더 URL은 조회 타이머를 멈춘다. `activate`는 미보유 파일을 요청하고 검증된 다운로드가 끝나면 `activated`를 보낸다. `StorageModelCatalog`은 호스트 카탈로그가 있으면 원본 헤더나 패키지를 읽지 않고 이름·경로·형식·크기·보유 상태로 모델 카드를 구성한다. 카탈로그 감시는 두 디렉터리로 제한하고, 로컬 전용 폴백의 감시는 최대 64개이다. `activatePath()`는 선택된 파일 또는 패키지만 SDK의 버전 고정 다운로드 요청으로 전달하며, 완료 뒤 `objectReady`를 보낼 수 있다. 로컬 전용 저장소의 구조 판정과 가져오기 검증은 유지한다. `SharedStorage::models()`도 미보유 모델을 표시하며 `resolveModel()`은 필요한 파일이 모두 준비되어야 성공한다. 패키지의 모델 참조는 구성 파일 전체의 버전에 고정된다. `shared_storage` 테스트는 목록만 있는 모델, 요청 취소, 파일 생성 없는 탐색과 다운로드 완료 후 열기를 검사한다.
+
 0.13.0은 최상위 `Photos/` 영역을 추가하고 기존 `Files/Photos/`를 데이터 보존을 확인하며 이전한다. `Files/Documents`, `Files/Audios`, `Files/3D objects`를 삭제·이름 변경·이동할 수 없는 실제 기본 디렉터리로 제공한다. `FileDirectory` 객체와 `FilesView::directories()`로 접근하며 Photos는 사진과 비디오를 함께 보관한다. 자동 분류는 수행하지 않는다. [Files 계약](docs/Files.md)에 기존 컨테이너 보완과 플랫폼별 보호 범위를 설명한다.
 
 드라이브 표시 이름은 `Society`이다. 0.9.1부터 새 매니페스트에도 이 이름을 기록하며, 기존 `Society Container` 매니페스트는 UUID와 파일을 수정하지 않고 열어 `Society`로 표시한다. C++·Apple·Android의 읽기 경계는 두 이름을 허용한다. Windows 볼륨 이름, Linux FUSE 이름, Android 문서 루트, Apple File Provider 루트도 같은 표시 이름을 사용한다.
@@ -8,7 +12,7 @@ macOS에서 기존 원본으로 `register`를 다시 호출하면 동일한 File
 
 `iiSocietyContainer.drive`와 `native_store`는 새 이름, 이전 이름의 호환성, UUID 및 기존 매니페스트 보존을 검증한다. iOS 패키지 테스트와 Android 제공자 테스트는 시스템에 표시되는 이름을 검사한다.
 
-C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.13.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 9개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 9개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
+C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.14.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 9개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 9개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
 
 `Models/`는 23개 모델 유형 폴더를 제공한다. `ModelStore`가 목록·자동 분류·수동 유형 수정·이전 경로 해석을 담당하고 `ModelClassifier`가 제한된 메타데이터를 읽는다. 0.11.1의 `metadata()`는 소비 앱의 카드에 표시할 아키텍처·정밀도·명시적 미디어 분류를 조회한다. 0.11.2는 Anima 체크포인트 구조 판별과 Safetensors 텐서 차원·자료형·바이트 범위 검증을 추가한다. 생성·레거시 정리·판정 규칙·이동 기록·CLI 계약은 [Models 관리 문서](docs/Models.md)에 설명한다.
 
@@ -237,7 +241,7 @@ iiSocietySync owns host selection, private recovery of a former independent
 container, and initial mirroring before uploads. A device's replica journal and
 credentials remain local. This API alone does not copy or merge files.
 
-`completeReplica(root, hostId)` marks the downloaded mirror ready. `isValid()`
+`completeReplica(root, hostId)` marks the host metadata snapshot ready. `isValid()`
 checks structure and identity; `isReady()` additionally checks publication state.
 The manifest retains `localIdentifier` for a stable native registration and
 `previousIdentifier` for recovering the selected drive across another host-drive

@@ -82,3 +82,13 @@ Swift 브리지와 File Provider 확장은 Qt의 AUTOMOC·AUTOUIC·AUTORCC를 �
 iOS에서 제공하지 않는 `versionNoLongerAvailable` 오류는 사용하지 않는다. 저장소가
 오래된 버전에 대한 작업을 거부하면 iOS에는 새로 고침을 안내하는 Cocoa 파일 충돌
 오류를 반환하고, 변경된 원본을 덮어쓰지 않는다. macOS의 기존 오류 매핑은 유지한다.
+
+## 독립적인 Live Activity
+
+`iiSocietyContainer_add_ios_live_activity(App TEAM ... BRIDGE_TARGET ...)`는 ActivityKit C 브리지와 WidgetKit 확장을 앱에 포함한다. Swift를 활성화하고 앱 Info.plist를 구성한 뒤 호출한다. `BRIDGE_TARGET`은 브리지를 호출하는 C++ 타깃이며 기본값은 앱이다. iOS 16.2 이상에서 지원하고 기존 앱의 최소 버전은 유지한다.
+
+표시 수명은 `BGContinuedProcessingTask` 실행 허가와 독립적이다. `begin`은 작업 ID별로 기존 카드를 복구하며, `update`는 실제 진행만 전달한다. `finish(completed)`와 명시적 `finish(cancelled)`만 Activity를 종료한다. `paused`/`failed`는 마지막 진행 상태를 보존한다. 앱 강제 종료 시에도 시스템이 카드를 보유한다. 갱신 유효시간은 90초이며, 시스템이 stale 상태를 반영하면 상태 확인 안내를 표시한다. 시스템 화면 갱신 시점에는 지연이 있을 수 있다. 이 표시는 중단된 로컬 연산의 실행이나 서버 진행을 보장하지 않는다. OS가 정한 최대 표시 수명은 적용된다.
+
+사용자가 지운 카드는 타이머나 앱 재실행으로 다시 만들지 않는다. 새 명시적 작업 요청만 `allow_restart`로 재시작할 수 있다. 완료 카드는 시스템 기본 정책에 따라 마지막 결과를 표시한다. 실행 중에는 iOS의 continued-processing 시스템 표시가 별도로 나타날 수 있다. 백그라운드 권한 만료를 막기 위해 가짜 진행을 보내지 않는다. `live-activity-state.json`에는 마지막 발행 상태와 Activity ID만 기록한다.
+
+`ios_package_contract`는 일시정지·실패·완료·취소 및 상태 복원을 실행 검증하고 실제 iOS SDK로 Swift 브리지와 WidgetKit 확장을 빌드한다. 실기기 표시 수명은 별도 앱 종료/재실행 테스트로 검증해야 한다.

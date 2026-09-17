@@ -102,3 +102,9 @@ Anima 회귀 검사는 원본·파생·통합 체크포인트, 이름 변경과 
 0.11.2에서는 유지보수 중인 Apache-2.0 Safetensors 구현의 [검증·자료형 계약](https://github.com/huggingface/safetensors/blob/main/safetensors/src/tensor.rs)을 참고하였다. Rust/Python 런타임을 새로 추가하는 대신 기존 Qt Core로 필요한 헤더 검증을 수행한다. 중복 JSON 키는 Qt 파서의 덮어쓰기 동작을 별도로 검사한다. 읽는 양은 헤더 크기에 비례하며 수 GB의 가중치 데이터를 읽거나 메모리에 적재하지 않는다.
 
 CLI는 `iiSocietyContainerDriveTool model-types`, `models <container>`, `organize-models <container>`를 제공한다. 마지막 명령은 파일을 이동하며 JSON 결과에 성공·오류를 구분한다.
+# Unified image models
+
+`model_index.json`에 `schema: iild-unified-model-v1`, `_class_name: IILDUnifiedCascade`가
+있는 패키지는 `SharedStorage`에서 `unified` 형식의 단일 모델로 노출한다. 내부 체크포인트는
+개별 모델로 중복 나열하지 않는다. 패키지 인벤토리의 일부가 변경되면 기존 모델 참조를 무효화한다.
+이 분류는 카탈로그 계약이며 실제 매니페스트·멤버 호환성 검사는 iiLocalDiffusion이 수행한다.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(iiSocietyContainer VERSION 0.13.0 LANGUAGES CXX)
+project(iiSocietyContainer VERSION 0.14.0 LANGUAGES CXX)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_language(OBJCXX)
@@ -33,7 +33,8 @@ add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyCo
         FilesView.h FilesView.cpp
         FileDirectory.h FileDirectory.cpp FilesLayout.h FilesLayout.cpp
         PhotosLayout.h PhotosLayout.cpp
-        SharedStorage.h SharedStorage.cpp
+        SharedStorage.h SharedStorage.cpp StorageMap.h StorageMap.cpp StorageDirectoryModel.h StorageDirectoryModel.cpp
+        StorageModelCatalog.h StorageModelCatalog.cpp
         ModelType.h ModelType.cpp ModelClassifier.h ModelClassifier.cpp ModelStore.h ModelStore.cpp
         ModelLayout.h ModelLayout.cpp
         src/Store/AssetLibrary/iiGE.cpp
@@ -82,6 +83,7 @@ target_include_directories(iiSocietyContainer PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 set_target_properties(iiSocietyContainer PROPERTIES
+    AUTOMOC ON
     CXX_EXTENSIONS OFF
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
@@ -267,3 +269,5 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/iiSocietyContainerConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/iiSocietyContainer
 )
+
+install(FILES StorageMap.h StorageDirectoryModel.h StorageModelCatalog.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

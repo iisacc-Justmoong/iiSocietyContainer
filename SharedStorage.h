@@ -8,8 +8,10 @@ namespace iiSocietyContainer {
 struct IISOCIETYCONTAINER_EXPORT StoredModel {
     QString id; // Path relative to Models; never a Finder/File Provider replica path.
     QString name;
-    QString format; // safetensors or diffusers
+    QString format; // safetensors, diffusers or unified
     QString fingerprint; // File inventory metadata, not a full weight hash.
+    bool available = true; // False for a model described by the host map only.
+    qint64 bytes = 0;
     QJsonObject reference(const QString &containerId) const;
 };
 

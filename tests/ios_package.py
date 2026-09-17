@@ -15,6 +15,11 @@ def main():
     args = parser.parse_args()
     output = args.build.resolve() / 'ios-package-contract'
     output.mkdir(parents=True, exist_ok=True)
+    activity = args.platform / 'ios/live-activity'
+    state_test = output / 'TaskActivityStateTests'
+    subprocess.run(['xcrun', 'swiftc', '-parse-as-library', str(activity / 'TaskActivityState.swift'),
+                    str(activity / 'TaskActivityStateTests.swift'), '-o', str(state_test)], check=True)
+    subprocess.run([str(state_test)], check=True)
     values = {
         'SOCIETY_IOS_APP_IDENTIFIER': 'com.iisacc.society',
         'SOCIETY_IOS_PROVIDER_IDENTIFIER': 'com.iisacc.society.fileprovider',
@@ -95,6 +100,7 @@ include("{args.platform / 'ios/iiSocietyContainerIOS.cmake'}")
 add_executable(Society MACOSX_BUNDLE main.cpp)
 set_target_properties(Society PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER com.iisacc.society)
 iiSocietyContainer_add_ios_file_provider(Society APP_GROUP {group})
+iiSocietyContainer_add_ios_live_activity(Society)
 # Exercise mixed-language compilation, including the C++ objects Qt autogen
 # previously injected into native Swift targets.
 target_sources(SocietyIosDriveBridge PRIVATE probe.cpp)
@@ -105,8 +111,14 @@ target_sources(SocietyFileProvider PRIVATE probe.cpp)
                         '-DCMAKE_OSX_ARCHITECTURES=arm64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0',
                         '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO'], check=True)
         subprocess.run(['cmake', '--build', str(native / 'build'), '--config', 'Debug',
-                        '--target', 'SocietyIosDriveBridge', 'SocietyFileProvider',
+                        '--target', 'SocietyIosDriveBridge', 'SocietyFileProvider', 'SocietyActivityBridge', 'SocietyLiveActivity',
                         '--parallel', '2'], check=True)
+        widget = native / 'build/Debug-iphoneos/SocietyLiveActivity.appex'
+        widget_info = plistlib.loads((widget / 'Info.plist').read_bytes())
+        assert widget_info['CFBundleIdentifier'] == 'com.iisacc.society.liveactivity'
+        assert widget_info['NSExtension']['NSExtensionPointIdentifier'] == 'com.apple.widgetkit-extension'
+        activity_info = plistlib.loads((native / 'build/ios-live-activity/Society/App.Info.plist.in').read_bytes())
+        assert activity_info['NSSupportsLiveActivities'] is True
         print('Native iOS bridge and extension compilation/link passed (no device runtime test)')
     else:
         print('Native iOS build skipped: the iPhoneOS SDK is unavailable')

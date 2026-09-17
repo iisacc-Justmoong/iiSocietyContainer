@@ -1,4 +1,9 @@
 #include <SharedStorage.h>
+#include <StorageMap.h>
+#include <StorageDirectoryModel.h>
+#include <StorageModelCatalog.h>
+#include <QSignalSpy>
+#include <QJsonArray>
 #include <algorithm>
 #include <QCoreApplication>
 #include <QDir>
@@ -8,6 +13,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QUuid>
+#include <QElapsedTimer>
 
 using namespace iiSocietyContainer;
 
@@ -24,6 +30,111 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void largeDirectoryRefreshReturnsBeforeReadingTheStorageMap() {
+        QTemporaryDir fixture(QDir::current().filePath("large-directory-XXXXXX"));
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageMap map(*drive); QJsonArray objects;
+        for (int i = 0; i < 8000; ++i)
+            objects.append(QJsonObject{{"path", QString("models/Checkpoint/remote-%1.safetensors").arg(i)},
+                {"kind", "file"}, {"size", "9000000000"}, {"resident", false}});
+        objects.append(QJsonObject{{"path", "files/Documents/visible.txt"}, {"kind", "file"},
+            {"size", "123"}, {"resident", false}});
+        QVERIFY(map.publish(objects));
+        StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(fixture.filePath("Files/Documents")));
+        QElapsedTimer elapsed; elapsed.start(); model.refresh();
+        QVERIFY2(elapsed.elapsed() < 50, "Directory refresh blocked its GUI caller on the full catalog");
+        QTRY_COMPARE(model.rowCount(), 1);
+        QCOMPARE(model.get(0, "fileName").toString(), "visible.txt");
+        QVERIFY(map.pendingRequests().isEmpty());
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Files/Documents/visible.txt")));
+    }
+    void directoryListsRemoteObjectsAndOpensOnlyCompletePayloads() {
+        QTemporaryDir fixture(QDir::current().filePath("remote-directory-XXXXXX"));
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageMap map(*drive);
+        QJsonObject object{{"path", "files/Documents/remote.png"}, {"kind", "file"},
+            {"size", "3"}, {"version", QString(64, 'a')}, {"hash", QString(64, 'b')}, {"resident", false}};
+        QVERIFY(map.publish({object}));
+        StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(fixture.filePath("Files/Documents")));
+        QTRY_COMPARE(model.rowCount(), 1);
+        QCOMPARE(model.get(0, "fileName").toString(), "remote.png");
+        QVERIFY(!model.get(0, "fileResident").toBool());
+        QVERIFY(model.get(0, "filePreviewUrl").toUrl().isEmpty());
+        const auto path = map.localPath("files/Documents/remote.png"); QVERIFY(!QFileInfo::exists(path));
+        QSignalSpy opened(&model, &StorageDirectoryModel::activated);
+        model.activate(0); QCOMPARE(opened.size(), 0); QTRY_COMPARE(map.pendingRequests().size(), 1);
+        const auto id = map.pendingRequests().first().toObject().value("id").toString();
+        write(path, "png"); object["resident"] = true; QVERIFY(map.publish({object}));
+        QVERIFY(map.finishRequest(id)); model.refresh(); QTRY_COMPARE(opened.size(), 1);
+        QCOMPARE(opened.first().first().toString(), path); QTRY_VERIFY(model.get(0, "fileResident").toBool());
+        QVERIFY(QFile::remove(path)); model.refresh(); QTRY_VERIFY(!model.get(0, "fileResident").toBool());
+        QCOMPARE(model.rowCount(), 1); // Cache absence does not erase the host row.
+    }
+    void navigationDiscardsAStaleDirectoryRead() {
+        QTemporaryDir fixture(QDir::current().filePath("directory-navigation-XXXXXX"));
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        write(fixture.filePath("Files/Documents/document.txt"), "doc");
+        write(fixture.filePath("Files/Audios/audio.wav"), "audio");
+        StorageDirectoryModel model;
+        model.setFolder(QUrl::fromLocalFile(fixture.filePath("Files/Documents"))); model.refresh();
+        model.setFolder(QUrl::fromLocalFile(fixture.filePath("Files/Audios"))); model.refresh();
+        QTRY_COMPARE(model.rowCount(), 1);
+        QTRY_COMPARE(model.get(0, "fileName").toString(), "audio.wav");
+        QTest::qWait(100); QCOMPARE(model.get(0, "fileName").toString(), "audio.wav");
+        model.setFolder({}); QCOMPARE(model.rowCount(), 0); QCOMPARE(model.status(), StorageDirectoryModel::Null);
+    }
+    void modelCardsCreateOnlyTheSelectedDownloadRequest() {
+        QTemporaryDir fixture(QDir::current().filePath("model-cards-XXXXXX"));
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageMap map(*drive);
+        QJsonObject selected{{"path", "models/Checkpoint/selected.safetensors"}, {"kind", "file"},
+            {"size", "3"}, {"resident", false}, {"version", QString(64, 'a')}};
+        auto other = selected; other["path"] = "models/LoRA/unselected.safetensors";
+        QVERIFY(map.publish({selected, other}));
+        StorageModelCatalog catalog; catalog.setDirectory(fixture.filePath("Models"));
+        QTRY_COMPARE(catalog.count(), 2); QTRY_VERIFY(!catalog.loading());
+        catalog.refresh(); QTRY_VERIFY(!catalog.loading()); QVERIFY(map.pendingRequests().isEmpty());
+        const auto path = fixture.filePath("Models/Checkpoint/selected.safetensors");
+        QVERIFY(!QFileInfo::exists(path));
+        QSignalSpy opened(&catalog, &StorageModelCatalog::objectReady);
+        QElapsedTimer elapsed; elapsed.start(); catalog.activatePath(path, true);
+        QVERIFY(elapsed.elapsed() < 50); QTRY_COMPARE(map.pendingRequests().size(), 1);
+        const auto request = map.pendingRequests().first().toObject();
+        const auto requested = request.value("objects").toArray(); QCOMPARE(requested.size(), 1);
+        QCOMPARE(requested.first().toObject().value("path"), selected.value("path"));
+        QCOMPARE(requested.first().toObject().value("version"), selected.value("version"));
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Models/LoRA/unselected.safetensors")));
+        write(path, "abc"); selected["resident"] = true; QVERIFY(map.publish({selected, other}));
+        QVERIFY(map.finishRequest(request.value("id").toString()));
+        QTRY_COMPARE(opened.size(), 1); QCOMPARE(opened.first().first().toString(), path);
+        QTRY_COMPARE(catalog.downloadStatus(), QString("Available on this device"));
+    }
+    void missingModelPackageIsNotReportedReady() {
+        QTemporaryDir fixture(QDir::current().filePath("missing-package-XXXXXX"));
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageDirectoryModel opener;
+        QSignalSpy ready(&opener, &StorageDirectoryModel::activated);
+        QSignalSpy failed(&opener, &StorageDirectoryModel::downloadFailed);
+        opener.openPath(fixture.filePath("Models/Checkpoint/removed-package"), true);
+        QTRY_COMPARE(failed.size(), 1); QCOMPARE(ready.size(), 0);
+    }
+    void remoteModelCatalogDoesNotCreatePayloads() {
+        QTemporaryDir fixture(QDir::current().filePath("remote-models-XXXXXX"));
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageMap map(*drive);
+        const QJsonObject object{{"path", "models/Checkpoint/remote.safetensors"}, {"kind", "file"},
+            {"size", "9000000000"}, {"version", QString(64, 'a')}, {"hash", QString(64, 'b')}, {"resident", false}};
+        QVERIFY(map.publish({object}));
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        const auto models = storage->models(); QCOMPARE(models.size(), 1);
+        QCOMPARE(models.first().id, "Checkpoint/remote.safetensors"); QVERIFY(!models.first().available);
+        QVERIFY(!QFileInfo::exists(map.localPath("models/Checkpoint/remote.safetensors")));
+        QString error; QVERIFY(storage->resolveModel(models.first().reference(drive->identifier()), &error).isEmpty());
+        QVERIFY(error.contains("Download"));
+        QVERIFY(map.request({"models/../outside"}, &error).isEmpty());
+        const auto id = map.request({"models/Checkpoint/remote.safetensors"}); QVERIFY(!id.isEmpty());
+        QCOMPARE(map.pendingRequests().size(), 1); QVERIFY(map.cancel(id)); QVERIFY(map.pendingRequests().isEmpty());
+    }
     void defaultSelectionFollowsHostAdoptionAndConsumersWaitForReadiness()
     {
         QTemporaryDir fixture(QDir::current().filePath("shared-mirror-XXXXXX"));
@@ -182,10 +293,17 @@ private slots:
         QVERIFY(QDir().mkdir(fixture.filePath("Models/pipeline")));
         write(fixture.filePath("Models/pipeline/model_index.json"), "{\"_class_name\":\"StableDiffusionPipeline\"}");
         write(fixture.filePath("Models/pipeline/model.safetensors"), "weights");
+        QVERIFY(QDir().mkpath(fixture.filePath("Models/cascade.iildmodel/members")));
+        write(fixture.filePath("Models/cascade.iildmodel/model_index.json"),
+              "{\"schema\":\"iild-unified-model-v1\",\"_class_name\":\"IILDUnifiedCascade\"}");
+        write(fixture.filePath("Models/cascade.iildmodel/members/model.safetensors"), "member weights");
         const auto client = SharedStorage::open(fixture.path());
         QVERIFY(client);
         const auto models = client->models();
-        QCOMPARE(models.size(), 2);
+        QCOMPARE(models.size(), 3);
+        const auto unified = std::find_if(models.begin(), models.end(), [](const auto &m) { return m.format == "unified"; });
+        QVERIFY(unified != models.end());
+        QCOMPARE(unified->id, QString("cascade.iildmodel"));
         for (const auto &model : models) {
             auto reference = model.reference(drive->identifier());
             QCOMPARE(client->resolveModel(reference), fixture.filePath("Models/" + model.id));
@@ -198,6 +316,8 @@ private slots:
         QVERIFY(client->resolveModel(reference).isEmpty());
         write(fixture.filePath("Models/weights.safetensor"), "changed model");
         QVERIFY(client->resolveModel(file.reference(drive->identifier())).isEmpty());
+        write(fixture.filePath("Models/cascade.iildmodel/members/model.safetensors"), "changed member");
+        QVERIFY(client->resolveModel(unified->reference(drive->identifier())).isEmpty());
     }
 
     void privateOutputDirectoriesRejectRedirection()

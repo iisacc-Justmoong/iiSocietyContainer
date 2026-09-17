@@ -1,5 +1,6 @@
 #include "SharedStorage.h"
 #include "ModelStore.h"
+#include "StorageMap.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -66,8 +67,17 @@ std::optional<StoredModel> inspect(const QString &path, const QString &base, con
     QCryptographicHash fingerprint(QCryptographicHash::Sha256);
     if (!inventory(path, base, fingerprint, path, previousId))
         return {};
+    QString format = package ? QStringLiteral("diffusers") : QStringLiteral("safetensors");
+    if (package) {
+        QFile manifest(QDir(path).filePath("model_index.json"));
+        if (manifest.size() <= 1024 * 1024 && manifest.open(QIODevice::ReadOnly)) {
+            const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
+            if (object.value("schema") == "iild-unified-model-v1" && object.value("_class_name") == "IILDUnifiedCascade")
+                format = QStringLiteral("unified");
+        }
+    }
     return StoredModel{previousId.isEmpty() ? QDir(base).relativeFilePath(path) : previousId, info.fileName(),
-        package ? QStringLiteral("diffusers") : QStringLiteral("safetensors"),
+        format,
         QString::fromLatin1(fingerprint.result().toHex())};
 }
 }
@@ -187,6 +197,48 @@ QList<StoredModel> SharedStorage::models(QString *error) const
     if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society mirror is not ready.")); return {}; }
     if (error) error->clear();
     QList<StoredModel> result;
+    StorageMap map(m_drive);
+    const auto objects = map.objects(error);
+    if (!objects.isEmpty()) {
+        QMap<QString, QJsonObject> entries;
+        QStringList packages;
+        for (const auto &value : objects) {
+            const auto e = value.toObject(); const auto key = e.value("path").toString();
+            if (!key.startsWith("models/") || e.value("kind") != "file") continue;
+            bool hidden = false; for (const auto &part : key.mid(7).split('/')) hidden |= part.startsWith('.');
+            if (hidden) continue;
+            entries.insert(key, e);
+            if (key.endsWith("/model_index.json")) packages.append(key.chopped(17));
+        }
+        const auto append = [&](const QString &key, bool package) {
+            QCryptographicHash fingerprint(QCryptographicHash::Sha256); bool available = true; qint64 size = 0;
+            for (auto it = entries.lowerBound(package ? key + '/' : key); it != entries.cend(); ++it) {
+                if (it.key() != key && !(package && it.key().startsWith(key + '/'))) break;
+                fingerprint.addData(it.key().toUtf8()); fingerprint.addData(it.value().value("version").toString().toUtf8());
+                available &= map.isResident(it.value()); size += it.value().value("size").toString().toLongLong();
+            }
+            QString format = package ? "diffusers" : "safetensors";
+            if (package) {
+                QFile manifest(map.localPath(key + "/model_index.json"));
+                if (manifest.size() <= 1024 * 1024 && manifest.open(QIODevice::ReadOnly)
+                    && QJsonDocument::fromJson(manifest.readAll()).object().value("schema") == "iild-unified-model-v1") format = "unified";
+            }
+            result.append({key.mid(7), key.section('/', -1), format,
+                QString::fromLatin1(fingerprint.result().toHex()), available, size});
+        };
+        packages.sort();
+        for (const auto &key : packages) {
+            bool nested = false; for (const auto &other : packages) if (key.startsWith(other + '/')) nested = true;
+            if (!nested) append(key, true);
+        }
+        for (auto it = entries.cbegin(); it != entries.cend(); ++it) {
+            if (!it.key().endsWith(".safetensors", Qt::CaseInsensitive) && !it.key().endsWith(".safetensor", Qt::CaseInsensitive)) continue;
+            bool nested = false; for (const auto &package : packages) if (it.key().startsWith(package + '/')) nested = true;
+            if (!nested) append(it.key(), false);
+        }
+        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.id < b.id; });
+        return result;
+    }
     const auto base = m_drive.sectionPath(StoreSection::Models);
     if (base.isEmpty()) {
         fail(error, QStringLiteral("The Society Models area is unavailable."));
@@ -217,6 +269,18 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
     if (base.isEmpty() || reference.value("containerId").toString() != m_drive.identifier() || !relative(id)) {
         fail(error, QStringLiteral("The model reference does not belong to this Society container."));
         return {};
+    }
+    StorageMap map(m_drive);
+    if (!map.objects().isEmpty()) {
+        for (const auto &model : models(error)) {
+            if (model.id != id) continue;
+            if (model.reference(m_drive.identifier()) != reference) {
+                fail(error, "The Society model changed after it was selected. Select it again."); return {};
+            }
+            if (!model.available) { fail(error, "Download this model from its Society host before generation."); return {}; }
+            return map.localPath("models/" + id);
+        }
+        fail(error, "The selected model is no longer in the Society storage map."); return {};
     }
     const auto store = ModelStore::open(m_drive.rootPath(), error);
     if (!store) return {};

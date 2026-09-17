@@ -1,4 +1,5 @@
 include_guard(GLOBAL)
+include("${CMAKE_CURRENT_LIST_DIR}/live-activity/LiveActivity.cmake")
 
 # Client apps share Society's private source, without installing another drive.
 function(iiSocietyContainer_configure_ios_client target)
