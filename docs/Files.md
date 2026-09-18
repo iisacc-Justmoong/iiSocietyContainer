@@ -38,3 +38,16 @@ macOS·iOS File Provider와 Android DocumentsProvider는 기본 폴더의 삭제
 Qt Core·Foundation·기존 Android 파일 API를 재사용하며 외부 의존성을 추가하지 않는다. `files_view`는 실제 생성·레거시 보완·충돌 보존·수동 저장·객체 ID 무효화를, `native_files`는 공개 열거·보호 기능·강제 삭제/이름 변경/이동 거부·자식 CRUD·복구를 검사한다. Android 기기 검사와 Linux/Windows 실제 마운트 검사에도 같은 회귀 시나리오가 포함된다. 실행한 플랫폼의 결과와 기기 설치는 별도로 보고한다.
 
 Photos는 별도 `StoreSection::Photos`이며 공개 Files 경로 바깥의 최상위 `Photos/`를 사용한다. 이전 8개 영역 매니페스트의 자동 이전은 [Photos.md](Photos.md)를 참고한다. 신규 Files에는 Photos를 만들지 않는다.
+
+## 디렉터리 조회와 변경 반영
+
+`StorageDirectoryModel`은 1초 간격의 비동기 조회를 유지한다. 경로·순서·표시 역할이 같은
+결과는 모델·개수·상태 변경 신호를 발생시키지 않는다. 실제 차이가 있을 때만
+`contentsAboutToChange`와 `contentsChanged` 사이에서 경로를 기준으로 행을 삽입·삭제·이동하고,
+메타데이터는 바뀐 역할의 `dataChanged`로 반영한다. 같은 폴더의 갱신은 `modelReset`을
+사용하지 않으며 살아 있는 항목의 영속 인덱스를 유지한다. `countChanged`는 실제 개수
+변경에만 발생한다. 폴더를 명시적으로 바꾸는 경우에는 이전 목록을 초기화한다.
+
+뷰는 조회 시작이 아니라 이 게시 경계에서 선택과 카메라 위치를 저장·복원한다.
+`shared_storage`의 `directoryRefreshPublishesOnlyTheChangedRows`는 변경 없는 수동·주기적
+조회, 메타데이터 수정, 앞쪽 삽입·삭제, 재정렬과 선택 항목 삭제를 Qt 모델 검사기로 검증한다.

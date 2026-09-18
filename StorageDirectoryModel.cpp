@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QSet>
 #include <QThread>
 #include <algorithm>
 #include <type_traits>
@@ -57,6 +58,7 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
             + '\n' + QString::number(catalog.lastModified().toMSecsSinceEpoch())
             + '\n' + QString::number(catalog.metadataChangeTime().toMSecsSinceEpoch());
         StorageMap map(*result.drive);
+        const bool authority = map.isLocalAuthority();
         result.catalog = result.stamp == cachedStamp ? cached : map.objects();
         for (const auto &value : result.catalog) {
             if (cancel->load()) return {};
@@ -66,15 +68,20 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
             const auto relative = StorageMap::physicalPath(key);
             if (relative.isEmpty() || relative.left(relative.lastIndexOf('/')) != relativeFolder) continue;
             const auto path = map.localPath(key); if (path.isEmpty()) continue;
+            // On the local host, the directory already is authoritative. An old
+            // index cannot resurrect a removed path or hide a newly restored file.
+            if (authority && (!paths.contains(path) || e.value("kind") == "deleted")) continue;
             if (e.value("kind") == "deleted") { paths.remove(path); continue; }
             const bool directory = e.value("kind") == "directory";
             if (!directory && e.value("kind") != "file") continue;
             auto row = paths.value(path);
-            const bool local = directory || map.isResident(e);
+            if (authority && directory != row.value("fileIsDir").toBool()) continue;
+            const bool local = authority || directory || map.isResident(e);
             const auto preview = map.previewPath(e);
             row.insert("fileName", key.section('/', -1)); row.insert("filePath", path);
             row.insert("fileUrl", QUrl::fromLocalFile(path)); row.insert("fileSuffix", QFileInfo(path).suffix());
-            row.insert("fileIsDir", directory); row.insert("fileSize", e.value("size").toString().toLongLong());
+            row.insert("fileIsDir", directory);
+            if (!authority) row.insert("fileSize", e.value("size").toString().toLongLong());
             row.insert("fileResident", local);
             row.insert("filePreviewUrl", !preview.isEmpty() ? QUrl::fromLocalFile(preview) : local ? QUrl::fromLocalFile(path) : QUrl());
             if (!row.contains("fileModified")) row.insert("fileModified", QDateTime());
@@ -200,6 +207,56 @@ void StorageDirectoryModel::checkRequest() {
         else emit downloadFailed(state.value("error").toString());
     });
 }
+void StorageDirectoryModel::applyRows(const QList<QVariantMap> &rows) {
+    if (rows == m_rows) return;
+    emit contentsAboutToChange();
+    const auto previousCount = m_rows.size();
+    const auto path = [](const QVariantMap &row) { return row.value("filePath").toString(); };
+    QSet<QString> nextPaths, existingPaths;
+    for (const auto &row : rows) nextPaths.insert(path(row));
+    for (const auto &row : m_rows) existingPaths.insert(path(row));
+
+    // Remove contiguous missing ranges backwards; surviving indexes keep their identity.
+    for (int last = m_rows.size() - 1; last >= 0;) {
+        if (nextPaths.contains(path(m_rows[last]))) { --last; continue; }
+        int first = last;
+        while (first > 0 && !nextPaths.contains(path(m_rows[first - 1]))) --first;
+        beginRemoveRows({}, first, last);
+        m_rows.remove(first, last - first + 1);
+        endRemoveRows();
+        last = first - 1;
+    }
+    const auto roles = roleNames();
+    for (int target = 0; target < rows.size(); ++target) {
+        const auto key = path(rows[target]);
+        if (!existingPaths.contains(key)) {
+            int last = target;
+            while (last + 1 < rows.size() && !existingPaths.contains(path(rows[last + 1]))) ++last;
+            beginInsertRows({}, target, last);
+            for (int i = target; i <= last; ++i) m_rows.insert(i, rows[i]);
+            endInsertRows();
+            target = last;
+            continue;
+        }
+        if (path(m_rows[target]) != key) {
+            int source = target + 1;
+            while (path(m_rows[source]) != key) ++source;
+            beginMoveRows({}, source, source, {}, target);
+            m_rows.move(source, target);
+            endMoveRows();
+        }
+        QList<int> changedRoles;
+        for (auto role = roles.cbegin(); role != roles.cend(); ++role)
+            if (m_rows[target].value(QString::fromLatin1(role.value())) != rows[target].value(QString::fromLatin1(role.value())))
+                changedRoles.append(role.key());
+        if (!changedRoles.isEmpty()) {
+            m_rows[target] = rows[target];
+            emit dataChanged(index(target), index(target), changedRoles);
+        }
+    }
+    if (previousCount != m_rows.size()) emit countChanged();
+    emit contentsChanged();
+}
 void StorageDirectoryModel::refresh() {
     if (!m_folder.isLocalFile() || m_folder.toLocalFile().isEmpty()) return;
     if (m_running) { m_pending = true; return; }
@@ -218,7 +275,7 @@ void StorageDirectoryModel::refresh() {
                 return;
             }
             m_running = false; m_drive = std::move(result.drive); m_catalog = std::move(result.catalog); m_catalogStamp = std::move(result.stamp);
-            if (result.rows != m_rows) { beginResetModel(); m_rows = std::move(result.rows); endResetModel(); emit countChanged(); }
+            applyRows(result.rows);
             if (m_status != Ready) { m_status = Ready; emit statusChanged(); }
             if (m_pending) QTimer::singleShot(0, this, &StorageDirectoryModel::refresh);
         });

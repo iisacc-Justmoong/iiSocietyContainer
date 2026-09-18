@@ -44,6 +44,9 @@ public:
     Q_INVOKABLE void openPath(const QString &path, bool materializeDirectory = false);
     Q_INVOKABLE void refresh();
 signals:
+    // One publication boundary per changed snapshot; polling alone emits neither.
+    void contentsAboutToChange();
+    void contentsChanged();
     void folderChanged();
     void countChanged();
     void statusChanged();
@@ -52,6 +55,7 @@ signals:
     void activated(QString path, bool directory);
     void downloadFailed(QString error);
 private:
+    void applyRows(const QList<QVariantMap> &rows);
     void checkRequest();
     QUrl m_folder;
     Status m_status = Null;

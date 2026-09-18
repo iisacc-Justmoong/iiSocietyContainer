@@ -2,7 +2,9 @@
 #include <StorageMap.h>
 #include <StorageDirectoryModel.h>
 #include <StorageModelCatalog.h>
+#include <FileOperations.h>
 #include <QSignalSpy>
+#include <QAbstractItemModelTester>
 #include <QJsonArray>
 #include <algorithm>
 #include <QCoreApplication>
@@ -30,6 +32,87 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void directoryRefreshPublishesOnlyTheChangedRows() {
+        QTemporaryDir fixture(QDir::current().filePath("directory-diff-XXXXXX")); QVERIFY(fixture.isValid());
+        write(fixture.filePath("b.txt"), "b");
+        write(fixture.filePath("c.txt"), "cc");
+        StorageDirectoryModel model;
+        QAbstractItemModelTester tester(&model, QAbstractItemModelTester::FailureReportingMode::QtTest);
+        model.setFolder(QUrl::fromLocalFile(fixture.path()));
+        QTRY_COMPARE(model.status(), StorageDirectoryModel::Ready);
+        QCOMPARE(model.rowCount(), 2);
+        const auto roles = model.roleNames();
+        const int pathRole = roles.key("filePath"), sizeRole = roles.key("fileSize");
+        QPersistentModelIndex selected(model.index(1));
+        QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
+        QSignalSpy changed(&model, &QAbstractItemModel::dataChanged);
+        QSignalSpy inserted(&model, &QAbstractItemModel::rowsInserted);
+        QSignalSpy removed(&model, &QAbstractItemModel::rowsRemoved);
+        QSignalSpy moved(&model, &QAbstractItemModel::rowsMoved);
+        QSignalSpy counts(&model, &StorageDirectoryModel::countChanged);
+        QSignalSpy status(&model, &StorageDirectoryModel::statusChanged);
+
+        // Both explicit checks and two automatic polls must remain invisible.
+        for (int i = 0; i < 3; ++i) model.refresh();
+        QTest::qWait(2200);
+        QCOMPARE(resets.size(), 0); QCOMPARE(changed.size(), 0);
+        QCOMPARE(inserted.size(), 0); QCOMPARE(removed.size(), 0); QCOMPARE(moved.size(), 0);
+        QCOMPARE(counts.size(), 0); QCOMPARE(status.size(), 0);
+
+        write(fixture.filePath("b.txt"), "longer content"); model.refresh();
+        QTRY_COMPARE(model.get(0, "fileSize").toLongLong(), 14);
+        QCOMPARE(resets.size(), 0);
+        QCOMPARE(changed.size(), 1); QCOMPARE(counts.size(), 0);
+        QCOMPARE(changed.first().at(0).value<QModelIndex>().row(), 0);
+        QVERIFY(changed.first().at(2).value<QList<int>>().contains(sizeRole));
+        QCOMPARE(selected.data(pathRole).toString(), fixture.filePath("c.txt"));
+
+        write(fixture.filePath("a.txt"), "a"); model.refresh();
+        QTRY_COMPARE(model.rowCount(), 3);
+        QCOMPARE(resets.size(), 0); QCOMPARE(inserted.size(), 1); QCOMPARE(counts.size(), 1);
+        QCOMPARE(selected.row(), 2);
+        QCOMPARE(selected.data(pathRole).toString(), fixture.filePath("c.txt"));
+        QVERIFY(QFile::remove(fixture.filePath("b.txt"))); model.refresh();
+        QTRY_COMPARE(model.rowCount(), 2);
+        QCOMPARE(resets.size(), 0); QCOMPARE(removed.size(), 1); QCOMPARE(counts.size(), 2);
+        QCOMPARE(selected.row(), 1);
+
+        QVERIFY(model.setProperty("sortReversed", true));
+        QTRY_COMPARE(model.get(0, "fileName").toString(), "c.txt");
+        QCOMPARE(resets.size(), 0); QVERIFY(!moved.isEmpty()); QCOMPARE(counts.size(), 2);
+        QCOMPARE(selected.row(), 0);
+        QCOMPARE(selected.data(pathRole).toString(), fixture.filePath("c.txt"));
+        QVERIFY(QFile::remove(fixture.filePath("c.txt"))); model.refresh();
+        QTRY_COMPARE(model.rowCount(), 1); QVERIFY(!selected.isValid());
+        QCOMPARE(resets.size(), 0);
+    }
+    void hostListingsFollowDeletionBeforeTheCatalogCatchesUp() {
+        QTemporaryDir fixture(QDir::current().filePath("host-delete-listing-XXXXXX")); QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive); StorageMap map(*drive);
+        const auto source = fixture.filePath("Models/Checkpoint/anima.safetensors");
+        write(source, "fixture");
+        const QJsonObject model{{"path", "models/Checkpoint/anima.safetensors"}, {"kind", "file"},
+            {"size", "7"}, {"resident", true}, {"version", QString(64, 'a')}};
+        QVERIFY(map.publish({model}));
+        write(fixture.filePath(".society-sync/primary.json"), QJsonDocument(QJsonObject{
+            {"schema", 1}, {"container", drive->identifier()}, {"scope", QString(64, 'a')}, {"host", "test-host"}}).toJson());
+        StorageModelCatalog catalog; catalog.setDirectory(fixture.filePath("Models"));
+        StorageDirectoryModel original; original.setFolder(QUrl::fromLocalFile(fixture.filePath("Models/Checkpoint")));
+        QTRY_COMPARE(catalog.count(), 1); QTRY_COMPARE(original.rowCount(), 1);
+        const auto moved = FileOperations(*drive).perform(FileOperations::Action::Trash, source); QVERIFY(moved);
+        catalog.refresh(); original.refresh();
+        QTRY_COMPARE(catalog.count(), 0); QTRY_COMPARE(original.rowCount(), 0);
+        // Even an old tombstone cannot hide a newly moved file on the authority.
+        const QJsonObject tombstone{{"path", "deleted/anima.safetensors"}, {"kind", "deleted"}};
+        QVERIFY(map.publish({model, tombstone}));
+        StorageDirectoryModel deleted; deleted.setFolder(QUrl::fromLocalFile(fixture.filePath("Deleted")));
+        QTRY_COMPARE(deleted.rowCount(), 1);
+        auto stale = model; stale["path"] = "deleted/anima.safetensors"; QVERIFY(map.publish({model, stale}));
+        deleted.refresh(); QTRY_COMPARE(deleted.rowCount(), 1);
+        QVERIFY(FileOperations(*drive).perform(FileOperations::Action::Remove, moved.path));
+        deleted.refresh(); QTRY_COMPARE(deleted.rowCount(), 0);
+        QVERIFY(map.pendingRequests().isEmpty());
+    }
     void largeDirectoryRefreshReturnsBeforeReadingTheStorageMap() {
         QTemporaryDir fixture(QDir::current().filePath("large-directory-XXXXXX"));
         const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);

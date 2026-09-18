@@ -76,6 +76,13 @@ QJsonArray StorageMap::objects(QString *error) const {
         || !snapshot.value("objects").isArray()) { fail(error, "The Society storage map belongs to a different container."); return {}; }
     return snapshot.value("objects").toArray();
 }
+bool StorageMap::isLocalAuthority() const {
+    const auto primary = read(".society-sync/primary.json", 8192);
+    static const QRegularExpression scope("\\A[a-f0-9]{64}\\z");
+    const auto host = primary.value("host").toString();
+    return primary.value("schema") == 1 && primary.value("container") == m_drive.identifier()
+        && !host.isEmpty() && host.size() <= 128 && scope.match(primary.value("scope").toString()).hasMatch();
+}
 QJsonObject StorageMap::object(const QString &key) const {
     for (const auto &value : objects()) if (value.toObject().value("path") == key) return value.toObject();
     return {};

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 project(iiSocietyContainer VERSION 0.14.0 LANGUAGES CXX)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(APPLE)
     enable_language(OBJCXX)
 endif()
 
@@ -32,6 +32,7 @@ add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyCo
         SocietyDrive.h SocietyDrive.cpp
         FilesView.h FilesView.cpp
         FileDirectory.h FileDirectory.cpp FilesLayout.h FilesLayout.cpp
+        FileOperations.h FileOperations.cpp
         PhotosLayout.h PhotosLayout.cpp
         SharedStorage.h SharedStorage.cpp StorageMap.h StorageMap.cpp StorageDirectoryModel.h StorageDirectoryModel.cpp
         StorageModelCatalog.h StorageModelCatalog.cpp
@@ -91,6 +92,39 @@ set_target_properties(iiSocietyContainer PROPERTIES
     VISIBILITY_INLINES_HIDDEN YES
     INSTALL_RPATH_USE_LINK_PATH TRUE
 )
+
+option(IISOCIETYCONTAINER_BUILD_GUI "Build asynchronous file actions and platform sharing" ON)
+if(IISOCIETYCONTAINER_BUILD_GUI)
+    find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Gui Concurrent)
+    # Qt 6.8 still advertises AGL, which recent macOS SDKs have removed.
+    if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        foreach(qt_gui_dependency WrapOpenGL::WrapOpenGL Qt6::Gui)
+            foreach(link_property INTERFACE_LINK_LIBRARIES INTERFACE_LINK_OPTIONS)
+                get_target_property(gui_links ${qt_gui_dependency} ${link_property})
+                if(gui_links)
+                    list(FILTER gui_links EXCLUDE REGEX "(^|[ /])AGL($|[ /.])|AGL\\.framework")
+                    set_target_properties(${qt_gui_dependency} PROPERTIES ${link_property} "${gui_links}")
+                endif()
+            endforeach()
+        endforeach()
+    endif()
+    add_library(iiSocietyContainerGui ${_library_type} FileActions.h FileActions.cpp)
+    add_library(iiSocietyContainer::Gui ALIAS iiSocietyContainerGui)
+    target_compile_features(iiSocietyContainerGui PUBLIC cxx_std_23)
+    target_compile_definitions(iiSocietyContainerGui PRIVATE IISOCIETYCONTAINER_GUI_BUILD)
+    target_link_libraries(iiSocietyContainerGui PUBLIC iiSocietyContainer Qt6::Gui PRIVATE Qt6::Concurrent)
+    set_target_properties(iiSocietyContainerGui PROPERTIES AUTOMOC ON EXPORT_NAME Gui
+        VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR} CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN YES INSTALL_RPATH_USE_LINK_PATH TRUE)
+    if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        target_sources(iiSocietyContainerGui PRIVATE platform/macos/FileSharing.mm)
+        target_link_libraries(iiSocietyContainerGui PRIVATE "-framework AppKit")
+        set_source_files_properties(platform/macos/FileSharing.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    endif()
+    install(TARGETS iiSocietyContainerGui EXPORT iiSocietyContainerTargets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(FILES FileActions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
     add_executable(iiSocietyContainerDriveTool tools/drive.cpp)
@@ -192,6 +226,19 @@ endif()
 
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Test)
+    add_executable(iiSocietyContainerFileOperationsTests tests/file_operations.cpp)
+    target_link_libraries(iiSocietyContainerFileOperationsTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
+    target_compile_definitions(iiSocietyContainerFileOperationsTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
+    set_target_properties(iiSocietyContainerFileOperationsTests PROPERTIES AUTOMOC ON)
+    add_test(NAME iiSocietyContainer.file_operations COMMAND iiSocietyContainerFileOperationsTests)
+    if(TARGET iiSocietyContainerGui)
+        add_executable(iiSocietyContainerFileActionsTests tests/file_actions.cpp)
+        target_link_libraries(iiSocietyContainerFileActionsTests PRIVATE iiSocietyContainer::Gui Qt6::Test)
+        target_compile_definitions(iiSocietyContainerFileActionsTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
+        set_target_properties(iiSocietyContainerFileActionsTests PROPERTIES AUTOMOC ON)
+        add_test(NAME iiSocietyContainer.file_actions COMMAND iiSocietyContainerFileActionsTests)
+        set_tests_properties(iiSocietyContainer.file_actions PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
     find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Network)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_executable(iiSocietyContainerMountServiceTests platform/desktop/MountDaemon.cpp tests/mount_stub.cpp)
@@ -241,12 +288,12 @@ install(TARGETS iiSocietyContainer EXPORT iiSocietyContainerTargets
 if(TARGET iiSocietyContainerDriveTool)
     install(TARGETS iiSocietyContainerDriveTool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-install(FILES iiSocietyContainer.h iiSocietyContainerExport.h SocietyDrive.h SharedStorage.h FilesView.h
+install(FILES iiSocietyContainer.h iiSocietyContainerExport.h SocietyDrive.h SharedStorage.h FilesView.h FileOperations.h
     FileDirectory.h ModelType.h ModelClassifier.h ModelStore.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
-install(FILES docs/Models.md docs/Files.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
+install(FILES docs/Models.md docs/Files.md docs/FileActions.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
 install(DIRECTORY platform/apple platform/ios platform/android DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform
     PATTERN "*Tests.swift" EXCLUDE PATTERN "._*" EXCLUDE PATTERN ".DS_Store" EXCLUDE)
 install(FILES platform/macos/README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform/macos)

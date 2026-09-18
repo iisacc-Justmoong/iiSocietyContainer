@@ -91,12 +91,16 @@ void sortRows(Snapshot &result) {
 }
 Snapshot fromMap(const SocietyDrive &drive, const QJsonArray &objects) {
     Snapshot result;
+    StorageMap map(drive); const bool authority = map.isLocalAuthority();
     result.watches = {QDir(drive.rootPath()).filePath("Models"), QDir(drive.rootPath()).filePath(".society-sync")};
     QMap<QString, QJsonObject> files;
     QStringList packages;
     for (const auto &value : objects) {
         const auto e = value.toObject(); const auto key = e.value("path").toString();
         if (!key.startsWith("models/") || e.value("kind") != "file" || StorageMap::physicalPath(key).isEmpty()) continue;
+        // Metadata remains sufficient for replica browsing. The host additionally
+        // checks existence so a filesystem move takes effect before reindexing.
+        if (authority && !QFileInfo::exists(map.localPath(key))) continue;
         bool hidden = false;
         for (const auto &part : key.mid(7).split('/')) hidden |= part.startsWith('.');
         if (hidden) continue;
