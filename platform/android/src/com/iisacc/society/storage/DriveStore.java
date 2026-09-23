@@ -17,7 +17,6 @@ import java.util.*;
 /** Private sectioned source. DocumentsProvider receives only Files-relative IDs. */
 public final class DriveStore {
     public static final String DISPLAY_NAME = "Society";
-    private static final String[] FIXED_DIRECTORIES = {"Documents", "Audios", "3D objects"};
     private static DriveStore instance;
     private final File root;
     private final String identity;
@@ -52,7 +51,7 @@ public final class DriveStore {
                     if (!section.isDirectory() && !section.mkdir()) throw new IOException("Cannot create Society area");
                     checkFile(section);
                 }
-                JSONObject data = new JSONObject().put("type", "SocietyDrive").put("schemaVersion", 1)
+                JSONObject data = new JSONObject().put("type", "SocietyDrive").put("schemaVersion", 1).put("filesLayoutVersion", 1)
                     .put("identifier", UUID.randomUUID().toString()).put("displayName", DISPLAY_NAME)
                     .put("sections", catalog);
                 AtomicFile atomic = new AtomicFile(manifest);
@@ -107,36 +106,11 @@ public final class DriveStore {
                 checkFile(section);
                 if (!section.isDirectory()) throw new IOException("Society area is unavailable");
             }
-            if (data.optBoolean("replicaReady", true)) ensureFilesDirectories();
         } catch (Exception error) { throw failure(error); }
     }
-    private void ensureFilesDirectories() throws IOException {
-        for (String name : FIXED_DIRECTORIES) {
-            File directory = new File(files(), name);
-            try {
-                Os.lstat(directory.getAbsolutePath());
-                checkFile(directory);
-                if (!directory.isDirectory()) throw new IOException("A fixed Files directory conflicts with an existing entry: " + name);
-            } catch (android.system.ErrnoException error) {
-                if (error.errno != OsConstants.ENOENT) throw failure(error);
-            }
-        }
-        for (String name : FIXED_DIRECTORIES) {
-            File directory = new File(files(), name);
-            if (!directory.exists() && !directory.mkdir() && !directory.isDirectory())
-                throw new IOException("Cannot create fixed Files directory: " + name);
-            checkFile(directory);
-            if (!directory.isDirectory()) throw new IOException("Fixed Files entry is not a directory");
-        }
-    }
     synchronized boolean protectedDocument(String id) throws IOException {
-        if (rootId().equals(id)) return true;
-        return fixedDirectory(document(id));
-    }
-    private boolean fixedDirectory(File file) {
-        if (!files().equals(file.getParentFile())) return false;
-        for (String name : FIXED_DIRECTORIES) if (name.equalsIgnoreCase(file.getName())) return true;
-        return false;
+        document(id); // Keep normal identity and confinement validation.
+        return rootId().equals(id);
     }
     public synchronized void requireReady() throws IOException {
         validate();
@@ -269,16 +243,14 @@ public final class DriveStore {
         File parent = document(parentId);
         if (!parent.isDirectory()) throw new IOException("Not a Society directory");
         File file = new File(parent, displayName);
-        if (fixedDirectory(file)) throw new IOException("This name is reserved for a fixed Files directory");
         boolean directory = android.provider.DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
         if (directory ? !file.mkdir() : !file.createNewFile()) throw new IOException("A file with this name already exists");
         return idFor(file);
     }
     synchronized String move(String id, String parentId, String displayName) throws IOException {
-        if (protectedDocument(id)) throw new IOException("Cannot move a fixed Society Files directory");
+        if (protectedDocument(id)) throw new IOException("Cannot move the Society Files root");
         name(displayName);
         File source = document(id), parent = document(parentId), destination = new File(parent, displayName);
-        if (fixedDirectory(destination)) throw new IOException("Cannot replace a fixed Society Files directory");
         if (!parent.isDirectory() || destination.exists() || parent.getAbsolutePath().startsWith(source.getAbsolutePath() + "/") || parent.equals(source))
             throw new IOException("Invalid Society move destination");
         String oldPath = relative(source), newPath = relative(destination);
@@ -298,7 +270,7 @@ public final class DriveStore {
         return id;
     }
     synchronized void delete(String id) throws IOException {
-        if (protectedDocument(id)) throw new IOException("Cannot delete a fixed Society Files directory");
+        if (protectedDocument(id)) throw new IOException("Cannot delete the Society Files root");
         File file = document(id);
         String path = relative(file);
         deleteTree(file);

@@ -1,14 +1,20 @@
-# Files 기본 디렉터리
+# Files 사용자 영역
 
-`Society/Files`에는 `Documents`, `Audios`, `3D objects`가 실제 디렉터리로 항상 생성된다. `SocietyDrive::create()`는 새 컨테이너를 초기화하고, `open()`은 준비된 기존 컨테이너에 누락된 기본 디렉터리를 추가한다. 컨테이너 UUID·매니페스트·기존 파일 위치는 유지한다. 이름이 충돌하는 파일·심볼릭 링크·junction은 덮어쓰지 않고 오류로 반환한다. 초기 동기화가 진행 중인 복제본을 읽는 것만으로 공개 상태로 전환하지 않는다.
+macOS 네이티브 디스크에서 논리 `Files/`는 공개 APFS `Society` 볼륨의 루트이다.
+실제 경로는 `SocietyDrive::sectionPath(StoreSection::Files)` 또는 `FilesView::rootPath()`로
+얻는다. 컨테이너 루트에 `/Files`를 문자열로 연결하지 않는다. 경로 변환에는 `resolvePath`와
+`relativePath`를 사용하며 내부 영역·동기화 데이터는 별도 비공개 볼륨에 유지한다.
 
-| 객체 종류 | 고정 키 | 디렉터리 | 용도 |
-| --- | --- | --- | --- |
-| `FileDirectoryKind::Documents` | `documents` | `Documents` | 문서 |
-| `FileDirectoryKind::Audios` | `audios` | `Audios` | 오디오 |
-| `FileDirectoryKind::Objects3D` | `objects3d` | `3D objects` | 3D 객체 |
+`Files/`는 기본 항목 없이 빈 상태로 시작한다. 새 컨테이너 생성, 기존 컨테이너 열기,
+복제본 공개, 파일 제공자 갱신과 동기화는 어떤 기본 하위 폴더도 생성하거나 복구하지 않는다.
+사용자가 만든 파일과 폴더만 표시한다. `Documents`, `Audios`, `3D objects`를 포함한 모든
+하위 이름은 일반 사용자 이름이며 생성·삭제·이름 변경·이동이 가능하다.
 
-자동 분류·확장자 제한·기존 파일 이동은 수행하지 않는다. 사용자가 폴더를 선택하며 루트와 사용자 하위 폴더에도 파일을 저장할 수 있다. Photos에 사진과 비디오를 함께 보관한다.
+기존 기본 폴더 정책을 사용하던 컨테이너는 SDK에서 최초로 열 때 세 이름의 **빈 디렉터리만**
+비재귀 `rmdir`로 제거한다. 숨김 파일을 포함해 내용이 있거나 일반 파일·링크·junction이면
+보존한다. 매니페스트의 `filesLayoutVersion: 1`은 완료된 이전을 기록한다. 새 컨테이너에도
+이 값을 저장하므로 이후 사용자가 같은 이름으로 만든 빈 폴더는 자동 삭제하지 않는다.
+UUID와 파일 위치는 유지하며, 준비 중인 구형 복제본은 공개 완료 시 이전한다.
 
 ```cpp
 #include <FilesView.h>
@@ -16,28 +22,29 @@ using namespace iiSocietyContainer;
 
 auto files = FilesView::open(containerPath, &error);
 if (!files) return;
-for (const FileDirectory &directory : files->directories()) {
-    // kind(), key(), name(), path(), isValid(), isProtected()
-    qInfo() << directory.key() << directory.path();
+for (const auto &entry : files->entries()) {
+    // 실제 사용자 항목을 사용한다. 신규 Files에서는 목록이 비어 있다.
+    qInfo() << entry.fileName() << entry.absoluteFilePath();
 }
-auto documents = files->directory(FileDirectoryKind::Documents);
-if (documents) {
-    const QString videoPath = files->resolve("Documents/movie.mp4", true, &error);
-    // 기존 파일 I/O 계층에 경로를 전달하여 사용자가 선택한 파일을 저장한다.
-}
+const QString path = files->resolve("notes.txt", true, &error);
 ```
 
-`FileDirectory`는 컨테이너 ID에 연결된 값 객체이며 이름·종류를 변경하는 setter를 제공하지 않는다. `path()`는 사용 시점의 준비 상태와 실제 디렉터리를 검사한다. 컨테이너가 교체되거나 다른 호스트 ID를 채택하면 이전 객체는 빈 경로를 반환한다.
+`FilesView::isProtectedPath()`는 공개 루트만 보호한다. 경로 이탈과 리디렉션 검증은 유지한다.
+기존 바이너리를 위해 `FileDirectoryKind`와 관련 함수의 ABI는 남겨 두되, 지원 종류와
+`FilesView::directories()`는 빈 목록이고 `directory()`는 값 없음이다. 이 호환 API는 폴더를
+만들거나 사용자 항목을 고정 객체로 취급하지 않는다.
 
-`FilesView::isProtectedPath()`는 공개 루트와 세 기본 폴더의 직계 경로를 보호 대상으로 판정한다. 대소문자 별칭도 예약하여 네이티브 파일 시스템의 별칭으로 보호를 우회할 수 없다. `Documents/subfolder`, `Custom/Photos` 등 하위 항목은 일반 사용자 항목이다. 이동은 원본과 목적지를 모두 검사한다.
+macOS·iOS File Provider, Android DocumentsProvider, Linux FUSE·Windows Dokan에서도
+하위 폴더에 기본 이름 예약이나 변경 제한을 적용하지 않는다. Apple 파일 제공자는 새 앵커
+버전으로 이전 연결의 기능 목록을 갱신한다. 동기화에서는 세 이름도 일반 디렉터리와 동일하게
+삭제·파일 교체·호스트 채택을 처리하고, 미동기화 내용의 보존 규칙은 유지한다.
 
-macOS·iOS File Provider와 Android DocumentsProvider는 기본 폴더의 삭제·이름 변경·부모 변경 기능을 노출하지 않으며, 요청이 직접 들어와도 거부한다. Linux FUSE·Windows Dokan도 삭제 및 이동의 양쪽 경로를 검사한다. 자식 생성·편집·이동·삭제는 가능하다. Apple 파일 제공자는 새 동기화 앵커로 기존 연결의 기능 표시를 갱신한다.
+`files_view`는 빈 초기 상태·반복 열기·복제본 공개·일회성 이전·사용자 내용 보존을 검사한다.
+`file_operations`와 `native_files`는 이전 기본 이름의 정상 변경과 삭제 후 미복구를 검사한다.
+Android 기기 및 Linux/Windows 마운트 검사에도 같은 계약을 적용한다.
 
-이 보호는 Society의 파일 제공자와 동기화 계층에서 적용한다. 관리자가 원본 디렉터리를 OS 파일 API로 직접 삭제하는 권한 자체를 변경하지는 않는다. 외부에서 삭제된 빈 기본 폴더는 다음 컨테이너 열기·파일 제공자 갱신 때 복구되며, 삭제된 사용자 파일의 복원 기능을 의미하지 않는다.
-
-Qt Core·Foundation·기존 Android 파일 API를 재사용하며 외부 의존성을 추가하지 않는다. `files_view`는 실제 생성·레거시 보완·충돌 보존·수동 저장·객체 ID 무효화를, `native_files`는 공개 열거·보호 기능·강제 삭제/이름 변경/이동 거부·자식 CRUD·복구를 검사한다. Android 기기 검사와 Linux/Windows 실제 마운트 검사에도 같은 회귀 시나리오가 포함된다. 실행한 플랫폼의 결과와 기기 설치는 별도로 보고한다.
-
-Photos는 별도 `StoreSection::Photos`이며 공개 Files 경로 바깥의 최상위 `Photos/`를 사용한다. 이전 8개 영역 매니페스트의 자동 이전은 [Photos.md](Photos.md)를 참고한다. 신규 Files에는 Photos를 만들지 않는다.
+Photos는 별도 `StoreSection::Photos`이며 공개 Files 경로 바깥의 최상위 `Photos/`를 사용한다.
+이전 매니페스트의 Photos 이전 계약은 [Photos.md](Photos.md)를 참고한다.
 
 ## 디렉터리 조회와 변경 반영
 

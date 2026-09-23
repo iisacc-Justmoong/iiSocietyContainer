@@ -98,8 +98,10 @@ QStringList StorageMap::files(const QString &key) const {
 }
 QString StorageMap::localPath(const QString &key) const {
     const auto relative = physicalPath(key); if (relative.isEmpty() || !m_drive.isValid()) return {};
-    auto path = m_drive.rootPath();
-    for (const auto &part : relative.split('/')) { path += '/' + part; if (!ordinary(path)) return {}; }
+    const auto parts = relative.split('/');
+    auto path = m_drive.resolvePath(parts.first());
+    if (path.isEmpty() || !ordinary(path)) return {};
+    for (const auto &part : parts.mid(1)) { path += '/' + part; if (!ordinary(path)) return {}; }
     return path;
 }
 bool StorageMap::available(const QStringList &keys) const {

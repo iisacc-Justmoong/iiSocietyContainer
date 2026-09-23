@@ -1,40 +1,23 @@
 #include "FilesLayout.h"
-#include "FileDirectory.h"
 #include <QDir>
 #include <QFileInfo>
 
 namespace iiSocietyContainer::detail {
-bool validateFilesLayout(const QString &root, QString *error)
+bool removeLegacyFilesDirectories(const QString &root, QString *error)
 {
-    for (const auto kind : allFileDirectoryKinds()) {
-        const auto path = QDir(root).filePath(fileDirectoryName(kind));
+    for (const auto *name : {"Documents", "Audios", "3D objects"}) {
+        const auto path = QDir(root).filePath(QLatin1String(name));
         const QFileInfo info(path);
-        if ((info.exists() || info.isSymLink() || info.isJunction())
-            && (!info.isDir() || info.isSymLink() || info.isJunction() || info.canonicalFilePath() != path)) {
-            if (error) *error = QStringLiteral("A fixed Files directory conflicts with an existing entry: %1").arg(path);
+        if (!info.isDir() || info.isSymLink() || info.isJunction()
+            || info.canonicalFilePath() != path) continue;
+        const auto entries = QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot;
+        if (!QDir(path).entryList(entries).isEmpty()) continue;
+        // rmdir is non-recursive and also preserves content added concurrently.
+        if (!QDir().rmdir(path) && QFileInfo::exists(path) && QDir(path).entryList(entries).isEmpty()) {
+            if (error) *error = QStringLiteral("Could not remove an empty legacy Files directory: %1").arg(path);
             return false;
         }
     }
     return true;
-}
-bool createFilesLayout(const QString &root, QString *error, QStringList *created)
-{
-    if (!validateFilesLayout(root, error)) return false;
-    for (const auto kind : allFileDirectoryKinds()) {
-        const auto path = QDir(root).filePath(fileDirectoryName(kind));
-        if (!QFileInfo::exists(path)) {
-            if (QDir().mkdir(path)) {
-                if (created) created->append(path);
-            } else {
-                // Another reader can create the same missing directory concurrently.
-                const QFileInfo info(path);
-                if (!info.isDir() || info.isSymLink() || info.isJunction() || info.canonicalFilePath() != path) {
-                    if (error) *error = QStringLiteral("Could not create fixed Files directory: %1").arg(path);
-                    return false;
-                }
-            }
-        }
-    }
-    return validateFilesLayout(root, error);
 }
 }

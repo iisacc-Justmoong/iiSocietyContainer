@@ -32,8 +32,12 @@ bool compatible(const QString &source, const QString &target, QString *error) {
     return true;
 }
 bool move(const QString &source, const QString &target, QString *error) {
-    if (!QFileInfo::exists(target))
-        return QDir().rename(source, target) || fail(error, source);
+    if (!QFileInfo::exists(target)) {
+        if (QDir().rename(source, target)) return true;
+        if (QFileInfo(source).isDir()) {
+            if (!QDir().mkdir(target)) return fail(error, target);
+        } else if (!QFile::copy(source, target)) return fail(error, target);
+    }
     if (QFileInfo(source).isDir()) {
         for (const auto &entry : QDir(source).entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot))
             if (!move(entry.absoluteFilePath(), QDir(target).filePath(entry.fileName()), error)) return false;
@@ -43,8 +47,9 @@ bool move(const QString &source, const QString &target, QString *error) {
     return (compatible(source, target, error) && QFile::remove(source)) || fail(error, source);
 }
 }
-bool migratePhotosLayout(const QString &root, QString *error) {
-    const auto source = QDir(root).filePath("Files/Photos"), target = QDir(root).filePath("Photos");
+bool migratePhotosLayout(const QString &root, QString *error, const QString &filesRoot) {
+    const auto source = filesRoot.isEmpty() ? QDir(root).filePath("Files/Photos") : QDir(filesRoot).filePath("Photos");
+    const auto target = QDir(root).filePath("Photos");
     const QFileInfo legacy(source), photos(target);
     if (photos.isSymLink() || photos.isJunction() || (photos.exists() && (!direct(photos) || !photos.isDir())))
         return fail(error, target);

@@ -11,7 +11,7 @@ rename, move to `Deleted`, and permanent removal from `Deleted`. macOS sharing
 uses `NSSharingServicePicker`; no recipient is selected or message sent by the SDK.
 Other platforms advertise `canShare=false` until a native adapter is supplied.
 
-Public section roots and the three fixed Files directories cannot be renamed,
+Public section roots cannot be renamed,
 deleted, or replaced. Destinations cannot cross the selected drive or follow
 symlinks/junctions. Paste may read explicitly selected ordinary external files.
 Existing destination files are never overwritten; duplicate/paste/trash choose
@@ -24,8 +24,11 @@ source or copy failure discards the staged output. Copy publication and ordinary
 rename share the replication operation lock.
 
 Delete bypasses materialization, residency checks, hashes, model/package inspection,
-and the replication lock. Trash uses a native no-replace rename into `Deleted`;
-it never falls back to copying bytes across filesystems. Permanent removal uses
+and the replication lock. Trash normally uses a native no-replace rename into `Deleted`.
+On macOS native disks, Files and private Deleted use separate volumes. This case copies to
+a private staging path, checks the source, retains a temporary original on the Files volume,
+and publishes the Deleted copy before removing that original. Failed copies preserve the source.
+Permanent removal uses
 ordinary filesystem unlink/recursive directory removal, only inside `Deleted`.
 Directories may contain any number of files, so permanent removal costs directory
 traversal and unlink operations, not reading model contents. Partial local packages

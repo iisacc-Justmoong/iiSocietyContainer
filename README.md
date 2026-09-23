@@ -4,7 +4,7 @@
 
 `StorageDirectoryModel`은 실제 디렉터리와 호스트 목록을 작업 스레드에서 합쳐 이름·크기·프리뷰·보유 여부를 제공한다. 현재 폴더의 직계 자식만 골라 경로를 검증하며, 변경되지 않은 저장소 맵은 파싱 결과를 재사용한다. `setFolder()`·`refresh()`는 GUI 호출을 기다리게 하지 않고, 이전 폴더의 늦은 결과를 폐기한다. 빈 폴더 URL은 조회 타이머를 멈춘다. `activate`는 미보유 파일을 요청하고 검증된 다운로드가 끝나면 `activated`를 보낸다. `StorageModelCatalog`은 호스트 카탈로그가 있으면 원본 헤더나 패키지를 읽지 않고 이름·경로·형식·크기·보유 상태로 모델 카드를 구성한다. 카탈로그 감시는 두 디렉터리로 제한하고, 로컬 전용 폴백의 감시는 최대 64개이다. `activatePath()`는 선택된 파일 또는 패키지만 SDK의 버전 고정 다운로드 요청으로 전달하며, 완료 뒤 `objectReady`를 보낼 수 있다. 로컬 전용 저장소의 구조 판정과 가져오기 검증은 유지한다. `SharedStorage::models()`도 미보유 모델을 표시하며 `resolveModel()`은 필요한 파일이 모두 준비되어야 성공한다. 패키지의 모델 참조는 구성 파일 전체의 버전에 고정된다. `shared_storage` 테스트는 목록만 있는 모델, 요청 취소, 파일 생성 없는 탐색과 다운로드 완료 후 열기를 검사한다.
 
-0.13.0은 최상위 `Photos/` 영역을 추가하고 기존 `Files/Photos/`를 데이터 보존을 확인하며 이전한다. `Files/Documents`, `Files/Audios`, `Files/3D objects`를 삭제·이름 변경·이동할 수 없는 실제 기본 디렉터리로 제공한다. `FileDirectory` 객체와 `FilesView::directories()`로 접근하며 Photos는 사진과 비디오를 함께 보관한다. 자동 분류는 수행하지 않는다. [Files 계약](docs/Files.md)에 기존 컨테이너 보완과 플랫폼별 보호 범위를 설명한다.
+`Files/`는 기본 파일이나 폴더 없이 시작한다. Documents, Audios, 3D objects의 자동 생성과 이름 예약·삭제 보호를 제거했다. 기존 빈 기본 폴더만 한 번 정리하고 사용자 내용과 이후 직접 만든 폴더는 보존한다. [Files 계약](docs/Files.md)을 참고한다. Photos는 독립된 최상위 영역이다.
 
 드라이브 표시 이름은 `Society`이다. 0.9.1부터 새 매니페스트에도 이 이름을 기록하며, 기존 `Society Container` 매니페스트는 UUID와 파일을 수정하지 않고 열어 `Society`로 표시한다. C++·Apple·Android의 읽기 경계는 두 이름을 허용한다. Windows 볼륨 이름, Linux FUSE 이름, Android 문서 루트, Apple File Provider 루트도 같은 표시 이름을 사용한다.
 
@@ -12,7 +12,7 @@ macOS에서 기존 원본으로 `register`를 다시 호출하면 동일한 File
 
 `iiSocietyContainer.drive`와 `native_store`는 새 이름, 이전 이름의 호환성, UUID 및 기존 매니페스트 보존을 검증한다. iOS 패키지 테스트와 Android 제공자 테스트는 시스템에 표시되는 이름을 검사한다.
 
-C++20 및 Qt 6.8.3 Core를 사용하는 버전 0.14.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. 경로를 인자로 받아 기존 디렉터리를 `SocietyContainer`라는 별도 공간으로 판정한다. `SocietyDrive`는 영속적인 드라이브 ID와 9개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 9개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
+C++23 및 Qt 6.8.3 Core를 사용하는 버전 0.14.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. `DiskImage`는 보관 위치에 별도 APFS 디스크 이미지를 생성하고 마운트한다. 기존 디렉터리 기반 API는 논리 레이아웃의 저수준 호환 API이다. `SocietyDrive`는 영속적인 드라이브 ID와 9개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 9개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
 
 `Models/`는 23개 모델 유형 폴더를 제공한다. `ModelStore`가 목록·자동 분류·수동 유형 수정·이전 경로 해석을 담당하고 `ModelClassifier`가 제한된 메타데이터를 읽는다. 0.11.1의 `metadata()`는 소비 앱의 카드에 표시할 아키텍처·정밀도·명시적 미디어 분류를 조회한다. 0.11.2는 Anima 체크포인트 구조 판별과 Safetensors 텐서 차원·자료형·바이트 범위 검증을 추가한다. 생성·레거시 정리·판정 규칙·이동 기록·CLI 계약은 [Models 관리 문서](docs/Models.md)에 설명한다.
 
@@ -116,6 +116,15 @@ auto reopened = iiSocietyContainer::SocietyDrive::open("/data/MyLibrary", &error
 macOS 15 이상에서는 네이티브 어댑터를 함께 빌드한다. 설치 위치는 `share/iiSocietyContainer/Society.app`이고 CMake 패키지의 `iiSocietyContainer_NATIVE_APP`으로 제공한다. SDK의 `iiSocietyContainerDriveTool create|open <path>`는 같은 API를 CLI로 제공한다. Finder 등록, 서명, 파일 반영 방식과 범위는 [macOS 어댑터 문서](platform/macos/README.md)를 따른다. [Windows·Linux 마운트](platform/desktop/README.md)와 [Android 문서 제공자·앱 간 공유](platform/android/README.md)는 별도 플랫폼 문서에 정의한다.
 
 시스템 드라이브에서 `Example.txt`를 열거나 저장하면 원본의 `Files/Example.txt`에 대응한다. 별도의 `Files` 폴더 단계를 표시하지 않는다. 나머지 7개 영역과 컨테이너 메타데이터는 시스템 드라이브의 목록·검색용 working set·파일 ID 접근에서 제외하며 Society 앱의 영역 탐색으로 제공한다. 이것은 File Provider의 노출 범위이며 원본 디렉터리의 운영체제 권한이나 암호화를 변경하지 않는다.
+
+## 네이티브 디스크 이미지
+
+macOS의 새 Society 온보딩은 Qt 없는 C++23 `DiskImage` API로 별도 APFS sparsebundle을 생성한다.
+선택한 폴더는 이미지 보관 위치이며 마운트된 볼륨이 컨테이너이다. `SharedStorage`는 이미지 경로와
+UUID를 저장하여 추출 후 다시 마운트한다. [API·저장 형식·검증](docs/DiskImage.md)을 참고한다.
+공개 APFS 볼륨의 루트도 Files의 내용만 제공한다. 나머지 영역과 메타데이터는 `nobrowse` 내부
+볼륨에 두며, `SocietyDrive::sectionPath()`·`resolvePath()`·`relativePath()`로 실제 경로를 얻는다.
+공개 이미지는 원래 이미지 패키지 내부에 보관하므로 계정의 디스크 경로 하나로 함께 이동한다.
 
 ## iisacc 공통 스토리지
 
@@ -252,3 +261,9 @@ reject incomplete mirrors. The storage owner can resolve their location through
 that handle remain gated. No credentials or account models enter this manifest.
 
 Photos 경로·매니페스트 이전 계약은 [Photos.md](docs/Photos.md)를 따른다. `FileDirectoryKind::Photos`는 값 호환성만 유지하며 FilesView에서는 반환하지 않는다. `StoreSection::Photos`를 사용한다.
+
+## 공유 대시보드와 Society 앱 연결
+
+`Gui` 컴포넌트의 `DashboardFiles`는 Society와 Dreamscapes가 공유하는 읽기 전용 비동기 목록이다. `containerPath`에 유효한 로컬 Society 드라이브를 지정하고 `recentFiles` 또는 `generationHistory`를 사용한다. 최신 20개 제한, 전체 스냅샷 검색, 원자적 이미지 교체 감시, 취소된 저장소 조회 폐기와 변경 없는 새로고침 시 목록 보존을 제공한다. 앱은 QML 등록과 표현만 담당한다.
+
+`SocietyApplication::openGenerationHistory()`는 `society://generation-history`를 운영체제로 전달하고 실행 요청 접수 여부를 반환한다. Society 호스트만 `listen()`을 호출하며 `generationHistoryRequested`를 Storage 화면에 연결한다. URL에는 파일 경로나 계정 정보가 없고 다른 host·path·query는 수락하지 않는다. macOS/iOS의 URL 이벤트, Android의 Qt URL 처리, 데스크톱 실행 인수를 지원한다. URL 등록은 Society 앱 패키지에서 처리하고 Windows는 Society 실행 시 현재 사용자에게 등록한다. 단위 테스트는 목록의 포함·제외·정렬·감시와 URL 전달을 검증한다.

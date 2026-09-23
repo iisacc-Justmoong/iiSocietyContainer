@@ -1,3 +1,6 @@
+> 새 Society 온보딩의 실제 APFS 디스크는 [DiskImage](../../docs/DiskImage.md)를 사용한다.
+> 이 문서는 기존 File Provider의 Files 전용 투영 어댑터에 관한 설명이다.
+
 # macOS Society
 
 Apple의 [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)로 Society 드라이브를 Finder와 파일 대화상자에 제공한다. 최소 macOS 15이다. Foundation·FileProvider·UniformTypeIdentifiers·CryptoKit·CoreServices는 운영체제에 포함된 프레임워크이며 FUSE, 외부 드라이버, 유료 클라우드 서비스를 추가하지 않는다. Swift 컴파일러는 Xcode Command Line Tools, 번들 생성은 Python 3을 사용한다. Apple 프레임워크의 사용 조건은 Apple SDK 라이선스를 따른다.
@@ -45,7 +48,7 @@ Asset Library, Deleted, Forked, Generation History, Models, Published, Thinking 
 
 파일 ID와 변경 앵커는 원본의 `.society-drive-provider.json`에 저장한다. inode와 생성 시각으로 이동을 추적하며 원자적 내용 교체에는 경로 ID를 유지한다. 이동한 원본이 남아 있다면 옛 경로에 생긴 새 파일은 새 ID를 받는다. 최근 8개 스냅샷 밖의 앵커에는 전체 재열거를 요청한다. 디렉터리 열거가 실패하면 부분 결과를 삭제 목록으로 처리하지 않는다. 현재 인덱스는 전체 영역을 스캔하므로 대규모 파일 집합의 성능 검증은 별도이다.
 
-0.5.0의 공개 앵커에는 `files-v3:` 접두사를 붙인다. 0.4.0 앵커에서 갱신할 때 기존 Files 자식의 ID를 유지하여 공개 루트로 옮기고, 기존 8개 영역 폴더와 비공개 항목은 시스템 복제본의 삭제 목록으로 보낸다. 이때 과거 전체 스냅샷은 변경 비교에만 사용하며 현재 항목 열거·다운로드에는 사용하지 않는다. 지원하지 않는 앵커 형식에는 전체 재열거를 요청한다. Society 앱에서 Files 밖으로 옮긴 항목은 시스템에서 사라지고, Files로 들어온 항목은 공개된다. 이미 다른 위치에 복사하거나 연결 해제 시 보존한 과거 데이터까지 회수하지는 않는다.
+공개 앵커에는 `files-v5:` 접두사를 붙인다. Files의 기본 폴더 보호가 제거되어 이전 접두사의 연결은 전체 재열거로 기능 목록을 갱신한다. 0.4.0 앵커에서 갱신할 때 기존 Files 자식의 ID를 유지하여 공개 루트로 옮기고, 기존 8개 영역 폴더와 비공개 항목은 시스템 복제본의 삭제 목록으로 보낸다. 이때 과거 전체 스냅샷은 변경 비교에만 사용하며 현재 항목 열거·다운로드에는 사용하지 않는다. 지원하지 않는 앵커 형식에는 전체 재열거를 요청한다. Society 앱에서 Files 밖으로 옮긴 항목은 시스템에서 사라지고, Files로 들어온 항목은 공개된다. 이미 다른 위치에 복사하거나 연결 해제 시 보존한 과거 데이터까지 회수하지는 않는다.
 
 working set에는 공개 루트의 메타데이터도 포함하며 루트가 변경되면 함께 전달한다. 따라서 기존 연결에 남은 루트 쓰기 제한도 해제되어 Finder의 `New Folder`를 사용할 수 있다. 루트 디렉터리의 화면 열거에는 자식만 전달한다. 내용 버전은 파일 내용 변경을 추적하고, 메타데이터 버전은 이름과 부모만 추적한다. 내용 수정 직후 요청한 이동을 수정 시각 변경 때문에 충돌로 처리하지 않는다. 디렉터리의 내용 버전은 디렉터리 자체의 식별자에 고정하고 자식은 각 항목의 버전으로 추적하여 자식 생성·삭제 때문에 폴더 삭제가 거부되지 않도록 한다. 변경 통지는 [Apple의 File Provider 변경 추적 계약](https://developer.apple.com/documentation/fileprovider/tracking-your-file-provider-s-changes)을 따른다.
 

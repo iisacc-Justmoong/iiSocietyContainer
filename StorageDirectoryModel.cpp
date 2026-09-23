@@ -1,4 +1,5 @@
 #include "StorageDirectoryModel.h"
+#include "FileOperations.h"
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
@@ -18,11 +19,7 @@ template<class Work, class Done> void background(QObject *owner, Work work, Done
     thread->start();
 }
 std::optional<SocietyDrive> containingDrive(QString path) {
-    while (!path.isEmpty() && path != QDir::rootPath()) {
-        if (QFileInfo::exists(QDir(path).filePath(".society-drive.json"))) return SocietyDrive::open(path);
-        path = QFileInfo(path).absolutePath();
-    }
-    return {};
+    return FileOperations::containingDrive(path);
 }
 struct Options {
     QUrl folder;
@@ -52,7 +49,7 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
     }
     if (result.drive) {
         const auto root = result.drive->rootPath();
-        const auto relativeFolder = QDir(root).relativeFilePath(folder);
+        const auto relativeFolder = result.drive->relativePath(folder);
         const QFileInfo catalog(QDir(root).filePath(".society-sync/catalog.json"));
         result.stamp = root + '\n' + result.drive->identifier() + '\n' + QString::number(catalog.size())
             + '\n' + QString::number(catalog.lastModified().toMSecsSinceEpoch())
@@ -164,7 +161,7 @@ void StorageDirectoryModel::openPath(const QString &path, bool materializeDirect
         r.drive = containingDrive(QFileInfo(path).absolutePath());
         if (!r.drive) { r.error = tr("The Society container is unavailable."); return r; }
         StorageMap map(*r.drive);
-        const auto key = StorageMap::logicalPath(QDir(r.drive->rootPath()).relativeFilePath(path));
+        const auto key = StorageMap::logicalPath(r.drive->relativePath(path));
         const auto safePath = map.localPath(key);
         if (safePath.isEmpty() || safePath != QDir::cleanPath(path)) { r.error = tr("The file is outside the Society container."); return r; }
         r.directory = materializeDirectory || QFileInfo(safePath).isDir();
@@ -192,7 +189,7 @@ void StorageDirectoryModel::checkRequest() {
     background(this, [drive, id, path] {
         StorageMap map(drive); auto state = map.requestState(id);
         if (state.value("state") == "ready") {
-            const auto key = StorageMap::logicalPath(QDir(drive.rootPath()).relativeFilePath(path));
+            const auto key = StorageMap::logicalPath(drive.relativePath(path));
             if (!map.available(map.files(key))) { state["state"] = "failed"; state["error"] = tr("The file changed before it could be opened. Select it again."); }
         }
         return state;

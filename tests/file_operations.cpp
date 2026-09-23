@@ -77,9 +77,17 @@ private slots:
         QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/file-action-boundary-XXXXXX"); QVERIFY(temp.isValid());
         QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/file-action-outside-XXXXXX"); QVERIFY(outside.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); FileOperations ops(*drive);
-        for (const auto &path : {temp.path(), temp.filePath("Models"), temp.filePath("Files/Documents"), temp.filePath("Files/Audios"), temp.filePath("Files/3D objects")}) {
+        for (const auto &path : {temp.path(), temp.filePath("Models"), temp.filePath("Files")}) {
             QVERIFY(!ops.editable(path)); QVERIFY(!ops.perform(FileOperations::Action::Trash, path));
         }
+        for (const auto *name : {"Documents", "Audios", "3D objects"}) {
+            const auto path = temp.filePath("Files/" + QString(name));
+            QVERIFY(QDir().mkdir(path)); QVERIFY(ops.editable(path));
+            const auto renamed = ops.perform(FileOperations::Action::Rename, path, QString(name) + " renamed");
+            QVERIFY2(renamed, qPrintable(renamed.error));
+            QVERIFY(ops.perform(FileOperations::Action::Trash, renamed.path));
+        }
+        QVERIFY(QDir().mkdir(temp.filePath("Files/Documents")));
         QFile f(temp.filePath("Files/example.txt")); QVERIFY(f.open(QIODevice::WriteOnly)); f.write("keep"); f.close();
         for (const auto &name : {"../escape", ".society-hidden", "a/b", "", "."})
             QVERIFY(!ops.perform(FileOperations::Action::Rename, f.fileName(), name));

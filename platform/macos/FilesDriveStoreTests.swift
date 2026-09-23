@@ -58,9 +58,9 @@ enum FilesDriveStoreTests {
         let store = try FilesDriveStore(root: root, catalog: catalog)
         let initial = try store.snapshot()
         try check(store.root.path == root.appendingPathComponent("Files").path, "The public source root must be Society/Files")
-        let expectedChildren: Set<String> = ["Example.txt", "Nested", "Documents", "Audios", "3D objects"]
-        try check(Set(store.children("root").map { $0.name }) == expectedChildren, "Opening the disk must show Files contents and four fixed directories")
-        try check(initial.records.count == 7, "The working set must contain only Files and its descendants")
+        let expectedChildren: Set<String> = ["Example.txt", "Nested"]
+        try check(Set(store.children("root").map { $0.name }) == expectedChildren, "Opening the disk must show only existing Files contents")
+        try check(initial.records.count == 4, "The working set must contain only Files and its descendants")
         try check(initial.records.values.allSatisfy { !$0.id.hasPrefix("section:") && !$0.path.hasPrefix("Files/") }, "Internal section IDs and the Files prefix must not be exposed")
         let publicFile = try store.children("root").first { $0.name == "Example.txt" }!
         try check(publicFile.parent == "root" && publicFile.path == "Example.txt", "Files children must belong directly to the public root")
@@ -85,39 +85,20 @@ enum FilesDriveStoreTests {
         try check(repeated.items.isEmpty && repeated.deleted.isEmpty && repeated.anchor == changes.anchor, "Unchanged refresh must not publish spurious root updates")
         let complete = EnumerationResult()
         workingSet.enumerateItems(for: complete, startingAt: firstPage)
-        try check(complete.items.contains { $0.itemIdentifier == .rootContainer } && complete.items.count == 7, "Full reconciliation must include root metadata and only public descendants")
+        try check(complete.items.contains { $0.itemIdentifier == .rootContainer } && complete.items.count == 4, "Full reconciliation must include root metadata and only public descendants")
 
         for name in ["Documents", "Audios", "3D objects"] {
-            let directory = try store.children("root").first { $0.name == name }!
-            try check(directory.protected && directory.directory, "Default directories must be protected directory objects")
+            let directory = try store.create(parent: "root", name: name, directory: true, contents: nil)
+            try check(!directory.protected, "Former default names must be ordinary user folders")
             let capabilities = DriveItem(directory).capabilities
-            try check(capabilities.contains(.allowsAddingSubItems) && !capabilities.contains(.allowsDeleting)
-                && !capabilities.contains(.allowsRenaming) && !capabilities.contains(.allowsReparenting), "Fixed folders must allow child creation without destructive capabilities")
-            try rejects("Fixed folder deletion accepted") { try store.remove(directory.id, baseContentVersion: nil, baseMetadataVersion: nil) }
-            try rejects("Fixed folder rename accepted") { _ = try store.modify(directory.id, name: "Moved", parent: nil, contents: nil, baseContentVersion: nil, baseMetadataVersion: nil) }
-            for destination in [name, name.lowercased()] {
-                do {
-                    _ = try store.modify(publicFile.id, name: destination, parent: "root", contents: nil, baseContentVersion: nil, baseMetadataVersion: nil)
-                    throw Failure(message: "A fixed destination accepted a file replacement")
-                } catch DriveStoreError.protectedItem { /* Includes case-sensitive source volumes. */ }
-            }
+            try check(capabilities.contains(.allowsDeleting) && capabilities.contains(.allowsRenaming)
+                && capabilities.contains(.allowsReparenting), "User folders must expose normal mutation capabilities")
             let nested = initial.records.values.first { $0.path == "Nested" }!
-            try rejects("Fixed folder move accepted") { _ = try store.modify(directory.id, name: nil, parent: nested.id, contents: nil, baseContentVersion: nil, baseMetadataVersion: nil) }
-            let sourceStore = try LocalDriveStore(root: root, catalog: catalog)
-            try rejects("Internal store bypassed fixed folder deletion") { try sourceStore.remove(directory.id, baseContentVersion: nil, baseMetadataVersion: nil) }
-            _ = try store.modify(directory.id, name: name, parent: "root", contents: nil, baseContentVersion: nil, baseMetadataVersion: nil)
-            for childName in ["photo.jpg", "video.mp4", "manual.txt"] {
-                let child = try store.create(parent: directory.id, name: childName, directory: false, contents: nil)
-                try check(!child.protected, "Files inside fixed folders must remain editable")
-                let renamed = try store.modify(child.id, name: "renamed-" + childName, parent: "root", contents: nil, baseContentVersion: nil, baseMetadataVersion: nil)
-                try store.remove(renamed.id, baseContentVersion: nil, baseMetadataVersion: nil)
-            }
-            let userDirectory = try store.create(parent: directory.id, name: "Photos", directory: true, contents: nil)
-            try check(!userDirectory.protected, "A nested folder named Photos must remain editable")
-            try store.remove(userDirectory.id, baseContentVersion: nil, baseMetadataVersion: nil)
-            try manager.removeItem(at: root.appendingPathComponent("Files/" + name))
-            let restored = try store.children("root").first { $0.name == name }!
-            try check(restored.protected && restored.directory, "Missing fixed directories must be restored during refresh")
+            let moved = try store.modify(directory.id, name: name + " moved", parent: nested.id, contents: nil, baseContentVersion: nil, baseMetadataVersion: nil)
+            try store.remove(moved.id, baseContentVersion: nil, baseMetadataVersion: nil)
+            try check(!store.children("root").contains { $0.name == name }, "Deleted folders must not be restored")
+            let file = try store.create(parent: "root", name: name, directory: false, contents: nil)
+            try store.remove(file.id, baseContentVersion: nil, baseMetadataVersion: nil)
         }
 
         let upload = root.appendingPathComponent("Upload.txt")

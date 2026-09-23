@@ -1,6 +1,7 @@
 #include "SharedStorage.h"
 #include "ModelStore.h"
 #include "StorageMap.h"
+#include "DiskImage.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -123,8 +124,12 @@ bool SharedStorage::setDefaultContainer(const QString &path, QString *error)
         return false;
     }
     QSaveFile file(settings);
-    const auto bytes = QJsonDocument(QJsonObject{{"schemaVersion", 1}, {"containerId", drive->identifier()},
-        {"path", drive->rootPath()}}).toJson();
+    QJsonObject configuration{{"schemaVersion", 1}, {"containerId", drive->identifier()}, {"path", drive->rootPath()}};
+    if (const auto volume = DiskImage::mountedAt(drive->rootPath().toStdString())) {
+        configuration.insert("schemaVersion", 2);
+        configuration.insert("imagePath", QString::fromStdString(volume->imagePath.string()));
+    }
+    const auto bytes = QJsonDocument(configuration).toJson();
     if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
         fail(error, file.errorString());
         return false;
@@ -167,9 +172,19 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
         const auto settings = QJsonDocument::fromJson(file.readAll()).object();
         selected = settings.value("path").toString();
         expectedId = settings.value("containerId").toString();
-        if (settings.value("schemaVersion").toInt() != 1 || expectedId.isEmpty() || selected.isEmpty()) {
+        const int version = settings.value("schemaVersion").toInt();
+        if ((version != 1 && version != 2) || expectedId.isEmpty() || selected.isEmpty()) {
             fail(error, QStringLiteral("The shared Society settings are invalid."));
             return {};
+        }
+        if (version == 2) {
+            const auto image = settings.value("imagePath").toString();
+            if (!QDir::isAbsolutePath(image)) {
+                fail(error, QStringLiteral("The saved Society disk image path is invalid.")); return {};
+            }
+            const auto volume = DiskImage::mount(image.toStdString());
+            if (!volume) { fail(error, QString::fromStdString(volume.error())); return {}; }
+            selected = QString::fromStdString(volume->mountPath.string());
         }
     }
     const auto drive = SocietyDrive::open(selected, error);

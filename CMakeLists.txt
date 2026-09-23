@@ -27,7 +27,7 @@ else()
     set(_library_type SHARED)
 endif()
 
-add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyContainer.cpp
+add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyContainer.cpp DiskImage.h
         iiSocietyContainerExport.h
         SocietyDrive.h SocietyDrive.cpp
         FilesView.h FilesView.cpp
@@ -76,7 +76,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_source_files_properties(platform/apple/SharedStorageLocation.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_target_properties(iiSocietyContainer PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
 endif()
-target_compile_features(iiSocietyContainer PUBLIC cxx_std_20)
+target_compile_features(iiSocietyContainer PUBLIC cxx_std_23)
+if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_sources(iiSocietyContainer PRIVATE platform/macos/DiskImage.mm)
+    target_link_libraries(iiSocietyContainer PRIVATE "-framework Foundation")
+    set_source_files_properties(platform/macos/DiskImage.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    set_target_properties(iiSocietyContainer PROPERTIES OBJCXX_STANDARD 23 OBJCXX_STANDARD_REQUIRED ON)
+else()
+    target_sources(iiSocietyContainer PRIVATE platform/desktop/DiskImageUnsupported.cpp)
+endif()
 target_compile_definitions(iiSocietyContainer PRIVATE IISOCIETYCONTAINER_BUILDING_LIBRARY)
 target_link_libraries(iiSocietyContainer PUBLIC Qt6::Core)
 target_include_directories(iiSocietyContainer PUBLIC
@@ -108,14 +116,22 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
             endforeach()
         endforeach()
     endif()
-    add_library(iiSocietyContainerGui ${_library_type} FileActions.h FileActions.cpp)
+    add_library(iiSocietyContainerGui ${_library_type} FileActions.h FileActions.cpp
+        src/iiSocietyContainer/DashboardFiles.h src/iiSocietyContainer/DashboardFiles.cpp
+        src/iiSocietyContainer/SocietyApplication.h src/iiSocietyContainer/SocietyApplication.cpp)
     add_library(iiSocietyContainer::Gui ALIAS iiSocietyContainerGui)
     target_compile_features(iiSocietyContainerGui PUBLIC cxx_std_23)
+    target_include_directories(iiSocietyContainerGui PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
     target_compile_definitions(iiSocietyContainerGui PRIVATE IISOCIETYCONTAINER_GUI_BUILD)
     target_link_libraries(iiSocietyContainerGui PUBLIC iiSocietyContainer Qt6::Gui PRIVATE Qt6::Concurrent)
     set_target_properties(iiSocietyContainerGui PROPERTIES AUTOMOC ON EXPORT_NAME Gui
         VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR} CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN YES INSTALL_RPATH_USE_LINK_PATH TRUE)
+    qt_extract_metatypes(iiSocietyContainerGui OUTPUT_FILES society_gui_metatypes)
+    get_filename_component(society_gui_metatypes_name "${society_gui_metatypes}" NAME)
+    install(FILES "${society_gui_metatypes}" DESTINATION "${CMAKE_INSTALL_LIBDIR}/metatypes")
+    target_sources(iiSocietyContainerGui INTERFACE
+        "$<INSTALL_INTERFACE:$<$<BOOL:$<TARGET_PROPERTY:QT_CONSUMES_METATYPES>>:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/metatypes/${society_gui_metatypes_name}>>")
     if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         target_sources(iiSocietyContainerGui PRIVATE platform/macos/FileSharing.mm)
         target_link_libraries(iiSocietyContainerGui PRIVATE "-framework AppKit")
@@ -124,6 +140,8 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
     install(TARGETS iiSocietyContainerGui EXPORT iiSocietyContainerTargets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     install(FILES FileActions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(FILES src/iiSocietyContainer/DashboardFiles.h src/iiSocietyContainer/SocietyApplication.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iiSocietyContainer)
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
@@ -232,6 +250,12 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     set_target_properties(iiSocietyContainerFileOperationsTests PROPERTIES AUTOMOC ON)
     add_test(NAME iiSocietyContainer.file_operations COMMAND iiSocietyContainerFileOperationsTests)
     if(TARGET iiSocietyContainerGui)
+        add_executable(iiSocietyContainerDashboardTests tests/dashboard.cpp)
+        target_link_libraries(iiSocietyContainerDashboardTests PRIVATE iiSocietyContainer::Gui Qt6::Test)
+        target_compile_definitions(iiSocietyContainerDashboardTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
+        set_target_properties(iiSocietyContainerDashboardTests PROPERTIES AUTOMOC ON)
+        add_test(NAME iiSocietyContainer.dashboard COMMAND iiSocietyContainerDashboardTests)
+        set_tests_properties(iiSocietyContainer.dashboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
         add_executable(iiSocietyContainerFileActionsTests tests/file_actions.cpp)
         target_link_libraries(iiSocietyContainerFileActionsTests PRIVATE iiSocietyContainer::Gui Qt6::Test)
         target_compile_definitions(iiSocietyContainerFileActionsTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
@@ -268,6 +292,16 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(iiSocietyContainerSharedStorageTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
     set_target_properties(iiSocietyContainerSharedStorageTests PROPERTIES AUTOMOC ON)
     add_test(NAME iiSocietyContainer.shared_storage COMMAND iiSocietyContainerSharedStorageTests)
+    if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        add_executable(iiSocietyContainerDiskImageTests tests/disk_image.cpp)
+        target_link_libraries(iiSocietyContainerDiskImageTests PRIVATE iiSocietyContainer Qt6::Test)
+        target_compile_definitions(iiSocietyContainerDiskImageTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
+        set_target_properties(iiSocietyContainerDiskImageTests PROPERTIES AUTOMOC ON)
+        add_test(NAME iiSocietyContainer.disk_image COMMAND iiSocietyContainerDiskImageTests)
+        set_tests_properties(iiSocietyContainer.disk_image PROPERTIES TIMEOUT 240)
+        add_test(NAME iiSocietyContainer.disk_image_header COMMAND "${CMAKE_CXX_COMPILER}" -std=c++23
+            -fsyntax-only "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/disk_image_header.cpp")
+    endif()
     add_executable(iiSocietyContainerModelStoreTests tests/model_store.cpp)
     target_link_libraries(iiSocietyContainerModelStoreTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
     target_compile_definitions(iiSocietyContainerModelStoreTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
@@ -288,7 +322,7 @@ install(TARGETS iiSocietyContainer EXPORT iiSocietyContainerTargets
 if(TARGET iiSocietyContainerDriveTool)
     install(TARGETS iiSocietyContainerDriveTool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-install(FILES iiSocietyContainer.h iiSocietyContainerExport.h SocietyDrive.h SharedStorage.h FilesView.h FileOperations.h
+install(FILES iiSocietyContainer.h iiSocietyContainerExport.h SocietyDrive.h DiskImage.h SharedStorage.h FilesView.h FileOperations.h
     FileDirectory.h ModelType.h ModelClassifier.h ModelStore.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)

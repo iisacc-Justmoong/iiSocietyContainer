@@ -42,6 +42,9 @@ public:
     [[nodiscard]] QList<StoreSection> sections() const;
     [[nodiscard]] QString sectionPath(StoreSection section) const;
     [[nodiscard]] std::optional<StoreSection> sectionForPath(const QString& path) const;
+    /// Map the logical section namespace to native paths, including the Files volume.
+    [[nodiscard]] QString resolvePath(const QString& relative) const;
+    [[nodiscard]] QString relativePath(const QString& absolute) const;
 
 private:
     SocietyDrive(QString root, QString identifier);

@@ -227,7 +227,7 @@ private slots:
         QString error;
         QVERIFY(!SocietyDrive::create(files, &error));
         QVERIFY(error.contains("source"));
-        QCOMPARE(QDir(files).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 3);
+        QCOMPARE(QDir(files).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 0);
         QVERIFY(!QFileInfo::exists(QDir(files).filePath(".society-drive.json")));
         QVERIFY(QDir().mkpath(QDir(files).filePath("Nested/Deep")));
         QVERIFY(!SocietyDrive::create(QDir(files).filePath("Nested/Deep"), &error));

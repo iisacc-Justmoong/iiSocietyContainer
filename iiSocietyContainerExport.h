@@ -1,9 +1,11 @@
 #pragma once
 
-#include <QtCore/qglobal.h>
-
-#if defined(IISOCIETYCONTAINER_BUILDING_LIBRARY)
-#  define IISOCIETYCONTAINER_EXPORT Q_DECL_EXPORT
+#if defined(_WIN32)
+#  if defined(IISOCIETYCONTAINER_BUILDING_LIBRARY)
+#    define IISOCIETYCONTAINER_EXPORT __declspec(dllexport)
+#  else
+#    define IISOCIETYCONTAINER_EXPORT __declspec(dllimport)
+#  endif
 #else
-#  define IISOCIETYCONTAINER_EXPORT Q_DECL_IMPORT
+#  define IISOCIETYCONTAINER_EXPORT __attribute__((visibility("default")))
 #endif

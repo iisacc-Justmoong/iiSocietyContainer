@@ -1,6 +1,6 @@
 #include "FileOperations.h"
-#include "FileDirectory.h"
 #include "StorageMap.h"
+#include "DiskImage.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -24,15 +24,19 @@ namespace iiSocietyContainer {
 namespace {
 bool confined(const SocietyDrive &drive, const QString &path, bool section = false) {
     if (!drive.isValid() || !QFileInfo(path).isAbsolute() || path != QDir::cleanPath(path)) return false;
-    const auto relative = QDir(drive.rootPath()).relativeFilePath(path);
-    if (relative == "." || relative.startsWith("../")) return false;
+    const auto relative = drive.relativePath(path);
+    if (relative.isEmpty()) return false;
     bool known = false;
     for (const auto s : allStoreSections()) known |= relative.section('/', 0, 0) == storeSectionName(s);
     if (!known || (!section && !relative.contains('/'))) return false;
-    auto current = drive.rootPath();
+    auto current = drive.resolvePath(relative.section('/', 0, 0));
+    if (current.isEmpty() || !QFileInfo(current).isDir() || QFileInfo(current).isSymLink()
+        || QFileInfo(current).canonicalFilePath() != current) return false;
+    bool first = true;
     for (const auto &part : relative.split('/')) {
         if (part.isEmpty() || part == "." || part == ".." || part.contains('\\') || part.contains(':')
             || part.contains(QChar::Null) || part.startsWith(".society-") || part.startsWith(".iiserverhost-")) return false;
+        if (first) { first = false; continue; }
         current += '/' + part; const QFileInfo info(current);
         if (info.isSymLink() || info.isJunction() || (info.exists() && info.canonicalFilePath() != current)) return false;
     }
@@ -106,6 +110,7 @@ bool moveWithoutCopy(const QString &source, const QString &destination) {
 FileOperations::FileOperations(SocietyDrive drive) : m_drive(std::move(drive)) {}
 std::optional<SocietyDrive> FileOperations::containingDrive(const QString &path) {
     if (!QFileInfo(path).isAbsolute()) return {};
+    if (const auto root = DiskImage::containerRoot(path.toStdString())) return SocietyDrive::open(QString::fromStdString(root->string()));
     QString parent = QDir::cleanPath(path);
     while (parent != QDir::rootPath()) {
         if (QFileInfo::exists(QDir(parent).filePath(".society-drive.json"))) return SocietyDrive::open(parent);
@@ -114,9 +119,7 @@ std::optional<SocietyDrive> FileOperations::containingDrive(const QString &path)
     return {};
 }
 bool FileOperations::editable(const QString &path) const {
-    if (!confined(m_drive, path)) return false;
-    const auto relative = QDir(m_drive.rootPath()).relativeFilePath(path);
-    return !(relative.startsWith("Files/") && isFixedFilesDirectory(relative.mid(6)));
+    return confined(m_drive, path);
 }
 FileOperations::Result FileOperations::perform(Action action, const QString &source, const QString &argument) const {
     auto failed = [](const QString &error) { return Result{{}, error}; };
@@ -140,11 +143,30 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
         if (source.startsWith(folder + '/')) return failed("This item is already in Deleted.");
         const auto destination = uniquePath(folder, sourceInfo.fileName(), false);
         if (destination.isEmpty() || !editable(destination)) return failed("The Deleted destination is unavailable.");
-        return moveWithoutCopy(source, destination) ? Result{destination, {}}
-            : failed("Could not move this item to Deleted. Check access and that both folders are on the same filesystem.");
+        if (moveWithoutCopy(source, destination)) return {destination, {}};
+#ifdef Q_OS_MACOS
+        // Native Files and private Deleted have separate volumes. Keep a local
+        // recovery name until the verified private copy has been published.
+        if (errno == EXDEV && DiskImage::filesRoot(m_drive.rootPath().toStdString())) {
+            const auto id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            const auto staged = folder + "/.society-trash-" + id;
+            const auto recovery = sourceInfo.absolutePath() + "/.society-trash-" + id;
+            const auto cleanup = qScopeGuard([&] { removeTree(staged); });
+            QString error;
+            if (!copyTree(source, staged, &error)) return failed(error);
+            if (!moveWithoutCopy(source, recovery)) return failed("The source changed before it could be moved to Deleted.");
+            if (!moveWithoutCopy(staged, destination)) {
+                moveWithoutCopy(recovery, source);
+                return failed("Could not publish the item in Deleted. Its original remains in the source volume.");
+            }
+            removeTree(recovery);
+            return {destination, {}};
+        }
+#endif
+        return failed("Could not move this item to Deleted. Check access and that both folders are on the same filesystem.");
     }
     StorageMap map(m_drive);
-    const auto sourceKey = StorageMap::logicalPath(QDir(m_drive.rootPath()).relativeFilePath(source));
+    const auto sourceKey = StorageMap::logicalPath(m_drive.relativePath(source));
     const auto keys = map.files(sourceKey);
     // Never move a partial model package and leave its remote children behind.
     if (!keys.isEmpty() && !map.available(keys)) return failed("The selected item is not fully downloaded yet.");

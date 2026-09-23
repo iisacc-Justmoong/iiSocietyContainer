@@ -123,6 +123,7 @@ private slots:
         objects.append(QJsonObject{{"path", "files/Documents/visible.txt"}, {"kind", "file"},
             {"size", "123"}, {"resident", false}});
         QVERIFY(map.publish(objects));
+        QVERIFY(QDir().mkpath(fixture.filePath("Files/Documents")));
         StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(fixture.filePath("Files/Documents")));
         QElapsedTimer elapsed; elapsed.start(); model.refresh();
         QVERIFY2(elapsed.elapsed() < 50, "Directory refresh blocked its GUI caller on the full catalog");
@@ -138,6 +139,7 @@ private slots:
         QJsonObject object{{"path", "files/Documents/remote.png"}, {"kind", "file"},
             {"size", "3"}, {"version", QString(64, 'a')}, {"hash", QString(64, 'b')}, {"resident", false}};
         QVERIFY(map.publish({object}));
+        QVERIFY(QDir().mkpath(fixture.filePath("Files/Documents")));
         StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(fixture.filePath("Files/Documents")));
         QTRY_COMPARE(model.rowCount(), 1);
         QCOMPARE(model.get(0, "fileName").toString(), "remote.png");
@@ -156,6 +158,8 @@ private slots:
     void navigationDiscardsAStaleDirectoryRead() {
         QTemporaryDir fixture(QDir::current().filePath("directory-navigation-XXXXXX"));
         const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        QVERIFY(QDir().mkpath(fixture.filePath("Files/Documents")));
+        QVERIFY(QDir().mkpath(fixture.filePath("Files/Audios")));
         write(fixture.filePath("Files/Documents/document.txt"), "doc");
         write(fixture.filePath("Files/Audios/audio.wav"), "audio");
         StorageDirectoryModel model;
@@ -316,7 +320,7 @@ private slots:
         QVERIFY(QFile::link(fixture.filePath("not-present"), fixture.filePath("Models/dangling")));
         for (const auto &path : {"redirect", "redirect/escape", "dangling"})
             QVERIFY(storage->filePath(StoreSection::Models, path).isEmpty());
-        QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 3);
+        QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 0);
 #endif
     }
 
@@ -417,7 +421,7 @@ private slots:
         QVERIFY(client->ensureDirectory(StoreSection::Models, "../Files/escape").isEmpty());
         QVERIFY(QFile::link(fixture.filePath("Files"), fixture.filePath("Asset Library/redirect")));
         QVERIFY(client->ensureDirectory(StoreSection::AssetLibrary, "redirect/job").isEmpty());
-        QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 3);
+        QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 0);
     }
 };
 

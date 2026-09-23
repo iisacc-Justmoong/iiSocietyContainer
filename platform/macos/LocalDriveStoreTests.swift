@@ -71,7 +71,7 @@ enum LocalDriveStoreTests {
         }
         try LocalDriveStore.validateSourceLocation(fakeHome.appendingPathComponent("Library/CloudStorage-backup"), home: fakeHome)
         let initial = try store.snapshot()
-        try check(initial.records.count == 9 + 23 + 4, "The working set must include four fixed Files directories")
+        try check(initial.records.count == 9 + 23 + 1, "The working set contains roots and model categories without default Files children")
         try check(store.children("root").count == 9, "Nine section directories must be enumerable")
         try check(store.children("section:models").count == 23, "Models must contain all 23 category directories")
         for section in catalog {

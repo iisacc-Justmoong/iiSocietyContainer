@@ -1,7 +1,7 @@
 #pragma once
-#include <QStringList>
+#include <QString>
 
 namespace iiSocietyContainer::detail {
-bool validateFilesLayout(const QString &root, QString *error);
-bool createFilesLayout(const QString &root, QString *error, QStringList *created = nullptr);
+// One-time upgrade of old containers; never removes contents or redirects.
+bool removeLegacyFilesDirectories(const QString &root, QString *error);
 }

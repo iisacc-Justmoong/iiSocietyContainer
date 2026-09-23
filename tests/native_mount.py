@@ -49,28 +49,18 @@ with tempfile.TemporaryDirectory(prefix='native-files-', dir=build) as temporary
         registered = True
         assert drive != source / 'Files', 'Test must use a real OS projection'
         assert (drive / 'from-app.txt').read_text() == 'from Society'
-        fixed = {'Documents', 'Audios', '3D objects'}
-        assert {path.name for path in drive.iterdir()} == {'from-app.txt'} | fixed
-        for name in fixed:
+        assert {path.name for path in drive.iterdir()} == {'from-app.txt'}
+        for name in ('Documents', 'Audios', '3D objects'):
             directory = drive / name
-            assert directory.is_dir()
-            for operation in (lambda: directory.rmdir(), lambda: directory.rename(drive / (name + '-renamed'))):
-                try:
-                    operation()
-                except OSError:
-                    pass
-                else:
-                    raise AssertionError('Fixed directory mutation was accepted: ' + name)
-            for child in ('photo.jpg', 'movie.mp4'):
-                path = directory / child
-                path.write_bytes(b'user data')
-                moved = directory / ('renamed-' + child)
-                path.rename(moved)
-                assert moved.read_bytes() == b'user data'
-                moved.unlink()
-            nested = directory / 'Photos'
-            nested.mkdir()
-            nested.rmdir()
+            directory.mkdir()
+            child = directory / 'user.txt'
+            child.write_bytes(b'user data')
+            moved = drive / (name + '-renamed')
+            directory.rename(moved)
+            assert (moved / 'user.txt').read_bytes() == b'user data'
+            (moved / 'user.txt').unlink()
+            moved.rmdir()
+            assert not directory.exists()
         for name in ('Models', 'Files', 'Deleted', '.society-drive.json'):
             assert not (drive / name).exists()
         folder = drive / '한글 folder'

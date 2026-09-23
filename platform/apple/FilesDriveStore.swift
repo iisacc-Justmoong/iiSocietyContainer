@@ -7,7 +7,7 @@ final class FilesDriveStore {
     var manifest: DriveManifest { source.manifest }
     private let source: LocalDriveStore
     private let section: DriveSection
-    private let anchorPrefix = "files-v4:"
+    private let anchorPrefix = "files-v5:"
 
     init(root: URL, catalog: [DriveSection]) throws {
         source = try LocalDriveStore(root: root, catalog: catalog)

@@ -4,15 +4,14 @@
 
 namespace iiSocietyContainer {
 
-// Keep the retired Photos value for ABI compatibility; directory(Photos) returns
-// no value. Photos now uses SocietyDrive::sectionPath(StoreSection::Photos).
+// Retired identifiers retained for source and ABI compatibility. No built-in
+// directories are provided; use FilesView::entries() for user-created items.
 enum class FileDirectoryKind { Documents, Photos, Audios, Objects3D };
 
 IISOCIETYCONTAINER_EXPORT QList<FileDirectoryKind> allFileDirectoryKinds();
 IISOCIETYCONTAINER_EXPORT QString fileDirectoryKey(FileDirectoryKind kind);
 IISOCIETYCONTAINER_EXPORT QString fileDirectoryName(FileDirectoryKind kind);
-/// Reserved immediate children of Files, including case aliases used by native filesystems.
-/// Descendants and equally named directories elsewhere are ordinary user entries.
+/// Compatibility query: no Files child name is reserved.
 IISOCIETYCONTAINER_EXPORT bool isFixedFilesDirectory(const QString &relativePath);
 
 /// A directory object bound to one container identity. Paths are resolved anew
@@ -24,7 +23,7 @@ public:
     QString name() const;
     QString path() const;
     bool isValid() const;
-    bool isProtected() const { return true; }
+    bool isProtected() const { return false; }
 
 private:
     friend class FilesView;

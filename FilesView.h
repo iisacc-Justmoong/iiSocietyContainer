@@ -16,10 +16,10 @@ public:
     // An empty path selects the root. Only a missing final component is allowed.
     QString resolve(const QString &relativePath, bool allowMissing = false, QString *error = nullptr) const;
     QList<QFileInfo> entries(const QString &relativeDirectory = {}, QString *error = nullptr) const;
+    // Retired fixed-directory API; no built-in objects are returned.
     QList<FileDirectory> directories() const;
     std::optional<FileDirectory> directory(FileDirectoryKind kind) const;
-    /// The public root and four fixed directory names cannot be deleted, moved,
-    /// renamed, or replaced. Native adapters must check both move endpoints.
+    /// Only the public root is fixed. Every child name is available to users.
     static bool isProtectedPath(const QString &relativePath);
 
 private:
