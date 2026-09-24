@@ -5,6 +5,7 @@
 #include <QFileSystemWatcher>
 #include <QTimer>
 #include "FileActions.h"
+#include <src/Store/StoreSection.h>
 #include <atomic>
 #include <memory>
 
@@ -16,6 +17,7 @@ class IISOCIETY_GUI_EXPORT DashboardFiles : public QObject
     Q_PROPERTY(QString containerPath READ containerPath WRITE setContainerPath NOTIFY containerPathChanged)
     Q_PROPERTY(QString query READ query WRITE setQuery NOTIFY queryChanged)
     Q_PROPERTY(QVariantList recentFiles READ recentFiles NOTIFY filesChanged)
+    Q_PROPERTY(QVariantList recentPublished READ recentPublished NOTIFY filesChanged)
     Q_PROPERTY(QVariantList generationHistory READ generationHistory NOTIFY filesChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY filesChanged)
@@ -27,6 +29,7 @@ public:
     QString query() const { return m_query; }
     void setQuery(const QString &query);
     QVariantList recentFiles() const;
+    QVariantList recentPublished() const;
     QVariantList generationHistory() const;
     bool loading() const { return m_loading; }
     QString errorString() const { return m_error; }
@@ -37,7 +40,7 @@ signals:
     void filesChanged();
     void loadingChanged();
 private:
-    QVariantList filtered(bool history) const;
+    QVariantList filtered(StoreSection section, qsizetype limit) const;
     QString m_path, m_query, m_error;
     QVariantList m_files;
     bool m_loading = false, m_refreshPending = false;

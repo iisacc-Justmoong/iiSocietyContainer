@@ -14,6 +14,7 @@
 namespace iiSocietyContainer {
 namespace {
 constexpr qsizetype dashboardListLimit = 20;
+constexpr qsizetype recentPublishedLimit = 4;
 struct Snapshot { QVariantList files; QStringList watches; QString error; };
 
 bool isImage(const QFileInfo &file)
@@ -33,6 +34,7 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
     // inspection. An unfinished initial replica is still not a readable store.
     if (!drive->isReady()) return result;
     for (const auto section : {iiSocietyContainer::StoreSection::Files,
+                              iiSocietyContainer::StoreSection::Published,
                               iiSocietyContainer::StoreSection::GenerationHistory}) {
         const bool history = section == iiSocietyContainer::StoreSection::GenerationHistory;
         result.watches.append(drive->sectionPath(section));
@@ -63,7 +65,8 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
             result.files.append(QVariantMap{
                 {"path", file.canonicalFilePath()}, {"folderPath", file.absolutePath()},
                 {"name", file.fileName()}, {"description", iiSocietyContainer::storeSectionName(section) + " · " + kind},
-                {"modified", file.lastModified().toUTC()}, {"history", history}, {"iconName", icon},
+                {"modified", file.lastModified().toUTC()}, {"history", history},
+                {"section", iiSocietyContainer::storeSectionKey(section)}, {"iconName", icon},
                 {"previewSource", preview},
                 {"metadata1", (suffix.isEmpty() ? kind : suffix.toUpper()) + " · " + QLocale().formattedDataSize(file.size())},
                 {"metadata2", QStringLiteral("Society / ") + folder}
@@ -116,23 +119,25 @@ void DashboardFiles::setQuery(const QString &query)
     emit queryChanged(); emit filesChanged();
 }
 
-QVariantList DashboardFiles::filtered(bool history) const
+QVariantList DashboardFiles::filtered(StoreSection section, qsizetype limit) const
 {
     QVariantList result;
+    const auto key = storeSectionKey(section);
     for (const auto &entry : m_files) {
         auto file = entry.toMap();
-        if (file.value("history").toBool() != history) continue;
+        if (file.value("section").toString() != key) continue;
         if (!m_query.trimmed().isEmpty() && !file.value("name").toString().contains(m_query.trimmed(), Qt::CaseInsensitive)
             && !file.value("metadata2").toString().contains(m_query.trimmed(), Qt::CaseInsensitive)) continue;
         file.insert("dateText", file.value("modified").toDateTime().toLocalTime().date().toString(Qt::ISODate));
         result.append(file);
-        if (result.size() == dashboardListLimit) break;
+        if (result.size() == limit) break;
     }
     return result;
 }
 
-QVariantList DashboardFiles::recentFiles() const { return filtered(false); }
-QVariantList DashboardFiles::generationHistory() const { return filtered(true); }
+QVariantList DashboardFiles::recentFiles() const { return filtered(StoreSection::Files, dashboardListLimit); }
+QVariantList DashboardFiles::recentPublished() const { return filtered(StoreSection::Published, recentPublishedLimit); }
+QVariantList DashboardFiles::generationHistory() const { return filtered(StoreSection::GenerationHistory, dashboardListLimit); }
 
 void DashboardFiles::refresh()
 {

@@ -264,6 +264,6 @@ Photos 경로·매니페스트 이전 계약은 [Photos.md](docs/Photos.md)를 �
 
 ## 공유 대시보드와 Society 앱 연결
 
-`Gui` 컴포넌트의 `DashboardFiles`는 Society와 Dreamscapes가 공유하는 읽기 전용 비동기 목록이다. `containerPath`에 유효한 로컬 Society 드라이브를 지정하고 `recentFiles` 또는 `generationHistory`를 사용한다. 최신 20개 제한, 전체 스냅샷 검색, 원자적 이미지 교체 감시, 취소된 저장소 조회 폐기와 변경 없는 새로고침 시 목록 보존을 제공한다. 앱은 QML 등록과 표현만 담당한다.
+`Gui` 컴포넌트의 `DashboardFiles`는 Society와 Dreamscapes가 공유하는 읽기 전용 비동기 목록이다. `containerPath`에 유효한 로컬 Society 드라이브를 지정하고 `recentFiles`, `recentPublished`, `generationHistory`를 사용한다. Files와 Generation History는 최신 20개, Published는 모바일 대시보드용 최신 4개로 제한한다. 전체 스냅샷 검색, 원자적 이미지 교체 감시, 취소된 저장소 조회 폐기와 변경 없는 새로고침 시 목록 보존을 제공한다. 앱은 QML 등록과 표현만 담당한다.
 
 `SocietyApplication::openGenerationHistory()`는 `society://generation-history`를 운영체제로 전달하고 실행 요청 접수 여부를 반환한다. Society 호스트만 `listen()`을 호출하며 `generationHistoryRequested`를 Storage 화면에 연결한다. URL에는 파일 경로나 계정 정보가 없고 다른 host·path·query는 수락하지 않는다. macOS/iOS의 URL 이벤트, Android의 Qt URL 처리, 데스크톱 실행 인수를 지원한다. URL 등록은 Society 앱 패키지에서 처리하고 Windows는 Society 실행 시 현재 사용자에게 등록한다. 단위 테스트는 목록의 포함·제외·정렬·감시와 URL 전달을 검증한다.

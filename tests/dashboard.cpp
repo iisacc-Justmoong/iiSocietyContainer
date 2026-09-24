@@ -27,6 +27,12 @@ private slots:
             QVERIFY(file.setFileTime(QDateTime::currentDateTimeUtc().addSecs(-60-i), QFileDevice::FileModificationTime));
         }
         QVERIFY(image.save(root.filePath("Files/separate.png")));
+        for (int i = 0; i < 6; ++i) {
+            const auto path = root.filePath(QString("Published/published-%1.png").arg(i, 2, 10, QChar('0')));
+            QVERIFY(image.save(path));
+            QFile file(path); QVERIFY(file.open(QIODevice::ReadWrite));
+            QVERIFY(file.setFileTime(QDateTime::currentDateTimeUtc().addSecs(-30-i), QFileDevice::FileModificationTime));
+        }
         QVERIFY(image.save(root.filePath("Generation History/.hidden.png")));
         QVERIFY(QDir().mkpath(root.filePath("Generation History/legacy")));
         QVERIFY(image.save(root.filePath("Generation History/legacy/nested.png")));
@@ -39,6 +45,9 @@ private slots:
         QCOMPARE(model.generationHistory().first().toMap().value("name").toString(), "image-00.png");
         QCOMPARE(model.generationHistory().last().toMap().value("name").toString(), "image-19.png");
         QCOMPARE(model.recentFiles().size(), 1);
+        QCOMPARE(model.recentPublished().size(), 4);
+        QCOMPARE(model.recentPublished().first().toMap().value("name").toString(), "published-00.png");
+        QCOMPARE(model.recentPublished().last().toMap().value("name").toString(), "published-03.png");
         QSignalSpy changed(&model, &DashboardFiles::filesChanged);
         model.refresh(); QTRY_VERIFY(!model.loading());
         QCOMPARE(changed.size(), 0);
