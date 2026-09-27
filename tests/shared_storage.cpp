@@ -2,6 +2,7 @@
 #include <StorageMap.h>
 #include <StorageDirectoryModel.h>
 #include <StorageModelCatalog.h>
+#include <ModelStore.h>
 #include <FileOperations.h>
 #include <QSignalSpy>
 #include <QAbstractItemModelTester>
@@ -32,6 +33,173 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void generationInventoryReconcilesAuthorityAndPreservesReplicas() {
+        QTemporaryDir fixture(QDir::current().filePath("generation-inventory-XXXXXX")); QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageMap map(*drive);
+        const QJsonObject old{{"path", "models/Checkpoint/old.safetensors"}, {"kind", "file"},
+            {"size", "7"}, {"resident", true}, {"version", QString(64, 'a')}};
+        write(fixture.filePath("Models/Checkpoint/old.safetensors"), "fixture");
+        QVERIFY(map.publish({old}));
+        auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        const auto reference = storage->models().first().reference(drive->identifier());
+        write(fixture.filePath(".society-sync/primary.json"), QJsonDocument(QJsonObject{
+            {"schema", 1}, {"container", drive->identifier()}, {"scope", QString(64, 'a')}, {"host", "test-host"}}).toJson());
+        QCOMPARE(storage->models().first().reference(drive->identifier()), reference);
+        QVERIFY(FileOperations(*drive).perform(FileOperations::Action::Trash,
+            fixture.filePath("Models/Checkpoint/old.safetensors")));
+        write(fixture.filePath("Models/Checkpoint/new.safetensors"), "new weights");
+        QVERIFY(QDir().mkpath(fixture.filePath("Models/Checkpoint/package")));
+        write(fixture.filePath("Models/Checkpoint/package/model_index.json"), "{}");
+        write(fixture.filePath("Models/Checkpoint/package/model.safetensors"), "package weights");
+        QVERIFY(QDir().mkpath(fixture.filePath("Models/.society-runtime")));
+        write(fixture.filePath("Models/.society-runtime/hidden.safetensors"), "hidden");
+        QVERIFY(QFile::link(fixture.filePath("Deleted/old.safetensors"), fixture.filePath("Models/Checkpoint/link.safetensors")));
+        const auto models = storage->models(); QCOMPARE(models.size(), 2);
+        QCOMPARE(models[0].id, "Checkpoint/new.safetensors"); QVERIFY(models[0].available);
+        QCOMPARE(models[0].bytes, 11);
+        QCOMPARE(models[1].id, "Checkpoint/package"); QCOMPARE(models[1].format, "diffusers");
+        QVERIFY(storage->resolveModel(reference).isEmpty());
+        for (const auto &model : models)
+            QCOMPARE(storage->resolveModel(model.reference(drive->identifier())), fixture.filePath("Models/" + model.id));
+        QCOMPARE(map.objects(), QJsonArray({old})); QVERIFY(map.pendingRequests().isEmpty());
+        // Replicas retain remote, nonresident models and never resurrect local leftovers.
+        QVERIFY(QFile::remove(fixture.filePath(".society-sync/primary.json")));
+        const auto remote = storage->models(); QCOMPARE(remote.size(), 1);
+        QCOMPARE(remote.first().id, "Checkpoint/old.safetensors"); QVERIFY(!remote.first().available);
+        QVERIFY(map.publish({})); QVERIFY(storage->models().isEmpty());
+    }
+
+    void modelCatalogIgnoresUnchangedRefreshAndDocumentation_data() {
+        QTest::addColumn<bool>("synchronized");
+        QTest::newRow("filesystem") << false;
+        QTest::newRow("replica-catalog") << true;
+    }
+    void modelCatalogIgnoresUnchangedRefreshAndDocumentation() {
+        QFETCH(bool, synchronized);
+        QTemporaryDir fixture(QDir::current().filePath("model-refresh-XXXXXX")); QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        QJsonArray objects;
+        const auto add = [&](const QString &relative, const QByteArray &bytes) {
+            const auto path = fixture.filePath("Models/" + relative);
+            QVERIFY(QDir().mkpath(QFileInfo(path).absolutePath())); write(path, bytes);
+            objects.append(QJsonObject{{"path", "models/" + relative}, {"kind", "file"},
+                {"size", QString::number(bytes.size())}, {"resident", false}});
+        };
+        add("VAE/decoder.safetensors", "fixture weights");
+        add("VAE/README.md", "documentation"); add("VAE/LICENSE", "license");
+        add("VAE/NOTICE.txt", "notice"); add("VAE/config.json", "{}");
+        add("Wildcards/colors.txt", "red\nblue");
+        StorageMap map(*drive);
+        if (synchronized) QVERIFY(map.publish(objects));
+        StorageModelCatalog catalog;
+        catalog.setDirectory(fixture.filePath("Models"));
+        QTRY_VERIFY(!catalog.loading());
+        QCOMPARE(catalog.groups().value("VAE").toList().size(), 1);
+        QCOMPARE(catalog.groups().value("Wildcards").toList().size(), 1);
+        QCOMPARE(catalog.count(), 2);
+        const auto snapshot = catalog.groups();
+        QSignalSpy changes(&catalog, &StorageModelCatalog::modelsChanged);
+        QSignalSpy before(&catalog, &StorageModelCatalog::modelsAboutToChange);
+        QSignalSpy loading(&catalog, &StorageModelCatalog::loadingChanged);
+        for (int i = 0; i < 4; ++i) {
+            if (synchronized) QVERIFY(map.publish(objects)); // Same rows, rewritten catalog.
+            else write(fixture.filePath("Models/VAE/README.md"), QByteArray(i + 1, 'x'));
+            catalog.refresh(); catalog.refresh();
+            QTest::qWait(250);
+        }
+        QCOMPARE(catalog.groups(), snapshot);
+        QCOMPARE(changes.size(), 0); QCOMPARE(before.size(), 0); QCOMPARE(loading.size(), 0);
+        add("VAE/new.bin", "new weights");
+        if (synchronized) QVERIFY(map.publish(objects));
+        catalog.refresh();
+        QTRY_COMPARE(catalog.count(), 3);
+        QCOMPARE(loading.size(), 0);
+        QVERIFY(changes.size() > 0);
+        QVERIFY(map.pendingRequests().isEmpty());
+    }
+
+    void hostModelImportsAppearBeforeSyncHashingCompletes() {
+        QTemporaryDir fixture(QDir::current().filePath("host-model-import-XXXXXX")); QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageMap map(*drive); QVERIFY(map.publish({}));
+        const auto source = fixture.filePath("Models/Other/krea.safetensors");
+        write(source, "metadata-only fixture");
+        StorageModelCatalog catalog; catalog.setDirectory(fixture.filePath("Models"));
+        QTRY_VERIFY(!catalog.loading()); QCOMPARE(catalog.count(), 0); // Replica remains catalog-only.
+        write(fixture.filePath(".society-sync/primary.json"), QJsonDocument(QJsonObject{
+            {"schema", 1}, {"container", drive->identifier()}, {"scope", QString(64, 'a')}, {"host", "test-host"}}).toJson());
+        catalog.refresh(); QTRY_COMPARE(catalog.count(), 1);
+        const auto destination = fixture.filePath("Models/Checkpoint/krea.safetensors");
+        QVERIFY(QFile::rename(source, destination));
+        catalog.refresh(); QTRY_COMPARE(catalog.groups().value("Checkpoint").toList().size(), 1);
+        QCOMPARE(catalog.groups().value("Other").toList().size(), 0);
+        const auto row = catalog.groups().value("Checkpoint").toList().first().toMap();
+        QCOMPARE(row.value("bytes").toLongLong(), QFileInfo(destination).size()); QVERIFY(row.value("available").toBool());
+        QTest::qWait(300);
+        QSignalSpy changed(&catalog, &StorageModelCatalog::modelsChanged);
+        for (int i = 0; i < 3; ++i) { catalog.refresh(); QTest::qWait(200); }
+        QCOMPARE(changed.size(), 0); QVERIFY(map.objects().isEmpty()); QVERIFY(map.pendingRequests().isEmpty());
+    }
+    void modelTypesMatchPhysicalFoldersAndRemoteCatalog() {
+        QTemporaryDir fixture(QDir::current().filePath("model-types-XXXXXX")); QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        QJsonArray objects;
+        int expected = 0;
+        const auto add = [&](const QString &relative, const QByteArray &bytes) {
+            const auto path = fixture.filePath("Models/" + relative);
+            QVERIFY(QDir().mkpath(QFileInfo(path).absolutePath()));
+            write(path, bytes);
+            objects.append(QJsonObject{{"path", "models/" + relative}, {"kind", "file"},
+                {"size", QString::number(bytes.size())}, {"resident", false}, {"version", QString(64, 'a')}});
+        };
+        for (const auto type : allModelTypes()) {
+            const auto name = modelTypeName(type);
+            QVERIFY(QFileInfo(fixture.filePath("Models/" + name)).isDir());
+            const auto extension = type == ModelType::Wildcards ? ".txt"
+                : type == ModelType::Workflows || type == ModelType::ComfyUIWorkflows || type == ModelType::Poses ? ".json" : ".bin";
+            add(name + "/sample" + extension, "{}"); ++expected;
+        }
+        add("Checkpoint/sample.bin.model.json", "{\"society.modality\":\"audio\"}");
+        add("Checkpoint/sample.preview.png", "preview");
+        add("LLM/package/config.json", "{\"architectures\":[\"LlamaForCausalLM\"]}");
+        add("LLM/package/model.bin", "weights"); ++expected;
+        add("Checkpoint/pipeline/model_index.json", "{}");
+        add("Checkpoint/pipeline/unet/model.bin", "weights"); ++expected;
+        add("legacy/unassigned.gguf", "unreadable"); ++expected;
+        add("Other/.hidden.bin", "hidden");
+        StorageModelCatalog local; local.setDirectory(fixture.filePath("Models"));
+        QTRY_VERIFY(!local.loading());
+        QCOMPARE(local.count(), expected);
+        QCOMPARE(local.categories().size(), 23);
+        QCOMPARE(local.groups().size(), 23);
+        QCOMPARE(local.uncategorizedCount(), 2);
+        for (const auto type : allModelTypes()) {
+            const auto name = modelTypeName(type);
+            QCOMPARE(local.groups().value(name).toList().size(),
+                type == ModelType::Checkpoint || type == ModelType::LLM || type == ModelType::Other ? 2 : 1);
+        }
+        StorageMap map(*drive); QVERIFY(map.publish(objects));
+        // Replicas must use folder identity even with all payloads absent.
+        QVERIFY(!map.isLocalAuthority());
+        QVERIFY(QDir(fixture.filePath("Models")).removeRecursively());
+        QVERIFY(QDir().mkpath(fixture.filePath("Models")));
+        StorageModelCatalog remote; remote.setDirectory(fixture.filePath("Models"));
+        QTRY_VERIFY(!remote.loading());
+        QCOMPARE(remote.count(), expected);
+        QCOMPARE(remote.uncategorizedCount(), 2);
+        for (const auto type : allModelTypes()) {
+            const auto name = modelTypeName(type);
+            QCOMPARE(remote.groups().value(name).toList().size(), local.groups().value(name).toList().size());
+            for (const auto &value : remote.groups().value(name).toList()) {
+                const auto row = value.toMap();
+                QVERIFY(!QFileInfo::exists(row.value("path").toString()));
+                QCOMPARE(row.value("type").toString(), name);
+            }
+        }
+        QVERIFY(map.pendingRequests().isEmpty());
+    }
+
     void directoryRefreshPublishesOnlyTheChangedRows() {
         QTemporaryDir fixture(QDir::current().filePath("directory-diff-XXXXXX")); QVERIFY(fixture.isValid());
         write(fixture.filePath("b.txt"), "b");

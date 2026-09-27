@@ -9,12 +9,13 @@
 #include <atomic>
 #include <memory>
 
-// The four presentation groups share the container's existing model inventory.
+// Presentation categories use the same ModelType contract as physical storage.
 namespace iiSocietyContainer {
 class IISOCIETYCONTAINER_EXPORT StorageModelCatalog : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString directory READ directory WRITE setDirectory NOTIFY directoryChanged)
+    Q_PROPERTY(QVariantList categories READ categories CONSTANT)
     Q_PROPERTY(QVariantMap groups READ groups NOTIFY modelsChanged)
     Q_PROPERTY(int count READ count NOTIFY modelsChanged)
     Q_PROPERTY(int uncategorizedCount READ uncategorizedCount NOTIFY modelsChanged)
@@ -27,9 +28,11 @@ public:
     ~StorageModelCatalog() override;
     QString directory() const { return m_directory; }
     void setDirectory(const QString &directory);
+    QVariantList categories() const;
     QVariantMap groups() const { return m_groups; }
     int count() const { return m_count; }
     int uncategorizedCount() const { return m_uncategorized; }
+    // Initial directory read only; background scans preserve the rendered snapshot.
     bool loading() const { return m_loading; }
     QString errorString() const { return m_error; }
     Q_INVOKABLE void refresh();
@@ -48,6 +51,7 @@ private:
     QVariantMap m_groups;
     int m_count = 0, m_uncategorized = 0;
     bool m_loading = false, m_refreshPending = false;
+    bool m_scanning = false, m_hasSnapshot = false;
     quint64 m_revision = 0;
     std::shared_ptr<std::atomic_bool> m_cancel;
     QFileSystemWatcher m_files;

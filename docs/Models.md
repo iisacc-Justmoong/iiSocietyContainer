@@ -108,3 +108,33 @@ CLI는 `iiSocietyContainerDriveTool model-types`, `models <container>`, `organiz
 있는 패키지는 `SharedStorage`에서 `unified` 형식의 단일 모델로 노출한다. 내부 체크포인트는
 개별 모델로 중복 나열하지 않는다. 패키지 인벤토리의 일부가 변경되면 기존 모델 참조를 무효화한다.
 이 분류는 카탈로그 계약이며 실제 매니페스트·멤버 호환성 검사는 iiLocalDiffusion이 수행한다.
+
+## 모델 카탈로그의 유형 계약
+
+`StorageModelCatalog.categories`는 `allModelTypes()`의 23개 이름과 순서를 QML에 제공한다. `groups`의 키도 실제 폴더명(Checkpoint, LoRA, Text Encoder 등)이다. 기존 image/video/audio/language 그룹은 제거되었다. 미디어 메타데이터와 파일 확장자로 유형을 다시 추정하지 않는다. 정리 전 유형 폴더 밖의 파일은 Other에 표시하고 `uncategorizedCount`는 Other에 표시된 항목 수이다.
+
+로컬·원격 카탈로그 모두 가중치, JSON 워크플로·포즈, 텍스트 와일드카드와 미확인 파일을 포함한다. 모델 부속 파일은 제외하며 Diffusers/PEFT/Transformers 패키지를 하나의 항목으로 묶는다. 원격 조회는 호스트 맵만 읽고 원본 헤더 읽기나 다운로드를 요청하지 않는다. 저장 유형 변경은 `ModelStore::place()`로 실제 파일을 이동하며 이후 조회에서 해당 유형으로 표시된다.
+
+`shared_storage`의 `modelTypesMatchPhysicalFoldersAndRemoteCatalog`는 23개 실제 폴더의 로컬 목록과 원본이 없는 원격 목록의 유형·개수 일치, 비가중치 파일, 부속 파일 제외, 패키지 단위 처리와 다운로드 요청 부재를 검사한다.
+
+## 변경 없는 카탈로그 재검사
+
+`StorageModelCatalog::loading`은 디렉터리의 최초 조회만 나타낸다. 최초 완료 이후에는 파일 감시·폴링·명시적 `refresh()`가 백그라운드에서 실행되어도 같은 카탈로그의 `loadingChanged`, `modelsAboutToChange`, `modelsChanged`를 발생시키지 않는다. 실제 행·오류 변경은 스냅샷 비교로 게시하고 동시 요청은 하나의 후속 재검사로 합친다. 디렉터리 전환은 이전 비동기 결과를 폐기하고 새 최초 조회 상태를 시작한다.
+
+가중치 유형의 파일 카드는 safetensors/safetensor, GGUF/GGML, bin/ckpt/pt/pth, ONNX/PB/TFLite, H5/HDF5/NPZ/NPY, model/mlmodel/engine 확장자를 표시 대상으로 삼는다. README·LICENSE·NOTICE·독립 설정 JSON은 VAE 등 가중치 카드에 포함하지 않는다. 패키지는 한 카드로 유지한다. Wildcards는 txt/wildcards, Poses·Workflows·ComfyUI Workflows는 JSON/PNG/JPG/JPEG/WebP를 표시하며 Other는 미분류 파일을 유지한다. 이 규칙은 로컬 스캔과 메타데이터만 존재하는 동기화 카탈로그에서 동일하고, 파일 삭제·이동·다운로드 또는 가중치 실행을 수행하지 않는다. 확장자는 표시 후보 기준이며 가중치의 실행 가능성 검증은 아니다.
+
+Krea2 imports use validated tensor signatures (`txtfusion.projector.weight`, compatible
+64-channel `first.weight` and `last.linear.weight`) in native and ComfyUI namespaces.
+They are categorized as Checkpoint; LoRA detection retains precedence. Organizing
+previously unknown Krea2 files moves them from Other while preserving path references.
+Truncated tensor payloads do not qualify as recognized Krea2 checkpoints.
+
+`ModelClassifier::validateSafetensors(path)` returns a diagnostic for incomplete or
+invalid files without reading tensor payloads. Import callers can reject truncated
+downloads before performing a multi-gigabyte copy.
+
+On the local authority, shallow file metadata from physical model category folders
+is merged with the sync catalog. A newly published checkpoint appears immediately,
+without waiting for a many-gigabyte sync checksum. This never reads tensor contents
+or scans inside packages. Replicas remain catalog-only and unchanged snapshots still
+emit no model/loading reset signals.

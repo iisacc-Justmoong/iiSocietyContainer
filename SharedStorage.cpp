@@ -213,18 +213,50 @@ QList<StoredModel> SharedStorage::models(QString *error) const
     if (error) error->clear();
     QList<StoredModel> result;
     StorageMap map(m_drive);
-    const auto objects = map.objects(error);
-    if (!objects.isEmpty()) {
+    QString catalogError;
+    const auto objects = map.objects(&catalogError);
+    const bool catalogPresent = QFileInfo::exists(QDir(m_drive.rootPath()).filePath(".society-sync/catalog.json"));
+    if (!catalogError.isEmpty()) { fail(error, catalogError); return {}; }
+    if (catalogPresent) {
+        const bool authority = map.isLocalAuthority();
         QMap<QString, QJsonObject> entries;
         QStringList packages;
         for (const auto &value : objects) {
             const auto e = value.toObject(); const auto key = e.value("path").toString();
-            if (!key.startsWith("models/") || e.value("kind") != "file") continue;
+            if (!key.startsWith("models/") || e.value("kind") != "file"
+                || StorageMap::physicalPath(key).isEmpty()) continue;
+            if (authority && !QFileInfo(map.localPath(key)).isFile()) continue;
             bool hidden = false; for (const auto &part : key.mid(7).split('/')) hidden |= part.startsWith('.');
             if (hidden) continue;
             entries.insert(key, e);
-            if (key.endsWith("/model_index.json")) packages.append(key.chopped(17));
         }
+        if (authority) {
+            // The local owner can publish/move files before the sync index hashes
+            // them. Reconcile native metadata without reading multi-GB weights.
+            const auto base = m_drive.sectionPath(StoreSection::Models);
+            if (base.isEmpty()) { fail(error, QStringLiteral("The Society Models area is unavailable.")); return {}; }
+            const auto visit = [&](auto &&self, const QString &directory) -> void {
+                for (const auto &file : QDir(directory).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::Name)) {
+                    if (file.isSymLink() || file.isJunction() || file.fileName().startsWith('.')
+                        || file.canonicalFilePath() != file.absoluteFilePath()) continue;
+                    if (file.isDir()) { self(self, file.absoluteFilePath()); continue; }
+                    if (!file.isFile()) continue;
+                    const auto key = "models/" + QDir(base).relativeFilePath(file.absoluteFilePath());
+                    auto entry = entries.value(key);
+                    // Preserve synchronized references for existing files, including
+                    // those sent by another device for host-side generation.
+                    if (entry.isEmpty() || entry.value("size").toString().toLongLong() != file.size())
+                        entry["version"] = "local:" + QString::number(file.size()) + ':'
+                            + QString::number(file.lastModified().toMSecsSinceEpoch());
+                    entry["path"] = key; entry["kind"] = "file";
+                    entry["size"] = QString::number(file.size()); entry["resident"] = true;
+                    entries.insert(key, entry);
+                }
+            };
+            visit(visit, base);
+        }
+        for (auto it = entries.cbegin(); it != entries.cend(); ++it)
+            if (it.key().endsWith("/model_index.json")) packages.append(it.key().chopped(17));
         const auto append = [&](const QString &key, bool package) {
             QCryptographicHash fingerprint(QCryptographicHash::Sha256); bool available = true; qint64 size = 0;
             for (auto it = entries.lowerBound(package ? key + '/' : key); it != entries.cend(); ++it) {
@@ -286,7 +318,7 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
         return {};
     }
     StorageMap map(m_drive);
-    if (!map.objects().isEmpty()) {
+    if (QFileInfo::exists(QDir(m_drive.rootPath()).filePath(".society-sync/catalog.json"))) {
         for (const auto &model : models(error)) {
             if (model.id != id) continue;
             if (model.reference(m_drive.identifier()) != reference) {

@@ -147,6 +147,57 @@ private slots:
         QCOMPARE(ModelClassifier::companionFiles(legacy), QStringList{fixture.filePath("arbitrary.civitai.info")});
     }
 
+    void validatesLargeSparseSafetensorsWithoutReadingPayload()
+    {
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/large-model-XXXXXX"); QVERIFY(fixture.isValid());
+        const auto path = fixture.filePath("large.safetensors");
+        const qint64 length = (qint64(1) << 32) + 123;
+        const QJsonObject header{{"tensor", QJsonObject{{"dtype", "U8"}, {"shape", QJsonArray{length}},
+            {"data_offsets", QJsonArray{0, length}}}}};
+        const auto prefix = tensorFile(header, {});
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(prefix), prefix.size()); QVERIFY(file.resize(prefix.size() + length)); file.close();
+        QVERIFY(ModelClassifier::validateSafetensors(path).isEmpty());
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Append));
+        QVERIFY(file.resize(prefix.size() + length - 1)); file.close();
+        QVERIFY(!ModelClassifier::validateSafetensors(path).isEmpty());
+    }
+    void kreaCheckpoint_data()
+    {
+        QTest::addColumn<QString>("prefix");
+        QTest::newRow("native") << QString();
+        QTest::newRow("comfy") << QString("model.diffusion_model.");
+    }
+    void kreaCheckpoint()
+    {
+        QFETCH(QString, prefix);
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/krea-XXXXXX"); QVERIFY(fixture.isValid());
+        QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto path = fixture.filePath("Models/Other/unrelated-name.safetensors");
+        QJsonObject header{
+            {prefix + "first.weight", QJsonObject{{"dtype", "BF16"}, {"shape", QJsonArray{8, 64}}, {"data_offsets", QJsonArray{0, 1024}}}},
+            {prefix + "last.linear.weight", QJsonObject{{"dtype", "BF16"}, {"shape", QJsonArray{64, 8}}, {"data_offsets", QJsonArray{1024, 2048}}}},
+            {prefix + "txtfusion.projector.weight", QJsonObject{{"dtype", "F32"}, {"shape", QJsonArray{1, 12}}, {"data_offsets", QJsonArray{2048, 2096}}}}
+        };
+        const auto bytes = tensorFile(header);
+        QVERIFY(write(path, bytes));
+        QCOMPARE(ModelClassifier::classify(path).type, ModelType::Checkpoint);
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        const auto report = store->organize();
+        QVERIFY(report.errors.isEmpty()); QCOMPARE(report.moved.size(), 1);
+        QCOMPARE(read(report.moved.first().path), bytes);
+        QCOMPARE(store->resolve("Other/unrelated-name.safetensors"), report.moved.first().path);
+        QVERIFY(write(path, bytes.chopped(1)));
+        QCOMPARE(ModelClassifier::classify(path).type, ModelType::Other);
+        auto output = header.value(prefix + "last.linear.weight").toObject();
+        output.insert("shape", QJsonArray{32, 16});
+        header.insert(prefix + "last.linear.weight", output);
+        QVERIFY(write(path, tensorFile(header)));
+        QCOMPARE(ModelClassifier::classify(path).type, ModelType::Other);
+        QVERIFY(write(path, weights({prefix + "txtfusion.projector.lora_A.weight"})));
+        QCOMPARE(ModelClassifier::classify(path).type, ModelType::LoRA);
+    }
+
     void animaCheckpoint_data()
     {
         QTest::addColumn<QString>("prefix");

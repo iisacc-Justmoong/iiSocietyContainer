@@ -15,6 +15,8 @@ struct IISOCIETYCONTAINER_EXPORT ModelClassification {
 /// Checks shapes/offsets against file size; never deserializes pickle or loads tensors.
 class IISOCIETYCONTAINER_EXPORT ModelClassifier {
 public:
+    /// Empty on a structurally complete safetensors file; bounded header/extent validation only.
+    static QString validateSafetensors(const QString &path);
     static ModelClassification classify(const QString &path, const QString &fileName = {});
     /// Reads bounded catalog metadata and tensor dtype names; never tensor contents.
     static QJsonObject metadata(const QString &path);

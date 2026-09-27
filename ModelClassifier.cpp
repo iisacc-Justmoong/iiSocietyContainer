@@ -191,6 +191,29 @@ bool animaCheckpoint(const QJsonObject &header)
     }
     return false;
 }
+bool kreaCheckpoint(const QJsonObject &header)
+{
+    for (const auto *fusion : {"txtfusion.projector.weight", "text_fusion.projector.weight"}) {
+        for (auto it = header.begin(); it != header.end(); ++it) {
+            const QString suffix = QLatin1String(fusion);
+            if (!it.key().endsWith(suffix)) continue;
+            const auto prefix = it.key().chopped(suffix.size());
+            if (!prefix.isEmpty() && !prefix.endsWith('.')) continue;
+            const auto shape = [&](const QString &key) {
+                return header.value(prefix + key).toObject().value("shape").toArray();
+            };
+            const auto input = shape("first.weight");
+            const auto output = shape("last.linear.weight");
+            const auto projector = shape(suffix);
+            if (input.size() == 2 && output.size() == 2 && projector.size() == 2
+                && input[0].toInteger() > 0 && input[1].toInteger() == 64
+                && output[0].toInteger() == 64 && output[1] == input[0]
+                && projector[0].toInteger() > 0 && projector[1].toInteger() > 0)
+                return true;
+        }
+    }
+    return false;
+}
 ModelClassification tensorType(const QJsonObject &header)
 {
     const auto metadata = header.value("__metadata__").toObject();
@@ -209,6 +232,7 @@ ModelClassification tensorType(const QJsonObject &header)
         || network.contains("networks.lora") || architecture.contains("lora"))
         return known(ModelType::LoRA, "LoRA tensors or network metadata");
     if (animaCheckpoint(header)) return known(ModelType::Checkpoint, "Anima diffusion backbone, LLM adapter and compatible projection tensors");
+    if (kreaCheckpoint(header)) return known(ModelType::Checkpoint, "Krea2 text fusion and compatible diffusion projections");
     if (has("model.diffusion_model.") && (has("first_stage_model.") || has("cond_stage_model.") || has("conditioner.")))
         return known(ModelType::Checkpoint, "diffusion checkpoint component tensors");
     if (has("controlnet_cond_embedding.") || has("controlnet_down_blocks.") || has("input_hint_block.") || has("zero_convs."))
@@ -336,6 +360,12 @@ bool ModelClassifier::isPackage(const QString &directory)
     if (plainFile(folder.filePath("model_index.json")) || plainFile(folder.filePath("adapter_config.json"))) return true;
     return plainFile(folder.filePath("config.json"))
         && !folder.entryList({"*.safetensors", "*.safetensor", "*.bin", "*.gguf"}, QDir::Files | QDir::NoSymLinks).isEmpty();
+}
+QString ModelClassifier::validateSafetensors(const QString &path)
+{
+    QFile file(path);
+    if (!plainFile(path) || !file.open(QIODevice::ReadOnly)) return "unreadable safetensors input";
+    return safetensorsHeader(file).error;
 }
 ModelClassification ModelClassifier::classify(const QString &path, const QString &fileName)
 {

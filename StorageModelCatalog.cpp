@@ -16,7 +16,9 @@ namespace iiSocietyContainer {
 namespace {
 QVariantMap emptyGroups()
 {
-    return {{"image", QVariantList()}, {"video", QVariantList()}, {"audio", QVariantList()}, {"language", QVariantList()}};
+    QVariantMap groups;
+    for (const auto type : allModelTypes()) groups.insert(modelTypeName(type), QVariantList());
+    return groups;
 }
 QString firstString(const QJsonObject &metadata, const QStringList &keys)
 {
@@ -34,24 +36,24 @@ QString architecture(const QJsonObject &metadata)
     if (value.contains("stable-diffusion-xl", Qt::CaseInsensitive) || value.contains("StableDiffusionXL")) return "SDXL";
     return value;
 }
-QString modality(const ModelEntry &entry, const QJsonObject &metadata)
+QString categoryForPath(const QString &relative)
 {
-    const auto explicitValue = firstString(metadata, {"society.modality", "modelspec.modality", "modality"}).toLower();
-    if (emptyGroups().contains(explicitValue)) return explicitValue;
-    const auto hint = (architecture(metadata) + ' ' + metadata.value("pipeline_tag").toString()).toLower();
-    const auto has = [&](const QStringList &words) {
-        return std::any_of(words.cbegin(), words.cend(), [&](const QString &word) { return hint.contains(word); });
-    };
-    if (has({"video", "animatediff", "cogvideo", "wanpipeline", "wantransformer", "hunyuanvideo"})) return "video";
-    if (has({"audio", "speech", "whisper", "bark", "musicgen", "vits", "tacotron"})) return "audio";
-    if (has({"causallm", "text-generation", "llama", "mistral", "gemma", "qwen", "llava"})) return "language";
-    if (has({"diffusion", "sdxl", "flux", "text-to-image", "image-to-image"})) return "image";
-    switch (entry.classification.type) {
-    case ModelType::LLM: case ModelType::VLM: return "language";
-    case ModelType::Motion: return "video";
-    case ModelType::Other: return {};
-    default: return "image";
-    }
+    const auto type = relative.contains('/') ? modelTypeFromName(relative.section('/', 0, 0)) : std::nullopt;
+    return modelTypeName(type.value_or(ModelType::Other));
+}
+// Catalog filtering is presentation-only: leave documents in physical storage.
+// Replicas apply the same filename contract without downloading tensor payloads.
+bool catalogFile(const QString &relative)
+{
+    const auto type = modelTypeFromName(categoryForPath(relative)).value_or(ModelType::Other);
+    const auto suffix = QFileInfo(relative).suffix().toLower();
+    if (type == ModelType::Other) return true;
+    if (QStringList{"safetensors", "safetensor", "gguf", "ggml", "bin", "ckpt", "pt", "pth",
+        "onnx", "pb", "tflite", "h5", "hdf5", "npz", "npy", "model", "mlmodel", "engine"}.contains(suffix)) return true;
+    if (type == ModelType::Wildcards) return suffix == "txt" || suffix == "wildcards";
+    if (type == ModelType::Poses || type == ModelType::Workflows || type == ModelType::ComfyUIWorkflows)
+        return QStringList{"json", "png", "jpg", "jpeg", "webp"}.contains(suffix);
+    return false;
 }
 QString precision(const QJsonObject &metadata)
 {
@@ -107,6 +109,50 @@ Snapshot fromMap(const SocietyDrive &drive, const QJsonArray &objects) {
         files.insert(key, e);
         if (key.endsWith("/model_index.json") || key.endsWith("/adapter_config.json")) packages.append(key.left(key.lastIndexOf('/')));
     }
+    if (authority) {
+        // A new multi-GB import can precede the sync index's full-file hash by
+        // minutes. Merge shallow directory metadata so local publication is
+        // immediately visible, without opening tensor headers or packages.
+        const auto modelsRoot = QDir(drive.rootPath()).filePath("Models");
+        for (const auto type : allModelTypes()) {
+            const auto category = modelTypeName(type);
+            const QDir directory(QDir(modelsRoot).filePath(category));
+            const QFileInfo folder(directory.path());
+            if (!folder.isDir() || folder.isSymLink() || folder.isJunction()) continue;
+            result.watches.append(directory.path());
+            for (const auto &file : directory.entryInfoList(QDir::Files | QDir::NoSymLinks)) {
+                const auto relative = category + '/' + file.fileName();
+                if (file.isJunction() || !catalogFile(relative)) continue;
+                const auto key = "models/" + relative;
+                files.insert(key, QJsonObject{{"path", key}, {"kind", "file"},
+                    {"size", QString::number(file.size())}, {"resident", true}});
+            }
+        }
+    }
+    QSet<QString> companions;
+    for (auto it = files.cbegin(); it != files.cend(); ++it) {
+        const auto &key = it.key();
+        const auto stem = key.left(key.lastIndexOf('/') + 1) + QFileInfo(key).completeBaseName();
+        for (const auto &prefix : {key, stem})
+            for (const auto *suffix : {".model.json", ".civitai.info", ".preview.png", ".preview.jpg", ".preview.webp"}) {
+                const auto companion = prefix + QLatin1String(suffix);
+                if (companion != key && files.contains(companion)) companions.insert(companion);
+            }
+        if (key.endsWith("/config.json")) {
+            const auto parent = key.left(key.lastIndexOf('/'));
+            for (auto child = files.lowerBound(parent + '/'); child != files.cend() && child.key().startsWith(parent + '/'); ++child) {
+                const auto name = child.key().mid(parent.size() + 1);
+                if (!name.contains('/') && QStringList{"safetensors", "safetensor", "bin", "gguf"}.contains(QFileInfo(name).suffix())) {
+                    packages.append(parent); break;
+                }
+            }
+        }
+    }
+    // Type directories are containers, never packages themselves.
+    packages.removeIf([](const QString &path) {
+        const auto relative = path.mid(7);
+        return !relative.contains('/') && modelTypeFromName(relative).has_value();
+    });
     packages.removeDuplicates(); packages.sort();
     QStringList roots;
     for (const auto &package : packages) {
@@ -117,11 +163,9 @@ Snapshot fromMap(const SocietyDrive &drive, const QJsonArray &objects) {
     const auto append = [&](const QString &key, bool package) {
         const auto relative = key.mid(7), name = relative.section('/', -1);
         const auto path = QDir(drive.rootPath()).filePath(StorageMap::physicalPath(key));
-        const auto category = relative.section('/', 0, 0).toLower();
+        const auto group = categoryForPath(relative);
         const auto format = package ? (name.endsWith(".iildmodel") ? QString("Unified") : QString("Diffusers"))
             : (name.endsWith(".safetensors", Qt::CaseInsensitive) || name.endsWith(".safetensor", Qt::CaseInsensitive)) ? QString("Safetensors") : QFileInfo(name).suffix().toUpper();
-        const auto group = category == "llm" || category == "vlm" || format == "GGUF" ? QString("language")
-            : category == "motion" ? QString("video") : QString("image");
         qint64 bytes = 0; bool resident = true;
         for (auto it = files.lowerBound(package ? key + '/' : key); it != files.cend(); ++it) {
             if (it.key() != key && !(package && it.key().startsWith(key + '/'))) break;
@@ -130,19 +174,19 @@ Snapshot fromMap(const SocietyDrive &drive, const QJsonArray &objects) {
         }
         auto rows = result.groups.value(group).toList();
         rows.append(QVariantMap{{"path", path}, {"folderPath", QFileInfo(path).absolutePath()}, {"name", name},
-            {"relativePath", relative}, {"directory", package}, {"architecture", QObject::tr("Unknown")},
+            {"relativePath", relative}, {"type", group}, {"directory", package}, {"architecture", QObject::tr("Unknown")},
             {"precision", QObject::tr("Unknown")}, {"format", format}, {"bytes", bytes}, {"available", resident},
             {"sizeText", resident ? QObject::tr("%1 on device").arg(QLocale().formattedDataSize(bytes))
                 : QObject::tr("%1 · download when used").arg(QLocale().formattedDataSize(bytes))}});
         result.groups.insert(group, rows); ++result.count;
+        if (group == modelTypeName(ModelType::Other)) ++result.uncategorized;
     };
     for (const auto &root : roots) append(root, true);
-    const QStringList extensions{"safetensors", "safetensor", "ckpt", "pt", "pth", "bin", "gguf", "onnx"};
     for (auto it = files.cbegin(); it != files.cend(); ++it) {
-        if (!extensions.contains(QFileInfo(it.key()).suffix().toLower())) continue;
+        if (companions.contains(it.key())) continue;
         bool nested = false;
         for (const auto &root : roots) if (it.key().startsWith(root + '/')) { nested = true; break; }
-        if (!nested) append(it.key(), false);
+        if (!nested && catalogFile(it.key().mid(7))) append(it.key(), false);
     }
     sortRows(result);
     return result;
@@ -170,12 +214,11 @@ Snapshot scan(const QString &directory, const std::shared_ptr<std::atomic_bool> 
         const auto info = directories.fileInfo();
         if (!info.isSymLink() && info.canonicalFilePath().startsWith(root + '/')) result.watches.append(info.canonicalFilePath());
     }
-    const QStringList extensions{"safetensors", "safetensor", "ckpt", "pt", "pth", "bin", "gguf", "onnx"};
     for (const auto &entry : entries) {
         if (cancel->load()) return {};
-        if (entry.kind == "file" && !extensions.contains(entry.format)) continue;
+        if (entry.kind == "file" && !catalogFile(entry.relativePath)) continue;
         const auto metadata = ModelClassifier::metadata(entry.path);
-        const auto group = modality(entry, metadata);
+        const auto group = categoryForPath(entry.relativePath);
         result.watches.append(entry.path);
         result.watches.append(ModelClassifier::companionFiles(entry.path));
         if (entry.kind != "file") {
@@ -184,7 +227,7 @@ Snapshot scan(const QString &directory, const std::shared_ptr<std::atomic_bool> 
                 if (info.isFile() && !info.isSymLink()) result.watches.append(info.absoluteFilePath());
             }
         }
-        if (group.isEmpty()) { ++result.uncategorized; continue; }
+        if (group == modelTypeName(ModelType::Other)) ++result.uncategorized;
         qint64 bytes = 0;
         if (entry.kind == "file") bytes = QFileInfo(entry.path).size();
         else {
@@ -202,7 +245,7 @@ Snapshot scan(const QString &directory, const std::shared_ptr<std::atomic_bool> 
         const auto modelPrecision = precision(metadata);
         auto rows = result.groups.value(group).toList();
         rows.append(QVariantMap{{"path", entry.path}, {"folderPath", QFileInfo(entry.path).absolutePath()},
-            {"name", name}, {"relativePath", entry.relativePath}, {"directory", entry.kind != "file"},
+            {"name", name}, {"relativePath", entry.relativePath}, {"type", group}, {"directory", entry.kind != "file"},
             {"architecture", modelArchitecture.isEmpty() ? QObject::tr("Unknown") : modelArchitecture},
             {"precision", modelPrecision.isEmpty() ? QObject::tr("Unknown") : modelPrecision},
             {"format", entry.format == "safetensors" || entry.format == "safetensor" ? QString("Safetensors")
@@ -217,6 +260,16 @@ Snapshot scan(const QString &directory, const std::shared_ptr<std::atomic_bool> 
     if (result.watches.size() > 64) result.watches = result.watches.mid(0, 64);
     return result;
 }
+}
+
+QVariantList StorageModelCatalog::categories() const
+{
+    QVariantList result;
+    for (const auto type : allModelTypes()) {
+        const auto name = modelTypeName(type);
+        result.append(QVariantMap{{"key", name}, {"title", name}});
+    }
+    return result;
 }
 
 StorageModelCatalog::StorageModelCatalog(QObject *parent) : QObject(parent), m_groups(emptyGroups())
@@ -242,7 +295,8 @@ void StorageModelCatalog::setDirectory(const QString &directory)
 {
     if (m_directory == directory) return;
     if (m_cancel) m_cancel->store(true);
-    ++m_revision; m_refreshPending = false; m_debounce.stop(); m_poll.stop();
+    ++m_revision; m_refreshPending = false; m_scanning = false; m_hasSnapshot = false;
+    m_debounce.stop(); m_poll.stop();
     m_openWhenReady = false; m_downloadStatus.clear(); m_requestedPath.clear(); emit downloadStatusChanged();
     if (m_loading) { m_loading = false; emit loadingChanged(); }
     const auto watches = m_files.files() + m_files.directories();
@@ -266,11 +320,12 @@ void StorageModelCatalog::activatePath(const QString &path, bool openWhenReady)
 }
 void StorageModelCatalog::refresh()
 {
-    if (m_loading) { m_refreshPending = true; return; }
+    if (m_scanning) { m_refreshPending = true; return; }
     if (m_directory.isEmpty()) return;
     const auto revision = ++m_revision;
     m_cancel = std::make_shared<std::atomic_bool>(false);
-    m_loading = true; emit loadingChanged();
+    m_scanning = true;
+    if (!m_hasSnapshot) { m_loading = true; emit loadingChanged(); }
     const auto snapshotResult = std::make_shared<Snapshot>();
     const auto directory = m_directory; const auto cancel = m_cancel;
     auto *worker = QThread::create([snapshotResult, directory, cancel] { *snapshotResult = scan(directory, cancel); });
@@ -290,7 +345,8 @@ void StorageModelCatalog::refresh()
             m_count = snapshot.count; m_uncategorized = snapshot.uncategorized;
             emit modelsChanged();
         }
-        m_loading = false; emit loadingChanged();
+        m_scanning = false; m_hasSnapshot = true;
+        if (m_loading) { m_loading = false; emit loadingChanged(); }
         if (m_refreshPending) { m_refreshPending = false; m_debounce.start(); }
     });
     worker->start();
