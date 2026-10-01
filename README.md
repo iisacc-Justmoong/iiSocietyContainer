@@ -271,3 +271,8 @@ Photos 경로·매니페스트 이전 계약은 [Photos.md](docs/Photos.md)를 �
 ### Generation inventory reconciliation
 
 `SharedStorage::models()` reconciles a local authority catalog with native Models files before returning generation models: Deleted moves disappear and new files/packages appear before background hashing finishes. Existing indexed version references remain compatible with remote generation. Discovery reads file metadata, not tensor payloads; hidden runtime directories and redirected paths are excluded. A replica with an empty catalog stays empty instead of exposing leftover local files. `resolveModel()` uses the same inventory. Regression coverage: `generationInventoryReconcilesAuthorityAndPreservesReplicas`.
+# File loading performance
+
+Application-local directory snapshots, SHA-256/preview caching and bounded parallel
+loading are documented in [FileLoading.md](FileLoading.md). GUI consumers register
+`iiSocietyContainer::PreviewProvider` under `society-preview` before loading QML.

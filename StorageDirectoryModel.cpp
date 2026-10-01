@@ -8,6 +8,14 @@
 #include <QThread>
 #include <algorithm>
 #include <type_traits>
+#include <filesystem>
+#include <mutex>
+#include <future>
+#include <thread>
+#include <QCryptographicHash>
+#include <QDataStream>
+#include <QSaveFile>
+#include <QStandardPaths>
 
 namespace iiSocietyContainer {
 namespace {
@@ -33,19 +41,77 @@ struct Listing {
     QJsonArray catalog;
     QString stamp;
 };
+QString snapshotPath(const Options &o) {
+    QByteArray key; QDataStream stream(&key, QIODevice::WriteOnly);
+    stream << o.folder << o.dirs << o.files << o.hidden << o.dirsFirst << o.caseSensitive
+           << o.sortCaseSensitive << o.reversed << int(o.sort) << o.filters;
+    return QDir(StorageDirectoryModel::cacheDirectory()).filePath(
+        "directories-v1/" + QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex()) + ".bin");
+}
+QList<QVariantMap> restoreSnapshot(const Options &o) {
+    const QFileInfo folder(o.folder.toLocalFile());
+    if (!folder.isDir() || folder.isSymLink()) return {};
+    const auto drive = containingDrive(folder.absoluteFilePath());
+    QFile file(snapshotPath(o));
+    if (file.size() > 16 * 1024 * 1024 || !file.open(QIODevice::ReadOnly)) return {};
+    QDataStream stream(&file); stream.setVersion(QDataStream::Qt_6_8);
+    quint32 version; QString binding; QList<QVariantMap> rows;
+    stream >> version >> binding >> rows;
+    if (stream.status() != QDataStream::Ok || version != 1 || binding != (drive ? drive->identifier() : QString())) return {};
+    for (const auto &row : rows)
+        if (QFileInfo(row.value("filePath").toString()).absolutePath() != folder.absoluteFilePath()) return {};
+    return rows;
+}
+void saveSnapshot(const Options &o, const Listing &listing) {
+    const auto path = snapshotPath(o); const auto directory = QFileInfo(path).absolutePath();
+    if (!QDir().mkpath(directory) || QFileInfo(directory).isSymLink()) return;
+    QFile::setPermissions(directory, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    QByteArray bytes; QDataStream stream(&bytes, QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_8);
+    stream << quint32(1) << (listing.drive ? listing.drive->identifier() : QString()) << listing.rows;
+    if (bytes.size() > 16 * 1024 * 1024) return;
+    QFile existing(path);
+    if (existing.open(QIODevice::ReadOnly) && existing.size() == bytes.size() && existing.readAll() == bytes) return;
+    existing.close(); QSaveFile file(path);
+    if (file.open(QIODevice::WriteOnly) && file.setPermissions(QFile::ReadOwner | QFile::WriteOwner)
+        && file.write(bytes) == bytes.size()) file.commit();
+    // Directory snapshots are rebuildable. Keep the 128 most recently written.
+    static std::mutex pruneMutex;
+    std::lock_guard lock(pruneMutex);
+    const auto entries = QDir(directory).entryInfoList({"*.bin"}, QDir::Files | QDir::NoSymLinks, QDir::Time);
+    qint64 total = 0;
+    for (int i = 0; i < entries.size(); ++i) {
+        total += entries[i].size();
+        if (i >= 128 || total > 128ll * 1024 * 1024) QFile::remove(entries[i].absoluteFilePath());
+    }
+}
 Listing list(const Options &o, const QJsonArray &cached, const QString &cachedStamp,
              const std::shared_ptr<std::atomic_bool> &cancel) {
     Listing result;
     if (!o.folder.isLocalFile() || o.folder.toLocalFile().isEmpty()) return result;
     const auto folder = QDir::cleanPath(o.folder.toLocalFile());
     result.drive = containingDrive(folder);
-    QMap<QString, QVariantMap> paths;
-    for (const auto &info : QDir(folder).entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDir::Name)) {
-        if (cancel->load()) return {};
-        const auto path = info.absoluteFilePath();
-        paths.insert(path, {{"fileName", info.fileName()}, {"filePath", path}, {"fileUrl", QUrl::fromLocalFile(path)},
-            {"fileSuffix", info.suffix()}, {"fileIsDir", info.isDir()}, {"fileSize", info.size()},
-            {"fileModified", info.lastModified()}, {"filePreviewUrl", QUrl::fromLocalFile(path)}, {"fileResident", true}});
+    QHash<QString, QVariantMap> paths;
+    const auto infos = QDir(folder).entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDir::NoSort);
+    std::atomic<qsizetype> next = 0;
+    auto inspect = [&] {
+        QList<QVariantMap> rows;
+        while (!cancel->load()) {
+            const auto i = next.fetch_add(1); if (i >= infos.size()) break;
+            const auto info = infos[i]; const auto path = info.absoluteFilePath();
+            rows.append({{"fileName", info.fileName()}, {"filePath", path}, {"fileUrl", QUrl::fromLocalFile(path)},
+                {"fileSuffix", info.suffix()}, {"fileIsDir", info.isDir()}, {"fileSize", info.size()},
+                {"fileModified", info.lastModified()}, {"filePreviewUrl", QUrl::fromLocalFile(path)}, {"fileResident", true}});
+        }
+        return rows;
+    };
+    // Amortize thread creation for small folders; fan out larger metadata walks.
+    const auto count = std::min<unsigned>(std::max(1u, std::thread::hardware_concurrency()), std::max<qsizetype>(1, infos.size() / 256));
+    std::vector<std::future<QList<QVariantMap>>> scans;
+    for (unsigned i = 1; i < count; ++i) scans.push_back(std::async(std::launch::async, inspect));
+    auto entries = inspect();
+    for (auto &scan : scans) entries.append(scan.get());
+    for (const auto &row : entries) {
+        paths.insert(row.value("filePath").toString(), row);
     }
     if (result.drive) {
         const auto root = result.drive->rootPath();
@@ -56,7 +122,9 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
             + '\n' + QString::number(catalog.metadataChangeTime().toMSecsSinceEpoch());
         StorageMap map(*result.drive);
         const bool authority = map.isLocalAuthority();
-        result.catalog = result.stamp == cachedStamp ? cached : map.objects();
+        // The host filesystem is authoritative. Parsing every remote/catalogue
+        // row cannot improve its local directory listing and adds O(namespace).
+        result.catalog = authority ? QJsonArray{} : result.stamp == cachedStamp ? cached : map.objects();
         for (const auto &value : result.catalog) {
             if (cancel->load()) return {};
             const auto e = value.toObject(); const auto key = e.value("path").toString();
@@ -95,7 +163,11 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
         if ((!o.hidden && name.startsWith('.')) || (directory ? !o.dirs : !o.files)) continue;
         bool match = filters.isEmpty() || directory;
         for (const auto &filter : filters) match |= filter.match(name).hasMatch();
-        if (match) result.rows.append(row);
+        if (match) {
+            auto entry = row;
+            entry.insert("fileThumbnailUrl", StorageDirectoryModel::thumbnailUrl(row.value("filePreviewUrl").toUrl().toLocalFile()));
+            result.rows.append(entry);
+        }
     }
     std::sort(result.rows.begin(), result.rows.end(), [&o](const auto &a, const auto &b) {
         if (o.dirsFirst && a.value("fileIsDir") != b.value("fileIsDir")) return a.value("fileIsDir").toBool();
@@ -103,6 +175,7 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
         if (o.sort == StorageDirectoryModel::Time && a.value("fileModified") != b.value("fileModified")) comparison = a.value("fileModified").toDateTime() > b.value("fileModified").toDateTime() ? -1 : 1;
         else if (o.sort == StorageDirectoryModel::Size && a.value("fileSize") != b.value("fileSize")) comparison = a.value("fileSize").toLongLong() > b.value("fileSize").toLongLong() ? -1 : 1;
         else comparison = a.value("fileName").toString().compare(b.value("fileName").toString(), o.sortCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive);
+        if (!comparison) comparison = a.value("filePath").toString().compare(b.value("filePath").toString(), Qt::CaseSensitive);
         return o.reversed ? comparison > 0 : comparison < 0;
     });
     return result;
@@ -114,16 +187,20 @@ struct OpenResult {
 };
 }
 StorageDirectoryModel::StorageDirectoryModel(QObject *parent) : QAbstractListModel(parent) {
-    m_poll.setInterval(1000); m_requestPoll.setInterval(500);
+    m_poll.setInterval(10000); m_requestPoll.setInterval(500);
+    m_debounce.setSingleShot(true); m_debounce.setInterval(100);
+    connect(&m_watches, &QFileSystemWatcher::directoryChanged, &m_debounce, qOverload<>(&QTimer::start));
+    connect(&m_watches, &QFileSystemWatcher::fileChanged, &m_debounce, qOverload<>(&QTimer::start));
+    connect(&m_debounce, &QTimer::timeout, this, &StorageDirectoryModel::refresh);
     connect(&m_poll, &QTimer::timeout, this, &StorageDirectoryModel::refresh);
     connect(&m_requestPoll, &QTimer::timeout, this, &StorageDirectoryModel::checkRequest);
-    connect(this, &StorageDirectoryModel::optionsChanged, this, [this] { ++m_optionsRevision; refresh(); });
+    connect(this, &StorageDirectoryModel::optionsChanged, this, [this] { ++m_optionsRevision; m_snapshotAttempted = true; refresh(); });
 }
 StorageDirectoryModel::~StorageDirectoryModel() { if (m_cancel) m_cancel->store(true); }
 int StorageDirectoryModel::rowCount(const QModelIndex &parent) const { return parent.isValid() ? 0 : m_rows.size(); }
 QHash<int, QByteArray> StorageDirectoryModel::roleNames() const {
     QHash<int, QByteArray> roles; int role = Qt::UserRole + 1;
-    for (const auto *name : {"fileName", "filePath", "fileUrl", "fileSuffix", "fileIsDir", "fileSize", "fileModified", "filePreviewUrl", "fileResident"}) roles.insert(role++, name);
+    for (const auto *name : {"fileName", "filePath", "fileUrl", "fileSuffix", "fileIsDir", "fileSize", "fileModified", "filePreviewUrl", "fileResident", "fileThumbnailUrl"}) roles.insert(role++, name);
     return roles;
 }
 QVariant StorageDirectoryModel::data(const QModelIndex &index, int role) const { return get(index.row(), QString::fromLatin1(roleNames().value(role))); }
@@ -132,8 +209,12 @@ bool StorageDirectoryModel::isFolder(int index) const { return get(index, "fileI
 void StorageDirectoryModel::setFolder(const QUrl &folder) {
     if (m_folder == folder) return;
     if (m_cancel) m_cancel->store(true);
+    m_debounce.stop();
+    const auto watches = m_watches.files() + m_watches.directories();
+    if (!watches.isEmpty()) m_watches.removePaths(watches);
     ++m_revision; ++m_requestRevision; m_running = m_pending = m_checkingRequest = false;
     m_folder = folder; m_drive.reset(); m_catalog = {}; m_catalogStamp.clear();
+    m_snapshotAttempted = false;
     m_request.clear(); m_requestDrive.reset(); m_requestPoll.stop();
     if (m_downloading) { m_downloading = false; emit downloadingChanged(); }
     if (!m_rows.isEmpty()) { beginResetModel(); m_rows.clear(); endResetModel(); emit countChanged(); }
@@ -143,6 +224,7 @@ void StorageDirectoryModel::setFolder(const QUrl &folder) {
     m_poll.start(); QTimer::singleShot(0, this, &StorageDirectoryModel::refresh);
 }
 void StorageDirectoryModel::activate(int index) {
+    if (m_status != Ready) return; // Never authorize an open from provisional cached residency.
     if (index < 0 || index >= m_rows.size()) return;
     const auto row = m_rows[index]; const auto path = row.value("filePath").toString();
     if (row.value("fileIsDir").toBool() || row.value("fileResident").toBool()) { emit activated(path, row.value("fileIsDir").toBool()); return; }
@@ -262,9 +344,20 @@ void StorageDirectoryModel::refresh() {
     const auto optionsRevision = m_optionsRevision;
     const auto cancel = m_cancel = std::make_shared<std::atomic_bool>(false);
     const Options options{m_folder, m_showDirs, m_showFiles, m_showHidden, m_showDirsFirst, m_caseSensitive, m_sortCaseSensitive, m_sortReversed, m_sortField, m_nameFilters};
+    if (!m_snapshotAttempted) {
+        m_snapshotAttempted = true;
+        background(this, [options] { return restoreSnapshot(options); },
+            [this, revision, optionsRevision](QList<QVariantMap> rows) {
+                if (revision != m_revision) return;
+                m_running = false;
+                if (optionsRevision == m_optionsRevision && !rows.isEmpty()) { applyRows(rows); emit snapshotRestored(); }
+                refresh();
+            });
+        return;
+    }
     const auto cached = m_catalog; const auto stamp = m_catalogStamp;
     background(this, [options, cached, stamp, cancel] { return list(options, cached, stamp, cancel); },
-        [this, revision, optionsRevision](Listing result) {
+        [this, revision, optionsRevision, options](Listing result) {
             if (revision != m_revision) return;
             if (optionsRevision != m_optionsRevision) {
                 m_running = false;
@@ -272,9 +365,62 @@ void StorageDirectoryModel::refresh() {
                 return;
             }
             m_running = false; m_drive = std::move(result.drive); m_catalog = std::move(result.catalog); m_catalogStamp = std::move(result.stamp);
+            QStringList wanted{m_folder.toLocalFile()};
+            if (m_drive) {
+                const auto sync = QDir(m_drive->rootPath()).filePath(".society-sync");
+                wanted.append({m_drive->rootPath(), sync, sync + "/catalog.json", sync + "/primary.json", sync + "/previews"});
+            }
+            // Bound OS watch handles; the fallback poll covers very large directories.
+            for (const auto &row : result.rows) {
+                if (wanted.size() >= 64) break;
+                if (row.value("fileResident").toBool()) wanted.append(row.value("filePath").toString());
+            }
+            const auto watched = m_watches.files() + m_watches.directories();
+            const QSet<QString> old(watched.cbegin(), watched.cend()), next(wanted.cbegin(), wanted.cend());
+            const auto remove = (old - next).values(), add = (next - old).values();
+            if (!remove.isEmpty()) m_watches.removePaths(remove);
+            // The directory watch must be active before Ready. Individual file
+            // watches are optional latency hints, installed in frame-sized batches.
+            auto pendingWatches = add;
+            if (pendingWatches.removeAll(m_folder.toLocalFile())) m_watches.addPath(m_folder.toLocalFile());
+            QTimer::singleShot(0, this, [this, pendingWatches, revision] { addWatches(pendingWatches, revision); });
+            const bool changed = result.rows != m_rows;
             applyRows(result.rows);
             if (m_status != Ready) { m_status = Ready; emit statusChanged(); }
+            // Cache persistence must not delay first paint or live readiness on
+            // a busy/slow disk. The bounded snapshot is independent of this model.
+            if (changed) background(this, [options, rows = result.rows, drive = m_drive] {
+                Listing snapshot; snapshot.rows = rows; snapshot.drive = drive;
+                saveSnapshot(options, snapshot); return true;
+            }, [](bool) {});
             if (m_pending) QTimer::singleShot(0, this, &StorageDirectoryModel::refresh);
         });
+}
+void StorageDirectoryModel::addWatches(QStringList paths, quint64 revision) {
+    if (revision != m_revision || paths.isEmpty()) return;
+    QStringList batch;
+    for (int i = 0; i < 8 && !paths.isEmpty(); ++i) {
+        const auto path = paths.takeFirst();
+        if (QFileInfo::exists(path)) batch.append(path);
+    }
+    if (!batch.isEmpty()) m_watches.addPaths(batch);
+    if (!paths.isEmpty()) QTimer::singleShot(16, this, [this, paths, revision] { addWatches(paths, revision); });
+}
+QUrl StorageDirectoryModel::thumbnailUrl(const QString &path) {
+    static const QStringList extensions{"png", "jpg", "jpeg", "webp", "bmp", "gif", "tif", "tiff", "avif", "heic", "heif", "svg"};
+    const QFileInfo info(path);
+    if (path.isEmpty() || !info.isAbsolute() || !extensions.contains(info.suffix().toLower())
+        || !info.isFile() || info.isSymLink() || info.canonicalFilePath() != QDir::cleanPath(path)) return {};
+    std::error_code error;
+    const auto modified = std::filesystem::last_write_time(std::filesystem::u8path(path.toStdString()), error);
+    if (error) return {};
+    const auto encoded = path.toUtf8().toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
+    return QUrl(QStringLiteral("image://society-preview/%1/%2-%3-%4").arg(QString::fromLatin1(encoded))
+        .arg(info.size()).arg(qint64(modified.time_since_epoch().count())).arg(info.metadataChangeTime().toMSecsSinceEpoch()));
+}
+QString StorageDirectoryModel::cacheDirectory() {
+    const auto configured = qEnvironmentVariable("IISOCIETY_FILE_CACHE_DIRECTORY");
+    if (!configured.isEmpty() && QFileInfo(configured).isAbsolute()) return QDir::cleanPath(configured);
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation)).filePath("society");
 }
 }

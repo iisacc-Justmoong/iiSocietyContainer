@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QFileOpenEvent>
 #include <QImage>
+#include <QLocale>
 #include <QSaveFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -16,6 +17,34 @@ using namespace iiSocietyContainer;
 class DashboardTests : public QObject {
     Q_OBJECT
 private slots:
+    void concurrentSectionsKeepMetadataIndependent() {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/parallel-dashboard-XXXXXX");
+        QVERIFY(SocietyDrive::create(root.path()));
+        QImage image(16, 16, QImage::Format_RGB32); image.fill(Qt::cyan);
+        for (const auto &section : {"Files", "Published", "Generation History"})
+            for (int i = 0; i < 8; ++i)
+                QVERIFY(image.save(root.filePath(QString("%1/item-%2.png").arg(section).arg(i))));
+        DashboardFiles model;
+        model.setContainerPath(root.path());
+        for (int iteration = 0; iteration < 12; ++iteration) {
+            QTRY_VERIFY_WITH_TIMEOUT(!model.loading(), 30000);
+            QVERIFY(model.errorString().isEmpty());
+            const auto verify = [&](const QVariantList &rows, const QString &section, int count) {
+                QCOMPARE(rows.size(), count);
+                for (const auto &entry : rows) {
+                    const auto row = entry.toMap();
+                    QVERIFY(row.value("path").toString().contains('/' + section + '/'));
+                    const QFileInfo file(row.value("path").toString());
+                    QCOMPARE(row.value("metadata1").toString(), "PNG · " + QLocale().formattedDataSize(file.size()));
+                    QVERIFY(!row.contains("_scanByteSize"));
+                }
+            };
+            verify(model.recentFiles(), "Files", 8);
+            verify(model.recentPublished(), "Published", 4);
+            verify(model.generationHistory(), "Generation History", 8);
+            if (iteration != 11) model.refresh();
+        }
+    }
     void historyIsPersistedBoundedAndObserved() {
         QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/history-XXXXXX");
         QVERIFY(SocietyDrive::create(root.path()));
@@ -45,6 +74,8 @@ private slots:
         QCOMPARE(model.generationHistory().first().toMap().value("name").toString(), "image-00.png");
         QCOMPARE(model.generationHistory().last().toMap().value("name").toString(), "image-19.png");
         QCOMPARE(model.recentFiles().size(), 1);
+        QCOMPARE(model.recentFiles().first().toMap().value("previewSource").toUrl().scheme(), QString("file"));
+        QCOMPARE(model.recentFiles().first().toMap().value("thumbnailSource").toUrl().host(), QString("society-preview"));
         QCOMPARE(model.recentPublished().size(), 4);
         QCOMPARE(model.recentPublished().first().toMap().value("name").toString(), "published-00.png");
         QCOMPARE(model.recentPublished().last().toMap().value("name").toString(), "published-03.png");

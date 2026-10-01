@@ -2,6 +2,7 @@
 #include "StorageMap.h"
 #include <QAbstractListModel>
 #include <QTimer>
+#include <QFileSystemWatcher>
 #include <QUrl>
 #include <atomic>
 #include <memory>
@@ -43,10 +44,15 @@ public:
     // For a model package, materialize its catalogued files before opening it.
     Q_INVOKABLE void openPath(const QString &path, bool materializeDirectory = false);
     Q_INVOKABLE void refresh();
+    // Revision-bound image-provider URL; empty for missing, redirected or non-image files.
+    static QUrl thumbnailUrl(const QString &path);
+    static QString cacheDirectory();
 signals:
     // One publication boundary per changed snapshot; polling alone emits neither.
     void contentsAboutToChange();
     void contentsChanged();
+    // Cached rows are provisional; Ready still means live filesystem reconciliation.
+    void snapshotRestored();
     void folderChanged();
     void countChanged();
     void statusChanged();
@@ -57,6 +63,7 @@ signals:
 private:
     void applyRows(const QList<QVariantMap> &rows);
     void checkRequest();
+    void addWatches(QStringList paths, quint64 revision);
     QUrl m_folder;
     Status m_status = Null;
     SortField m_sortField = Name;
@@ -71,8 +78,10 @@ private:
     std::optional<SocietyDrive> m_requestDrive;
     bool m_running = false, m_pending = false, m_downloading = false, m_checkingRequest = false;
     bool m_requestedDirectory = false;
+    bool m_snapshotAttempted = false;
     quint64 m_revision = 0, m_requestRevision = 0, m_optionsRevision = 0;
     std::shared_ptr<std::atomic_bool> m_cancel;
-    QTimer m_poll, m_requestPoll;
+    QTimer m_poll, m_requestPoll, m_debounce;
+    QFileSystemWatcher m_watches;
 };
 }

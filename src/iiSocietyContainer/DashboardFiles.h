@@ -41,13 +41,14 @@ signals:
     void loadingChanged();
 private:
     QVariantList filtered(StoreSection section, qsizetype limit) const;
+    void addWatches(QStringList paths, quint64 revision);
     QString m_path, m_query, m_error;
     QVariantList m_files;
     bool m_loading = false, m_refreshPending = false;
     quint64 m_revision = 0;
     std::shared_ptr<std::atomic_bool> m_cancel;
     QFileSystemWatcher m_watches;
-    QTimer m_debounce;
+    QTimer m_debounce, m_fallback;
 };
 
 } // namespace iiSocietyContainer

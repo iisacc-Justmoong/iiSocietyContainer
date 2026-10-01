@@ -17,6 +17,7 @@
 #include <QTest>
 #include <QUuid>
 #include <QElapsedTimer>
+#include <QDataStream>
 
 using namespace iiSocietyContainer;
 
@@ -33,6 +34,43 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void cachedDirectorySnapshotIsReconciledBeforeOpening() {
+        QTemporaryDir fixture(QDir::current().filePath("directory-cache-XXXXXX")); QVERIFY(fixture.isValid());
+        write(fixture.filePath("old.txt"), "original");
+        {
+            StorageDirectoryModel initial; initial.setFolder(QUrl::fromLocalFile(fixture.path()));
+            QTRY_COMPARE(initial.status(), StorageDirectoryModel::Ready); QCOMPARE(initial.rowCount(), 1);
+            // The snapshot write is deliberately outside the visible Ready path.
+            const auto persisted = [&] {
+                const QDir cache(QDir(StorageDirectoryModel::cacheDirectory()).filePath("directories-v1"));
+                for (const auto &path : cache.entryList({"*.bin"}, QDir::Files)) {
+                    QFile file(cache.filePath(path)); if (!file.open(QIODevice::ReadOnly)) continue;
+                    QDataStream stream(&file); stream.setVersion(QDataStream::Qt_6_8);
+                    quint32 version; QString binding; QList<QVariantMap> rows;
+                    stream >> version >> binding >> rows;
+                    if (stream.status() == QDataStream::Ok && rows.size() == 1
+                        && rows[0].value("filePath") == fixture.filePath("old.txt")) return true;
+                }
+                return false;
+            };
+            QTRY_VERIFY(persisted());
+        }
+        QVERIFY(QFile::remove(fixture.filePath("old.txt"))); write(fixture.filePath("new.txt"), "current");
+        StorageDirectoryModel restored;
+        QSignalSpy cached(&restored, &StorageDirectoryModel::snapshotRestored);
+        QSignalSpy activated(&restored, &StorageDirectoryModel::activated);
+        connect(&restored, &StorageDirectoryModel::snapshotRestored, &restored, [&] {
+            QCOMPARE(restored.status(), StorageDirectoryModel::Loading);
+            QCOMPARE(restored.get(0, "fileName").toString(), "old.txt");
+            restored.activate(0); QCOMPARE(activated.size(), 0);
+        });
+        restored.setFolder(QUrl::fromLocalFile(fixture.path()));
+        QTRY_COMPARE(restored.status(), StorageDirectoryModel::Ready);
+        QCOMPARE(cached.size(), 1); QCOMPARE(restored.rowCount(), 1);
+        QCOMPARE(restored.get(0, "fileName").toString(), "new.txt");
+        write(fixture.filePath("watched.txt"), "observed");
+        QTRY_COMPARE_WITH_TIMEOUT(restored.rowCount(), 2, 3000); // No explicit refresh or ten-second fallback.
+    }
     void generationInventoryReconcilesAuthorityAndPreservesReplicas() {
         QTemporaryDir fixture(QDir::current().filePath("generation-inventory-XXXXXX")); QVERIFY(fixture.isValid());
         const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
@@ -94,7 +132,9 @@ private slots:
         if (synchronized) QVERIFY(map.publish(objects));
         StorageModelCatalog catalog;
         catalog.setDirectory(fixture.filePath("Models"));
-        QTRY_VERIFY(!catalog.loading());
+        // The model scans a real filesystem asynchronously; external volumes can
+        // take several seconds to publish even this small fixture under I/O load.
+        QTRY_VERIFY_WITH_TIMEOUT(!catalog.loading(), 30000);
         QCOMPARE(catalog.groups().value("VAE").toList().size(), 1);
         QCOMPARE(catalog.groups().value("Wildcards").toList().size(), 1);
         QCOMPARE(catalog.count(), 2);
