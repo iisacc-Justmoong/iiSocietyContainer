@@ -71,7 +71,7 @@ Anima는 Cosmos 계열의 `blocks.0.mlp.layer1.weight`, `llm_adapter.blocks.0.cr
 
 | 입력 | 판정 근거 |
 | --- | --- |
-| Safetensors | JSON 헤더의 모델 유형·네트워크 메타데이터와 텐서 키. Checkpoint, LoRA, LyCORIS, DoRA, Controlnet, Motion, Embedding, VAE, Upscaler, UNet, Text Encoder, CLIP Vision, CLIP, LLM, VLM의 알려진 구조 |
+|안전 텐서| JSON 헤더의 모델 유형·네트워크 메타데이터와 텐서 키. Checkpoint, LoRA, LyCORIS, DoRA, Controlnet, Motion, Embedding, VAE, Upscaler, UNet, Text Encoder, CLIP Vision, CLIP, LLM, VLM의 알려진 구조 |
 | Diffusers/Transformers/PEFT 폴더 | `model_index.json`, `config.json`과 가중치, `adapter_config.json`. 설정의 아키텍처·모델 유형·`use_dora` 등. 폴더 전체를 하나의 모델로 이동 |
 | GGUF v2/v3 | `general.architecture`, CLIP 텍스트·비전 플래그. 알려진 언어·멀티모달·확산·인코더 구조 |
 | JSON | ComfyUI 노드/링크 또는 API 그래프, OpenPose 키포인트, workflow/steps 구조 |
@@ -102,7 +102,9 @@ Anima 회귀 검사는 원본·파생·통합 체크포인트, 이름 변경과 
 0.11.2에서는 유지보수 중인 Apache-2.0 Safetensors 구현의 [검증·자료형 계약](https://github.com/huggingface/safetensors/blob/main/safetensors/src/tensor.rs)을 참고하였다. Rust/Python 런타임을 새로 추가하는 대신 기존 Qt Core로 필요한 헤더 검증을 수행한다. 중복 JSON 키는 Qt 파서의 덮어쓰기 동작을 별도로 검사한다. 읽는 양은 헤더 크기에 비례하며 수 GB의 가중치 데이터를 읽거나 메모리에 적재하지 않는다.
 
 CLI는 `iiSocietyContainerDriveTool model-types`, `models <container>`, `organize-models <container>`를 제공한다. 마지막 명령은 파일을 이동하며 JSON 결과에 성공·오류를 구분한다.
-# Unified image models
+<a id="unified-image-models"></a>
+
+# 통합 이미지 모델
 
 `model_index.json`에 `schema: iild-unified-model-v1`, `_class_name: IILDUnifiedCascade`가
 있는 패키지는 `SharedStorage`에서 `unified` 형식의 단일 모델로 노출한다. 내부 체크포인트는
@@ -123,18 +125,8 @@ CLI는 `iiSocietyContainerDriveTool model-types`, `models <container>`, `organiz
 
 가중치 유형의 파일 카드는 safetensors/safetensor, GGUF/GGML, bin/ckpt/pt/pth, ONNX/PB/TFLite, H5/HDF5/NPZ/NPY, model/mlmodel/engine 확장자를 표시 대상으로 삼는다. README·LICENSE·NOTICE·독립 설정 JSON은 VAE 등 가중치 카드에 포함하지 않는다. 패키지는 한 카드로 유지한다. Wildcards는 txt/wildcards, Poses·Workflows·ComfyUI Workflows는 JSON/PNG/JPG/JPEG/WebP를 표시하며 Other는 미분류 파일을 유지한다. 이 규칙은 로컬 스캔과 메타데이터만 존재하는 동기화 카탈로그에서 동일하고, 파일 삭제·이동·다운로드 또는 가중치 실행을 수행하지 않는다. 확장자는 표시 후보 기준이며 가중치의 실행 가능성 검증은 아니다.
 
-Krea2 imports use validated tensor signatures (`txtfusion.projector.weight`, compatible
-64-channel `first.weight` and `last.linear.weight`) in native and ComfyUI namespaces.
-They are categorized as Checkpoint; LoRA detection retains precedence. Organizing
-previously unknown Krea2 files moves them from Other while preserving path references.
-Truncated tensor payloads do not qualify as recognized Krea2 checkpoints.
+Krea2 가져오기는 검증된 텐서 시그니처(`txtfusion.projector.weight`, 호환되는 64-채널 `first.weight` 및 `last.linear.weight`)를 네이티브 및 ComfyUI 네임스페이스에서 사용합니다. 그들은 체크포인트로 분류되며, LoRA 탐지는 우선권을 유지합니다. 이전에 알 수 없었던 Krea2 파일을 정리하면 경로 참조를 유지하면서 Other에서 이동합니다. 잘린 텐서 페이로드는 인식된 Krea2 체크포인트에 해당되지 않습니다.
 
-`ModelClassifier::validateSafetensors(path)` returns a diagnostic for incomplete or
-invalid files without reading tensor payloads. Import callers can reject truncated
-downloads before performing a multi-gigabyte copy.
+`ModelClassifier::validateSafetensors(path)`는 텐서 페이로드를 읽지 않고 불완전하거나 유효하지 않은 파일에 대한 진단을 반환합니다. 가져오기 호출자는 다중 기가바이트 복사를 수행하기 전에 잘린 다운로드를 거부할 수 있습니다.
 
-On the local authority, shallow file metadata from physical model category folders
-is merged with the sync catalog. A newly published checkpoint appears immediately,
-without waiting for a many-gigabyte sync checksum. This never reads tensor contents
-or scans inside packages. Replicas remain catalog-only and unchanged snapshots still
-emit no model/loading reset signals.
+지역 당국에서는 물리적 모델 카테고리 폴더의 얕은 파일 메타데이터가 동기화 카탈로그와 병합됩니다. 새로 게시된 체크포인트가 즉시 나타나며, 다수의 기가바이트 동기화 체크섬을 기다리지 않습니다. 이것은 텐서 내용이나 패키지 내부의 스캔을 절대 읽지 않습니다. 복제본은 카탈로그 전용이며, 변경되지 않은 스냅샷은 여전히 모델/로딩 재설정 신호를 발생시키지 않습니다.

@@ -11,6 +11,10 @@ namespace iiSocietyContainer {
 class IISOCIETYCONTAINER_EXPORT SocietyDrive
 {
 public:
+    /// Creates the ordinary Society folder beneath an existing parent directory.
+    /// Selecting an existing drive reuses its identity. No disk image is created.
+    [[nodiscard]] static std::optional<SocietyDrive> createAt(
+        const QString& parentDirectory, QString* error = nullptr);
     /// Initializes an existing directory, or opens its existing valid drive.
     /// Conflicting entries and unknown manifests are preserved and rejected.
     /// Finder CloudStorage replicas and descendants of another drive are rejected
@@ -45,6 +49,15 @@ public:
     /// Map the logical section namespace to native paths, including the Files volume.
     [[nodiscard]] QString resolvePath(const QString& relative) const;
     [[nodiscard]] QString relativePath(const QString& absolute) const;
+
+    /// Live logical tree of the nine sections, including a separate Files volume.
+    /// Empty paths select the logical root; paths use display names ("Files/a").
+    /// Unready or replaced drives fail. Only resident native entries are returned.
+    [[nodiscard]] FileTree::EntryResult entry(const QString& relativePath = {}) const;
+    [[nodiscard]] FileTree::ChildrenResult entries(const QString& relativeDirectory = {},
+                                                 bool includeHidden = false) const;
+    [[nodiscard]] FileTree::EntryResult tree(const QString& relativePath = {},
+                                            FileTree::Options options = {}) const;
 
 private:
     SocietyDrive(QString root, QString identifier);

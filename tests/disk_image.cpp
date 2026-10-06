@@ -12,6 +12,7 @@
 #include <QScopeGuard>
 #include <QProcess>
 #include <sys/mount.h>
+#include <unistd.h>
 
 using namespace iiSocietyContainer;
 namespace fs = std::filesystem;
@@ -33,6 +34,8 @@ private slots:
         QVERIFY2(result, result ? "" : result.error().c_str());
         const auto image = result->imagePath;
         const auto cleanup = qScopeGuard([&] { DiskImage::detach(image); });
+        QCOMPARE(qt(image.filename()), QString("Society.societycontainer"));
+        QVERIFY(!QFileInfo::exists(parent + "/Society.sparsebundle"));
         QVERIFY(result->mountPath != native(parent));
         QVERIFY(result->device.starts_with("/dev/disk"));
         const QStorageInfo volume(qt(result->mountPath));
@@ -61,6 +64,16 @@ private slots:
         QVERIFY(!QFileInfo::exists(publicRoot + "/Files"));
         QVERIFY(!QFileInfo::exists(publicRoot + "/.society-drive.json"));
         QVERIFY(QDir(publicRoot).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).isEmpty());
+        QVERIFY(QDir().mkpath(publicRoot + "/Tree/nested"));
+        QFile treeFile(publicRoot + "/Tree/nested/public.txt");
+        QVERIFY(treeFile.open(QIODevice::WriteOnly)); treeFile.write("public tree"); treeFile.close();
+        auto tree = drive->tree(); QVERIFY(tree);
+        const auto* publicNode = tree.value->find("Files/Tree/nested/public.txt"); QVERIFY(publicNode);
+        QVERIFY(publicNode->path == native(treeFile.fileName()));
+        QVERIFY(publicNode->parentPath == "Files/Tree/nested");
+        QVERIFY(publicNode->path != native(drive->rootPath() + "/Files/Tree/nested/public.txt"));
+        auto publicChildren = drive->entries("Files/Tree"); QVERIFY(publicChildren);
+        QCOMPARE(publicChildren.value->size(), std::size_t(1));
         QVERIFY(QDir().mkdir(publicRoot + "/Documents"));
         QCOMPARE(drive->relativePath(publicRoot + "/Documents/item.txt"), QString("Files/Documents/item.txt"));
         QCOMPARE(drive->resolvePath("Files/Documents/item.txt"), publicRoot + "/Documents/item.txt");
@@ -104,6 +117,47 @@ private slots:
         QVERIFY(!SharedStorage::open({}, &error)); QVERIFY(!error.isEmpty());
         QVERIFY(!fs::exists(image)); // A missing disk must never become an empty replacement.
         fs::rename(image.parent_path() / "offline.sparsebundle", image);
+    }
+    void renamedMountedPackageRestoresLegacySettingsWithoutChangingIdentity() {
+        QTemporaryDir fixture(QStringLiteral(SOCIETY_TEST_DIRECTORY "/renamed-disk-XXXXXX"));
+        QVERIFY(fixture.isValid());
+        qputenv("SOCIETY_STORAGE_SETTINGS_PATH", fixture.filePath("storage.json").toUtf8());
+        const auto volume = DiskImage::create(native(fixture.path()), 512ULL * 1024 * 1024);
+        QVERIFY2(volume, volume ? "" : volume.error().c_str());
+        const auto image = volume->imagePath;
+        const auto legacy = image.parent_path() / "Society.sparsebundle";
+        const auto cleanup = qScopeGuard([&] { DiskImage::detach(fs::exists(image) ? image : legacy); });
+        const auto drive = SocietyDrive::create(qt(volume->mountPath)); QVERIFY(drive);
+        const auto id = drive->identifier();
+        const auto files = drive->sectionPath(StoreSection::Files);
+        QFile payload(files + "/preserved.txt"); QVERIFY(payload.open(QIODevice::WriteOnly));
+        payload.write("same mounted bytes"); payload.close();
+        fs::rename(image, legacy);
+        QVERIFY(DiskImage::mountedAt(volume->mountPath));
+        QVERIFY(SharedStorage::setDefaultContainer(drive->rootPath()));
+        const auto reused = DiskImage::create(native(fixture.path()), 512ULL * 1024 * 1024);
+        QVERIFY(reused); QCOMPARE(qt(reused->imagePath), qt(legacy));
+        QVERIFY(!fs::exists(image));
+        fs::rename(legacy, image);
+        const auto mounted = DiskImage::mountedAt(volume->mountPath); QVERIFY(mounted);
+        QCOMPARE(qt(mounted->imagePath), qt(image));
+        const auto restored = SharedStorage::open(); QVERIFY(restored);
+        QCOMPARE(restored->drive().identifier(), id);
+        QCOMPARE(restored->drive().sectionPath(StoreSection::Files), files);
+        QVERIFY(payload.open(QIODevice::ReadOnly)); QCOMPARE(payload.readAll(), QByteArray("same mounted bytes"));
+        payload.close();
+        const QByteArray writtenAfterRename(20 * 1024 * 1024, 'p');
+        QFile newPayload(files + "/after-rename.bin"); QVERIFY(newPayload.open(QIODevice::WriteOnly));
+        QCOMPARE(newPayload.write(writtenAfterRename), qint64(writtenAfterRename.size()));
+        QVERIFY(newPayload.flush()); QVERIFY(!fsync(newPayload.handle())); newPayload.close();
+        QFile settings(fixture.filePath("storage.json")); QVERIFY(settings.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(settings.readAll()).object().value("imagePath").toString(), qt(image));
+        QVERIFY(DiskImage::detach(image));
+        const auto remounted = DiskImage::mount(legacy); QVERIFY(remounted);
+        const auto reopened = SocietyDrive::open(qt(remounted->mountPath)); QVERIFY(reopened);
+        QCOMPARE(reopened->identifier(), id);
+        QFile saved(reopened->sectionPath(StoreSection::Files) + "/after-rename.bin");
+        QVERIFY(saved.open(QIODevice::ReadOnly)); QCOMPARE(saved.readAll(), writtenAfterRename);
     }
     void migratesLegacyFilesWithoutPublishingInternalDirectories() {
         QTemporaryDir fixture(QStringLiteral(SOCIETY_TEST_DIRECTORY "/legacy-disk-XXXXXX")); QVERIFY(fixture.isValid());

@@ -1,4 +1,5 @@
 #include "iiSocietyContainer.h"
+#include "src/FileTreePaths.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
@@ -84,6 +85,24 @@ SocietyContainer::PathKind SocietyContainer::classifyPath(const QString& path) c
 QList<StoreSection> SocietyContainer::sections() const
 {
     return isValid() ? allStoreSections() : QList<StoreSection>{};
+}
+
+FileTree::EntryResult SocietyContainer::entry(const QString& relativePath) const
+{
+    if (!isValid()) return {std::nullopt, std::make_error_code(std::errc::no_such_file_or_directory)};
+    return FileTree(detail::nativePath(m_rootPath)).entry(detail::nativePath(relativePath));
+}
+
+FileTree::ChildrenResult SocietyContainer::entries(const QString& relativeDirectory, bool includeHidden) const
+{
+    if (!isValid()) return {std::nullopt, std::make_error_code(std::errc::no_such_file_or_directory)};
+    return FileTree(detail::nativePath(m_rootPath)).children(detail::nativePath(relativeDirectory), includeHidden);
+}
+
+FileTree::EntryResult SocietyContainer::tree(const QString& relativePath, FileTree::Options options) const
+{
+    if (!isValid()) return {std::nullopt, std::make_error_code(std::errc::no_such_file_or_directory)};
+    return FileTree(detail::nativePath(m_rootPath)).snapshot(detail::nativePath(relativePath), options);
 }
 
 bool SocietyContainer::hasSection(StoreSection section) const

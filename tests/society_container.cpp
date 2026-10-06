@@ -21,6 +21,24 @@ class SocietyContainerTests : public QObject
     Q_OBJECT
 
 private slots:
+    void accessesMetadataAndNestedTree()
+    {
+        const SocietyContainer container(root);
+        const auto snapshot = container.tree();
+        QVERIFY(snapshot);
+        const auto* note = snapshot.value->find("assets/note.txt");
+        QVERIFY(note);
+        QCOMPARE(note->size, std::uintmax_t(16));
+        QVERIFY(note->parentPath == "assets");
+        const auto children = container.entries("assets");
+        QVERIFY(children); QCOMPARE(children.value->size(), std::size_t(1));
+        QVERIFY(container.entry("assets/note.txt"));
+        QVERIFY(!container.entry("../Space-other/child"));
+        QVERIFY(!container.tree("assets/note.txt/child"));
+        QVERIFY(QDir(root).removeRecursively());
+        QVERIFY(!container.tree());
+    }
+
     void init()
     {
         workspace = std::make_unique<QTemporaryDir>(

@@ -1,6 +1,7 @@
 #include "FileOperations.h"
 #include "StorageMap.h"
 #include "DiskImage.h"
+#include "src/FileTreePaths.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -121,8 +122,29 @@ std::optional<SocietyDrive> FileOperations::containingDrive(const QString &path)
 bool FileOperations::editable(const QString &path) const {
     return confined(m_drive, path);
 }
+FileOperations::Result FileOperations::createDirectory(const QString &parent, const QString &name) const {
+    auto failed = [](const QString &error) { return Result{{}, error}; };
+    if (!m_drive.isReady() || !confined(m_drive, parent, true) || !QFileInfo(parent).isDir())
+        return failed("Choose an available folder in this Society container.");
+    if (name.isEmpty() || name.startsWith('.') || name.contains('/') || name.contains('\\')
+        || name.contains(':') || name.contains(QChar::Null)) return failed("Enter a valid folder name.");
+    const auto destination = QDir(parent).filePath(name);
+    if (!editable(destination)) return failed("The destination is unavailable or protected.");
+    const auto syncDirectory = m_drive.rootPath() + "/.society-sync";
+    if (QFileInfo(syncDirectory).isSymLink() || !QDir().mkpath(syncDirectory))
+        return failed("The Society operation directory is unavailable.");
+    QLockFile lock(syncDirectory + "/operation.lock"); lock.setStaleLockTime(0);
+    if (!lock.tryLock(2000)) return failed("Another Society operation is in progress. Try again.");
+    if (!m_drive.isReady() || !confined(m_drive, parent, true) || !QFileInfo(parent).isDir() || !editable(destination))
+        return failed("The selected folder changed. Try again.");
+    std::error_code error;
+    if (!std::filesystem::create_directory(detail::nativePath(destination), error))
+        return failed(error ? QString::fromStdString(error.message()) : QStringLiteral("An item with that name already exists."));
+    return {destination, {}};
+}
 FileOperations::Result FileOperations::perform(Action action, const QString &source, const QString &argument) const {
     auto failed = [](const QString &error) { return Result{{}, error}; };
+    if (action == Action::Move && !m_drive.isReady()) return failed("The Society drive is not ready.");
     const bool importing = action == Action::Copy;
     const QFileInfo sourceInfo(source);
     if (importing ? (!sourceInfo.isAbsolute() || sourceInfo.canonicalFilePath() != source || sourceInfo.isSymLink() || sourceInfo.isJunction()) : !editable(source))
@@ -182,10 +204,12 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
         destination = QDir(parent).filePath(argument);
         if (destination == source) return {source, {}};
     } else {
-        const auto folder = action == Action::Copy ? argument : parent;
+        const auto folder = action == Action::Copy || action == Action::Move ? argument : parent;
         if (!confined(m_drive, folder, true) || !QFileInfo(folder).isDir()) return failed("Choose a folder in this Society container.");
         if (folder == source || folder.startsWith(source + '/')) return failed("An item cannot be copied into itself.");
-        destination = uniquePath(folder, QFileInfo(source).fileName(), action == Action::Duplicate);
+        destination = action == Action::Move ? QDir(folder).filePath(sourceInfo.fileName())
+                                            : uniquePath(folder, sourceInfo.fileName(), action == Action::Duplicate);
+        if (action == Action::Move && destination == source) return {source, {}};
     }
     if (destination.isEmpty() || !editable(destination)) return failed("The destination is unavailable or protected.");
     QString staged;
@@ -197,8 +221,12 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
     if (!lock.tryLock(2000)) return failed("Another Society operation is in progress. Try again.");
     if ((importing ? QFileInfo(source).canonicalFilePath() != source : !editable(source)) || !QFileInfo::exists(source)) return failed("The selected item changed. Try again.");
     if (!editable(destination) || QFileInfo::exists(destination) || QFileInfo(destination).isSymLink()) return failed("An item with that name already exists.");
-    // QDir::rename works for both files and directories and never overwrites.
-    if (!QDir().rename(copy ? staged : source, destination)) return failed("Could not move this item. Check access and try again.");
+    if (action == Action::Move) {
+        if (!m_drive.isReady() || !moveWithoutCopy(source, destination))
+            return failed("Could not move this item without replacement. Check access and that both folders are on the same filesystem.");
+    } else if (!QDir().rename(copy ? staged : source, destination)) {
+        return failed("Could not move this item. Check access and try again.");
+    }
     staged.clear(); return {destination, {}};
 }
 }

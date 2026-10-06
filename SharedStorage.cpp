@@ -146,6 +146,7 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
     if (error) error->clear();
     QString selected = path;
     QString expectedId;
+    bool renamedImage = false;
     if (selected.isEmpty())
         selected = qEnvironmentVariable("SOCIETY_CONTAINER_PATH");
 #if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
@@ -184,6 +185,7 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
             }
             const auto volume = DiskImage::mount(image.toStdString());
             if (!volume) { fail(error, QString::fromStdString(volume.error())); return {}; }
+            renamedImage = QString::fromStdString(volume->imagePath.string()) != image;
             selected = QString::fromStdString(volume->mountPath.string());
         }
     }
@@ -203,6 +205,7 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
         fail(error, QStringLiteral("The host drive's initial mirror is not ready."));
         return {};
     }
+    if (renamedImage && !setDefaultContainer(drive->rootPath(), error)) return {};
     return SharedStorage(*drive);
 }
 SharedStorage::SharedStorage(SocietyDrive drive) : m_drive(std::move(drive)) {}

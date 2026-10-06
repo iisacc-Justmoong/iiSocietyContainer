@@ -1,24 +1,28 @@
 # iiSocietyContainer
 
-0.14.0은 원본 파일과 호스트의 저장소 목록을 분리한다. `StorageMap`은 `.society-sync/catalog.json`의 논리 키·버전·크기·해시·로컬 보유 여부를 읽고, 특정 버전을 고정하는 다운로드 요청을 `.society-sync/requests/`에 원자적으로 기록한다. 내용이 없는 항목에는 빈 원본 파일을 만들지 않는다. `available(keys)`가 참이고 요청 상태가 `ready`인 이후 파일을 사용한다. 경로 이탈·리디렉션과 다른 컨테이너의 목록을 거부한다.
+0.14.0 separates the original file and the host's repository list. `StorageMap` reads the logical key, version, size, hash, and local hold status of `.society-sync/catalog.json`, and atomically records a download request to fix a specific version at `.society-sync/requests/`. It does not create an empty original file for empty items. `available(keys)` must be true and the request status must be `ready` before using the file. It rejects path escapes, redirects, and lists from other containers.
 
-`StorageDirectoryModel`은 실제 디렉터리와 호스트 목록을 작업 스레드에서 합쳐 이름·크기·프리뷰·보유 여부를 제공한다. 현재 폴더의 직계 자식만 골라 경로를 검증하며, 변경되지 않은 저장소 맵은 파싱 결과를 재사용한다. `setFolder()`·`refresh()`는 GUI 호출을 기다리게 하지 않고, 이전 폴더의 늦은 결과를 폐기한다. 빈 폴더 URL은 조회 타이머를 멈춘다. `activate`는 미보유 파일을 요청하고 검증된 다운로드가 끝나면 `activated`를 보낸다. `StorageModelCatalog`은 호스트 카탈로그가 있으면 원본 헤더나 패키지를 읽지 않고 이름·경로·형식·크기·보유 상태로 모델 카드를 구성한다. 카탈로그 감시는 두 디렉터리로 제한하고, 로컬 전용 폴백의 감시는 최대 64개이다. `activatePath()`는 선택된 파일 또는 패키지만 SDK의 버전 고정 다운로드 요청으로 전달하며, 완료 뒤 `objectReady`를 보낼 수 있다. 로컬 전용 저장소의 구조 판정과 가져오기 검증은 유지한다. `SharedStorage::models()`도 미보유 모델을 표시하며 `resolveModel()`은 필요한 파일이 모두 준비되어야 성공한다. 패키지의 모델 참조는 구성 파일 전체의 버전에 고정된다. `shared_storage` 테스트는 목록만 있는 모델, 요청 취소, 파일 생성 없는 탐색과 다운로드 완료 후 열기를 검사한다.
+`StorageDirectoryModel` merges the actual directory and the host list in the worker thread to provide name, size, preview, and hold status. It selects only the immediate children of the current folder to validate the path, and reuses the parsing result for unchanged repository maps. `setFolder()` and `refresh()` do not wait for the GUI call and discard the late results of the previous folder. Empty folder URLs stop the lookup timer. `activate` requests the non-held file and sends `activated` after the verified download completes. `StorageModelCatalog` constructs the model card with name, path, format, size, and hold status without reading the original header or package if the host catalog exists. Catalog monitoring is limited to two directories, and local-only fallback monitoring is limited to a maximum of 64 items. `activatePath()` passes only the selected file or package as a version-fixed download request to the SDK and may send `objectReady` after completion. It maintains the structural judgment and import validation for local-only repositories. `SharedStorage::models()` also displays non-held models, and `resolveModel()` succeeds only when all required files are ready. The model reference of a package is fixed to the version of the entire configuration file. `shared_storage` tests check only-list models, request cancellation, opening after navigation and download completion without file creation.
 
-`Files/`는 기본 파일이나 폴더 없이 시작한다. Documents, Audios, 3D objects의 자동 생성과 이름 예약·삭제 보호를 제거했다. 기존 빈 기본 폴더만 한 번 정리하고 사용자 내용과 이후 직접 만든 폴더는 보존한다. [Files 계약](docs/Files.md)을 참고한다. Photos는 독립된 최상위 영역이다.
+`Files/` starts without default files or folders. Automatic creation and name reservation/deletion protection for Documents, Audios, 3D objects have been removed. Only existing empty default folders are one time cleaned up, preserving user content and folders created directly afterward. Refer to [Files contract](docs/Files.md). Photos is an independent top-level area.
 
-드라이브 표시 이름은 `Society`이다. 0.9.1부터 새 매니페스트에도 이 이름을 기록하며, 기존 `Society Container` 매니페스트는 UUID와 파일을 수정하지 않고 열어 `Society`로 표시한다. C++·Apple·Android의 읽기 경계는 두 이름을 허용한다. Windows 볼륨 이름, Linux FUSE 이름, Android 문서 루트, Apple File Provider 루트도 같은 표시 이름을 사용한다.
+The drive's display name is `Society`. Since 0.9.1, new manifests also record this name. Existing `Society Container` manifests open without modifying their UUIDs or files and are displayed as `Society`. Read boundaries in C++, Apple, and Android accept both names. The Windows volume name, Linux FUSE name, Android document root, and Apple File Provider root also use the same display name.
 
-macOS에서 기존 원본으로 `register`를 다시 호출하면 동일한 File Provider 도메인 ID로 표시 이름을 갱신한다. 도메인을 제거하지 않는다. 설치된 Apple SDK의 `NSFileProviderManager.addDomain` 계약을 사용하며 [Apple 도메인 API](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/add(_:completionhandler:))를 따른다. 어댑터 번들 이름도 `Society.app`으로 변경하여 Finder 사이드바에 같은 이름을 표시한다. CMake의 `iiSocietyContainer_NATIVE_APP`이 새 경로를 제공하며, 실행 파일·번들 ID와 Windows 자동 실행 등록 키는 기존 연동을 위한 내부 식별자로 유지한다.
+macOS re-invokes `register` with the existing original, updating the display name with the same File Provider domain ID. The domain is not removed. The installed Apple SDK's `NSFileProviderManager.addDomain` contract is used, following [Apple domain API](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/add(_:completionhandler:)). The adapter bundle name is also changed to `Society.app` to display the same name in the Finder sidebar. CMake's `iiSocietyContainer_NATIVE_APP` provides the new path, and the executable/bundle ID and Windows auto-launch registration key are kept as internal identifiers for existing integration.
 
-`iiSocietyContainer.drive`와 `native_store`는 새 이름, 이전 이름의 호환성, UUID 및 기존 매니페스트 보존을 검증한다. iOS 패키지 테스트와 Android 제공자 테스트는 시스템에 표시되는 이름을 검사한다.
+`iiSocietyContainer.drive` and `native_store` verify the new name, compatibility with the previous name, UUID, and preservation of the existing manifest. iOS package tests and Android provider tests check the name displayed on the system.
 
-C++23 및 Qt 6.8.3 Core를 사용하는 버전 0.14.0 라이브러리(데스크톱·Android 동적, iOS 정적)이다. `DiskImage`는 보관 위치에 별도 APFS 디스크 이미지를 생성하고 마운트한다. 기존 디렉터리 기반 API는 논리 레이아웃의 저수준 호환 API이다. `SocietyDrive`는 영속적인 드라이브 ID와 9개 영역을 구성한다. macOS·iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider는 `Files/`의 내용을 시스템 드라이브 루트로 제공한다. Society와 iisacc 앱은 내부 9개 영역을 사용하며, 다른 Android 앱은 같은 서명으로 보호된 URI와 Helper 파일 시스템 API를 사용한다.
+Version 0.14.0 libraries using C++23 and Qt 6.8.3 Core (desktop·Android dynamic, iOS static) are. `DiskImage` creates a separate APFS disk image at the archive location and mounts it. The existing directory-based API is a low-level compatibility API for the logical layout. `SocietyDrive` consists of a persistent drive ID and 9 areas. macOS · iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider provide the contents of `Files/` to the system drive root. Society and iisacc app use internal 9 areas, and other Android apps use the same signed URI and Helper file system API.
 
-`Models/`는 23개 모델 유형 폴더를 제공한다. `ModelStore`가 목록·자동 분류·수동 유형 수정·이전 경로 해석을 담당하고 `ModelClassifier`가 제한된 메타데이터를 읽는다. 0.11.1의 `metadata()`는 소비 앱의 카드에 표시할 아키텍처·정밀도·명시적 미디어 분류를 조회한다. 0.11.2는 Anima 체크포인트 구조 판별과 Safetensors 텐서 차원·자료형·바이트 범위 검증을 추가한다. 생성·레거시 정리·판정 규칙·이동 기록·CLI 계약은 [Models 관리 문서](docs/Models.md)에 설명한다.
+`Models/` provides 23 model type folders. `ModelStore` is responsible for listing, auto-classification, manual type modification, and path interpretation, while `ModelClassifier` reads limited metadata. 0.11.1's `metadata()` queries the architecture, precision, and explicit media classification to be displayed on the consumer app's cards. 0.11.2 adds Anima checkpoint structure validation and Safetensors tensor dimension, data type, and byte range verification. Creation, legacy cleanup, judgment rules, move history, and CLI contracts are described in the [Models management document](docs/Models.md).
 
-## 공개 API
+<a id="공개-api"></a>
 
-`SocietyDrive::create()`·`open()`은 다른 Society 컨테이너 내부를 원본으로 받지 않는다. macOS에서는 `~/Library/CloudStorage/`의 Finder 복제본도 거부한다. 경로를 실제 위치로 판정하고 파일 생성 전에 검증하므로 `Files/` 안에 8개 앱 영역이 다시 만들어지는 것을 방지한다. 공통 저장 설정과 Helper 파일 시스템 접근도 같은 경계를 적용한다. 원본에는 9개 영역을 유지하고 시스템 드라이브에는 원본 `Files/`의 내용만 제공한다. 복구 절차는 [macOS 파일 계약](platform/macos/README.md#파일-계약)에 설명한다.
+## Public API
+
+Version 0.15.0 adds live file metadata, immediate directory children, and recursive tree snapshots through `SocietyContainer::entry/entries/tree` and `SocietyDrive::entry/entries/tree`. Nodes expose native and relative paths, parent relationships, file type, size, modification time, permissions, loaded children, and lookup with `find()`. Depth and node limits keep traversal explicit. Drive snapshots preserve all nine logical sections and correctly map a separate Files volume. The standalone `iiSocietyContainer::FileTree` C++23 target has no Qt dependency. Directory creation and collision-safe moves extend `FileOperations`; see the [file tree API and examples](docs/FileTree.md).
+
+`SocietyDrive::create()` and `open()` do not accept a location inside another Society container as the source. On macOS, Finder replicas under `~/Library/CloudStorage/` are also rejected. Paths are resolved to their actual locations and validated before file creation, preventing 8 app areas from being recreated inside `Files/`. Shared storage settings and Helper file-system access apply the same boundary. The source retains 9 areas, while the system drive exposes only the contents of the source `Files/`. Recovery procedures are described in the [macOS file contract](platform/macos/README.md#파일-계약).
 
 ```cpp
 #include <iiSocietyContainer.h>
@@ -32,35 +36,37 @@ if (!container.isValid()) {
     return;
 }
 
-const QString root = container.rootPath(); // 정규화된 절대 디렉터리 경로
+const QString root = container.rootPath(); // Normalized absolute directory path
 const auto kind = container.classifyPath(QStringLiteral(".")); // PathKind::Root
 const auto asset = container.classifyPath(QStringLiteral("assets/model.bin"));
-// 실제 파일이 루트 내부에 존재하면 PathKind::Entry이다.
+// If the actual file exists within the root, this is PathKind::Entry.
 const auto outside = container.classifyPath(QStringLiteral("../OtherLibrary"));
 // PathKind::Outside
 ```
 
-`SocietyContainer` 생성자는 비어 있지 않은 실제 파일 시스템 디렉터리 경로를 요구한다. 생성자에 전달한 상대 경로는 생성 시점의 작업 디렉터리를 기준으로 해석한다. 이후 루트는 정규화된 절대 경로로 고정되므로 작업 디렉터리가 바뀌어도 같은 공간을 가리킨다. 공백과 유니코드가 있는 이름을 그대로 보존한다. 파일, 없는 디렉터리, NUL 문자가 포함된 경로, Qt 리소스 경로는 거부하며, 생성 실패 시 `isValid()`는 `false`, `rootPath()`는 빈 문자열, `errorString()`은 오류 설명을 반환한다.
+`SocietyContainer` generator requires a non-empty actual file system directory path. Relative paths passed to the generator are interpreted based on the working directory at the time of creation. Subsequently, the root is fixed as a normalized absolute path, so even if the working directory changes, it points to the same space. Names with spaces and Unicode are preserved as is. Paths containing files, non-existent directories, NUL characters, and Qt resource paths are rejected, and upon generation failure, `isValid()` returns `false`, `rootPath()` returns an empty string, and `errorString()` returns an error description.
 
-`classifyPath()`에 전달하는 상대 경로는 이 공간의 루트를 기준으로 해석한다. 판정 결과는 다음과 같다.
+Relative paths passed to `classifyPath()` are interpreted based on the root of this space. The judgment results are as follows.
 
-| 결과 | 의미 |
+|Result|Meaning|
 | --- | --- |
-| `PathKind::Root` | 지정한 SocietyContainer 디렉터리 자체 |
-| `PathKind::Entry` | 루트 아래에 실제로 존재하는 파일 또는 디렉터리 |
-| `PathKind::Outside` | 외부 경로, 없는 항목, 잘못된 입력 또는 유효하지 않은 컨테이너 |
+| `PathKind::Root` |The specified SocietyContainer directory itself|
+| `PathKind::Entry` |A file or directory that actually exists under the root|
+| `PathKind::Outside` |External paths, non-existent items, invalid input, or invalid containers|
 
-`.`은 루트이고 빈 문자열은 잘못된 입력이다. 심볼릭 링크는 실제 대상 경로를 기준으로 판정한다. 내부에서 외부로 향하는 링크는 `Outside`, 외부에서 내부 항목으로 향하는 링크는 `Entry`이다. `..`로 루트를 벗어나는 경로와 `MyLibrary-backup`처럼 접두사만 같은 옆 디렉터리도 `Outside`이다. 루트 자체를 링크로 지정하면 최초 대상 디렉터리에 고정되며, 원래 링크를 다른 곳으로 변경해도 공간의 루트는 바뀌지 않는다.
+`.` is the root and an empty string is invalid input. Symbolic links are judged based on the actual target path. Links pointing from inside to outside are `Outside`, and links pointing from outside to inside items are `Entry`. Paths that go beyond the root with `..` and side directories with only the same prefix like `MyLibrary-backup` are also `Outside`. If the root itself is specified as a link, it is fixed to the initial target directory, and changing the original link to another location does not change the space's root.
 
-공간 지정은 객체에 보관한다. 디렉터리를 생성하거나 이름을 바꾸거나 표식 파일을 기록하지 않으며 기존 내용도 변경하지 않는다. 별도 실행에서 사용하려면 같은 경로로 객체를 다시 구성한다. `isValid()`와 경로 판정은 현재 파일 시스템을 확인하므로 지정한 루트가 없어지거나 다른 위치를 가리키는 링크로 대체되면 무효이다. 경로를 기준으로 하므로 같은 위치에 실제 디렉터리를 다시 만들면 다시 유효하다. 이는 경로 분류 API이며, 동시 파일 시스템 변경을 차단하는 접근 제어 또는 파일 시스템 격리 기능은 제공하지 않는다.
+Space specification is stored in the object. It does not create directories, rename names, or record marker files, nor does it modify existing content. To use in a separate execution, the object must be reconstructed with the same path. Since `isValid()` and path validation check the current file system, they become invalid if the specified root disappears or is replaced by a link pointing to a different location. Since it is based on the path, it becomes valid again if an actual directory is recreated at the same location. This is a path classification API, and it does not provide access control or file system isolation features that block concurrent file system changes.
 
-기존 `iiSocietyContainer::helloWorld()`는 소비자 호환성을 위해 계속 `Hello world!`를 반환한다. 컨테이너의 공개 헤더와 소스는 프로젝트 루트에 함께 두고, 영역 모델의 헤더와 소스는 `src/Store/`에 함께 둔다. 공개 API는 공통 `iiSocietyContainerExport.h`의 플랫폼별 export/import 매크로를 사용한다. CMake 타깃은 `iiSocietyContainer::iiSocietyContainer`이며 C++20 요구와 Qt Core 의존성을 소비자에게 전달한다.
+Existing `iiSocietyContainer::helloWorld()` continues to return `Hello world!` for consumer compatibility. The container's public header and source are kept together in the project root, while the domain model's header and source are kept together in `src/Store/`. The public API uses platform-specific export/import macros for common `iiSocietyContainerExport.h`. CMake targets `iiSocietyContainer::iiSocietyContainer` and delivers C++20 requirements and Qt Core dependencies to the consumer.
 
-## 논리 영역
+<a id="논리-영역"></a>
 
-`iiSocietyContainer::StoreSection` 열거형으로 영역을 명확히 구분한다. 영역의 고유 식별자는 열거형 값이며, `storeSectionName()`이 반환하는 문자열은 표시 이름이다. 영역 목록은 다음 순서로 고정된다.
+## Logical Domain
 
-| 식별자 | 표시 이름 |
+`iiSocietyContainer::StoreSection` enum clearly distinguishes domains. The domain's unique identifier is the enum value, and the string returned by `storeSectionName()` is the display name. The domain list is fixed in the following order.
+
+|identifier|display name|
 | --- | --- |
 | `StoreSection::AssetLibrary` | Asset Library |
 | `StoreSection::Deleted` | Deleted |
@@ -75,22 +81,24 @@ const auto outside = container.classifyPath(QStringLiteral("../OtherLibrary"));
 using iiSocietyContainer::StoreSection;
 using iiSocietyContainer::storeSectionName;
 
-const auto sections = container.sections(); // 유효한 컨테이너이면 9개 영역
+const auto sections = container.sections(); // 9 sections for a valid container
 for (const StoreSection section : sections) {
     const QString name = storeSectionName(section);
-    // section으로 영역을 식별하고 name을 화면에 표시한다.
+    // Identify the section with section and display name on screen.
 }
 
 const bool hasModels = container.hasSection(StoreSection::Models);
 ```
 
-`allStoreSections()`는 컨테이너 상태와 무관하게 지원되는 9개 영역의 목록을 반환한다. `container.sections()`와 `container.hasSection()`은 해당 컨테이너의 현재 유효성을 반영한다. 컨테이너가 무효이면 각각 빈 목록과 `false`를 반환한다. 정의되지 않은 열거형 값에 대해서는 `storeSectionName()`이 빈 문자열을, `hasSection()`이 `false`를 반환한다.
+`allStoreSections()` returns a list of 9 areas regardless of container status. `container.sections()` and `container.hasSection()` reflect the current validity of the container. If the container is invalid, it returns an empty list and `false` respectively. For undefined enum values, `storeSectionName()` returns an empty string and `hasSection()` returns `false`.
 
-`SocietyContainer`의 영역 조회는 식별과 분리만 담당한다. 빈 디렉터리를 지정해도 9개 영역을 반환하지만 조회만으로 물리 디렉터리를 생성하거나 기존 파일을 변경하지 않는다. 모든 영역은 같은 방식으로 제공되며 영역별 데이터 형식, 보관 정책, 권한을 정의하지 않는다. `classifyPath()`는 기존의 컨테이너 경계 판정을 유지한다. 드라이브의 실제 디렉터리 배치는 `SocietyDrive::create()`에서 명시적으로 초기화한다.
+region lookup for `SocietyContainer` is responsible only for identification and separation. Specifying an empty directory returns 9 regions, but does not create physical directories or modify existing files through lookup alone. All regions are provided in the same manner, without defining data formats, retention policies, or permissions per region. `classifyPath()` maintains the existing container boundary determination. The actual directory layout of the drive is explicitly initialized in `SocietyDrive::create()`.
 
-영역 정의와 이름 목록은 `src/Store/StoreSection.h`와 `src/Store/StoreSection.cpp`가 담당한다. 이 하위 모듈은 컨테이너 구현을 참조하지 않고, 상위 `SocietyContainer`가 영역 모델을 사용한다.
+Region definition and name list are handled by `src/Store/StoreSection.h` and `src/Store/StoreSection.cpp`. This sub-module does not reference container implementation, while the upper-level `SocietyContainer` uses the region model.
 
-## 드라이브
+<a id="드라이브"></a>
+
+## drive
 
 ```cpp
 #include <SocietyDrive.h>
@@ -107,79 +115,82 @@ auto reopened = iiSocietyContainer::SocietyDrive::open("/data/MyLibrary", &error
 // reopened->identifier() == id
 ```
 
-`create()`는 **이미 존재하는 디렉터리**에 9개 영역 이름과 정확히 일치하는 하위 디렉터리와 `.society-drive.json`을 생성한다. 기존의 정상 영역 디렉터리와 내용은 보존한다. 같은 이름의 파일·심볼릭 링크·정션이나 잘못된 기존 매니페스트는 덮어쓰지 않고 오류를 반환한다. 초기화 잠금과 원자적 매니페스트 저장을 사용하며 실패 시 이번 호출이 생성한 빈 디렉터리만 정리한다. 유효한 기존 드라이브는 같은 ID로 연다. `open()`은 파일을 생성하지 않으며 매니페스트, 버전, ID, 전체 영역 배치를 검증한다.
+`create()` creates subdirectories matching the 9 section names exactly, along with `.society-drive.json`, inside an **already existing directory**. Existing valid section directories and their contents are preserved. A file, symbolic link, or junction with the same name, or an invalid existing manifest, returns an error without being overwritten. Initialization locking and atomic manifest saving are used. On failure, only empty directories created by this call are cleaned up. A valid existing drive is opened with the same ID. `open()` creates no files; it validates the manifest, version, ID, and complete section layout.
 
-매니페스트 버전은 `schemaVersion: 1`, 종류는 `type: "SocietyDrive"`, 표시 이름은 `Society`이다. 식별자는 UUID이며 영역 항목은 `id`, `name`, `path`를 가진다. `storeSectionKey()`가 반환하는 영속 키는 순서대로 `asset-library`, `deleted`, `files`, `forked`, `generation-history`, `models`, `published`, `thinking-space`이다. 표시 이름과 디렉터리명은 위 표와 같다. 네이티브 영역 카탈로그는 C++ 도구의 `catalog` 출력으로 생성하여 중복 정의하지 않는다.
+The manifest version is `schemaVersion: 1`, its type is `type: "SocietyDrive"`, and its display name is `Society`. The identifier is a UUID, and section entries contain `id`, `name`, and `path`. The persistent keys returned by `storeSectionKey()` are, in order, `asset-library`, `deleted`, `files`, `forked`, `generation-history`, `models`, `published`, and `thinking-space`. Display names and directory names are as listed in the table above. The native section catalog is generated from the `catalog` output of the C++ tool rather than defined redundantly.
 
-`sectionForPath()`는 실제 존재하는 경로의 정규화된 대상을 기준으로 영역을 반환한다. 루트 자체, 영역 외 루트 항목, 없는 항목, 외부 경로는 `std::nullopt`이다. 기존 루트의 미분류 파일은 보존하며 어느 영역으로도 임의 이동하지 않는다. `Deleted`를 포함한 모든 영역은 동일한 일반 폴더이며 휴지통·게시·생성 이력 등의 업무 규칙은 아직 부여하지 않는다.
+`sectionForPath()` returns regions based on normalized targets of paths that actually exist. Root itself, root items outside regions, missing items, and external paths are `std::nullopt`. Unclassified files of the existing root are preserved and do not arbitrarily move to any region. All regions including `Deleted` are the same general folder, and business rules such as trash, publish, or creation history are not yet assigned.
 
-macOS 15 이상에서는 네이티브 어댑터를 함께 빌드한다. 설치 위치는 `share/iiSocietyContainer/Society.app`이고 CMake 패키지의 `iiSocietyContainer_NATIVE_APP`으로 제공한다. SDK의 `iiSocietyContainerDriveTool create|open <path>`는 같은 API를 CLI로 제공한다. Finder 등록, 서명, 파일 반영 방식과 범위는 [macOS 어댑터 문서](platform/macos/README.md)를 따른다. [Windows·Linux 마운트](platform/desktop/README.md)와 [Android 문서 제공자·앱 간 공유](platform/android/README.md)는 별도 플랫폼 문서에 정의한다.
+On macOS 15 or later, the native adapter is built alongside the SDK. It is installed at `share/iiSocietyContainer/Society.app` and exposed through `iiSocietyContainer_NATIVE_APP` in the CMake package. The SDK's `iiSocietyContainerDriveTool create|open <path>` exposes the same API through a CLI. Finder registration, signing, file reflection behavior, and scope follow the [macOS adapter documentation](platform/macos/README.md). [Windows/Linux mounting](platform/desktop/README.md)and [Android document-provider and inter-app sharing](platform/android/README.md)are defined in separate platform documentation.
 
-시스템 드라이브에서 `Example.txt`를 열거나 저장하면 원본의 `Files/Example.txt`에 대응한다. 별도의 `Files` 폴더 단계를 표시하지 않는다. 나머지 7개 영역과 컨테이너 메타데이터는 시스템 드라이브의 목록·검색용 working set·파일 ID 접근에서 제외하며 Society 앱의 영역 탐색으로 제공한다. 이것은 File Provider의 노출 범위이며 원본 디렉터리의 운영체제 권한이나 암호화를 변경하지 않는다.
+Opening or saving `Example.txt` from the system drive corresponds to `Files/Example.txt` of the original. A separate `Files` folder stage is not indicated. The remaining 7 regions and container metadata are excluded from the system drive's list/search working set and file ID access, and are provided via Society app's region navigation. This is the exposure scope of File Provider and does not change the operating system permissions or encryption of the original directory.
 
-## 네이티브 디스크 이미지
+<a id="네이티브-디스크-이미지"></a>
 
-macOS의 새 Society 온보딩은 Qt 없는 C++23 `DiskImage` API로 별도 APFS sparsebundle을 생성한다.
-선택한 폴더는 이미지 보관 위치이며 마운트된 볼륨이 컨테이너이다. `SharedStorage`는 이미지 경로와
-UUID를 저장하여 추출 후 다시 마운트한다. [API·저장 형식·검증](docs/DiskImage.md)을 참고한다.
-공개 APFS 볼륨의 루트도 Files의 내용만 제공한다. 나머지 영역과 메타데이터는 `nobrowse` 내부
-볼륨에 두며, `SocietyDrive::sectionPath()`·`resolvePath()`·`relativePath()`로 실제 경로를 얻는다.
-공개 이미지는 원래 이미지 패키지 내부에 보관하므로 계정의 디스크 경로 하나로 함께 이동한다.
+## native disk image
 
-## iisacc 공통 스토리지
+Society desktop onboarding creates an ordinary `Society/` directory with `SocietyDrive::createAt(parent)`. The nine Storage sections are direct child directories, including `Files` and `Models`; the file manager opens the complete root. Shared settings preserve the directory path and container UUID without mounting a disk image. Existing sparsebundle images remain readable for recovery and migration. See [directory storage and migration](docs/DirectoryStorage.md) and the [legacy disk-image API](docs/DiskImage.md).
 
-`SharedStorage.h/.cpp`는 앱 이름에 종속되지 않는 저장소 발견, 모델 목록·참조 해석, 영역 내부 디렉터리 생성을 제공한다. Society가 선택한 원본을 등록하고 Dreamscapes 등 소비자가 같은 저장소를 연다. 앱별 모델 복사본이나 Finder의 `Files/` 투영본을 사용하지 않는다.
+<a id="iisacc-공통-스토리지"></a>
 
-생성 큐·프롬프트·실행 상태는 각 앱 인스턴스의 메모리에 보관하며 Society에 저장하거나 재실행 시 복원하지 않는다. 생성기가 파일 경로를 요구하는 임시 자료는 Society 밖의 앱 전용 임시 디렉터리에서 처리하고 작업이 끝나면 정리한다. 완성된 이미지 파일만 `Generation History/` 바로 아래에 저장하며 앱별·작업별 폴더와 자동 Asset Library 등록을 만들지 않는다. `SharedStorage`는 생성 큐나 임시 작업 수명주기를 소유하지 않는다.
+## iisacc Common Storage
+
+`SharedStorage.h/.cpp` provides repository discovery independent of app name, model list and reference interpretation, and area internal directory creation. Society registers the selected source, and Dreamscapes and consumers open the same repository. App-specific model copies or Finder's `Files/` projection are not used.
+
+Generation queue, prompt, and execution status are stored in each app instance's memory and are not saved to Society or restored upon re-execution. Temporary materials requiring file paths from the generator are processed in the app-specific temporary directory outside Society and cleaned up when the task is finished. Only completed image files are saved immediately below `Generation History/`, and no app-specific or task-specific folders or automatic Asset Library registration are created. `SharedStorage` does not own the generation queue or temporary task lifecycle.
 
 ```cpp
 #include <SharedStorage.h>
 using namespace iiSocietyContainer;
 QString error;
-SharedStorage::setDefaultContainer("/data/Society", &error); // Society가 선택한 기존 드라이브
-auto storage = SharedStorage::open({}, &error);             // 다른 iisacc 앱
+SharedStorage::setDefaultContainer("/data/Society", &error); // Existing drive selected by Society
+auto storage = SharedStorage::open({}, &error);             // Another iisacc app
 if (storage) {
     const auto models = storage->models(&error);
     if (!models.isEmpty()) {
         const auto reference = models.first().reference(storage->drive().identifier());
-        // 앱 메모리의 요청에 reference를 보관하고 실행 직전에 다시 해석한다.
+        // Keep the reference in the request in app memory and resolve it again immediately before execution.
         const auto originalWeights = storage->resolveModel(reference, &error);
     }
     const auto image = storage->filePath(StoreSection::GenerationHistory, "unique-result.png", &error);
 }
 ```
 
-데스크톱에서는 `QStandardPaths::GenericConfigLocation/iisacc/Society/storage.json`에 원본 경로와 드라이브 UUID를 원자적으로 저장한다. `open()`의 우선순위는 명시 경로, `SOCIETY_CONTAINER_PATH`, 공통 설정이다. 테스트·분리 실행은 절대 경로인 `SOCIETY_STORAGE_SETTINGS_PATH`로 설정 파일을 바꾼다. 설정된 경로의 드라이브 UUID가 달라졌으면 임의 전환하지 않고 Society에서 다시 선택하도록 오류를 반환한다. 이는 같은 사용자 환경의 로컬 저장소 발견이며 계정 인증·네트워크 동기화·원격 추론을 구현하지 않는다.
+On desktop, `QStandardPaths::GenericConfigLocation/iisacc/Society/storage.json` atomically stores the original path and drive UUID. `open()` priority is explicit path, `SOCIETY_CONTAINER_PATH`, and common settings. Test and isolated execution change the config file to the absolute path `SOCIETY_STORAGE_SETTINGS_PATH`. If the drive UUID of the set path changes, it returns an error without arbitrary switching, asking Society to select again. This is local repository discovery for the same user environment and does not implement account authentication, network synchronization, or remote inference.
 
-모델 목록은 `Models/` 아래 `.safetensor`·`.safetensors` 파일(대소문자 무관)과 `model_index.json`을 포함한 Diffusers 디렉터리를 열거한다. 패키지 내부의 개별 가중치를 별도 모델로 중복 표시하지 않는다. 숨김 항목, 심볼릭 링크, 경계 밖으로 향하는 경로는 제외한다. 이 목록은 저장 형식의 후보 목록이며 Diffusion·LLM 종류, 체크포인트·LoRA 역할이나 실행 가능성을 확정하지 않는다. 모델 의미와 추론 지원 여부는 소비 앱의 엔진이 검증한다.
+The model list enumerates the Diffusers directory including `Models/` `.safetensor` · `.safetensors` files (case-insensitive) and `model_index.json`. Individual weights inside the package are not redundantly listed as separate models. Hidden items, symbolic links, and paths going outside the boundary are excluded. This list is a candidate list of storage formats and does not confirm the type of Diffusion · LLM, the role of checkpoint · LoRA, or executability. Model meaning and whether inference support is available are verified by the engine of the consuming app.
 
-참조는 `{containerId, path, format, fingerprint}`이다. `path`는 `Models/` 상대 경로이고 `fingerprint`는 각 파일의 상대 경로·크기·수정 시각·앞 64 KiB를 이용한 변경 감지 값이다. 전체 가중치 해시나 수정 불가능한 스냅샷은 아니다. 다른 드라이브, 삭제·재지정·변경된 모델 참조를 거부하며 전체 가중치 provenance는 실제 생성 엔진에서 기록한다. `ensureDirectory()`는 지정 영역 아래의 상대 경로만 만들고 `..`, `.`, 빈 중간 요소, 역슬래시, 콜론, NUL, 리디렉션을 거부한다. 일반 파일 시스템 접근은 숨김 파일·디렉터리도 지원하며 모델 검색의 숨김 항목 제외는 유지한다. 파일 시스템의 동시 변경을 차단하는 격리 기능은 아니다.
+A reference is `{containerId, path, format, fingerprint}`. `path` is a path relative to `Models/`, and `fingerprint` is a change-detection value based on each file's relative path, size, modification time, and first 64 KiB. It is neither a hash of all weights nor an immutable snapshot. References to another drive or to deleted, redirected, or modified models are rejected; full weight provenance is recorded by the actual generation engine. `ensureDirectory()` creates only relative paths beneath the specified section and rejects `..`, `.`, empty intermediate components, backslashes, colons, NUL, and redirection. General file-system access also supports hidden files and directories, while model discovery continues to exclude hidden entries. This is not an isolation mechanism that blocks concurrent file-system changes.
 
-iOS에서는 앱별 Documents 대신 Society와 동일한 App Group의 `Library/Application Support/Society`를 연다. 소비 앱은 번들 ID를 설정한 뒤 `iiSocietyContainer_configure_ios_client(Dreamscapes APP_GROUP group.com.iisacc.society DISPLAY_NAME Dreamscapes TEAM ...)`를 호출한다. 이 함수는 소비 앱 이름·번들 ID를 유지하면서 같은 `SocietyAppGroup` Info.plist 키와 App Group entitlement를 구성하고, 별도 File Provider 확장을 추가하지 않는다. Society를 먼저 열어 원본을 초기화해야 한다. 모든 참여 앱은 동일한 Apple 팀의 유효한 그룹 권한으로 서명해야 한다. [Apple App Group 구성](https://developer.apple.com/documentation/xcode/configuring-app-groups)의 공유 컨테이너 API를 사용한다.
+iOS opens the `Library/Application Support/Society` of the same App Group as Society instead of Documents per app. The consuming app sets the bundle ID and then calls `iiSocietyContainer_configure_ios_client(Dreamscapes APP_GROUP group.com.iisacc.society DISPLAY_NAME Dreamscapes TEAM ...)`. This function configures the same `SocietyAppGroup` Info.plist key and App Group entitlement while maintaining the consuming app name and bundle ID, without adding a separate File Provider extension. Society must be opened first to initialize the original. All participating apps must be signed with a valid group entitlement from the same Apple team. [](https://developer.apple.com/documentation/xcode/configuring-app-groups)uses the shared container API.
 
-공통 스토리지 테스트와 설치 소비자는 앱 이름이 달라도 같은 UUID를 찾는지, 설정된 드라이브 교체 감지, 원본 모델 경로 해석, 패키지 중복 제외, 모델 변경 감지, 내부 출력 디렉터리 경계를 검증한다. iOS 패키지 검사는 Society와 Dreamscapes의 실제 생성 plist·그룹 권한 일치를 검사하며 기기 실행을 대신하지 않는다.
+Common storage tests and install consumers verify that the same UUID is found even if the app name differs, configured drive replacement detection, original model path parsing, package duplication exclusion, model change detection, and internal output directory boundaries. iOS Package inspection checks the actual generated plist and group entitlement match between Society and Dreamscapes, without substituting device execution.
 
-0.8.0의 `SharedStorage::filePath(section, relativePath, error)`는 일반 파일 I/O용 절대 경로를 반환한다. 빈 상대 경로는 영역 디렉터리이고 마지막 이름만 존재하지 않아도 새 파일 경로를 반환한다. 부모는 먼저 `ensureDirectory()`로 준비한다. 경로 조회는 파일을 만들지 않는다. 각 요청은 원본 경로·UUID와 경로 요소를 검증하고 루트·하위 경로의 심볼릭 링크 및 junction, 영역 이탈을 거부한다. 반환 뒤 동시 변경까지 잠그는 기능은 아니다. iiSocietyHelper 0.4.0의 `fileSystem`이 이 API를 재사용한다. 공통 스토리지 테스트와 설치 소비자가 9개 영역의 일반 읽기·쓰기 및 경계·원본 교체를 검사한다.
+0.8.0's `SharedStorage::filePath(section, relativePath, error)` returns an absolute path for regular file I/O. An empty relative path returns a new file path even if only the last name exists, and the parent is prepared first via `ensureDirectory()`. Path lookup does not create files. Each request validates the original path and UUID and path elements, rejecting symbolic links and junctions at root and subpaths, and domain exit. The feature to lock even concurrent changes after return is not provided. iiSocietyHelper 0.4.0's `fileSystem` reuses this API. Common storage tests and install consumers check 9 domains for regular read/write and boundary/original replacement.
 
-## 의존성 검토
+<a id="의존성-검토"></a>
 
-기존 Qt Core의 `QFileInfo`와 `QDir`로 경로 조회와 정규화를 구현한다. [Qt의 경로 정규화 API](https://doc.qt.io/qt-6.8/qfileinfo.html#canonicalFilePath)와 [상대 경로 API](https://doc.qt.io/qt-6.8/qdir.html#relativeFilePath)를 사용하므로 별도 파일 시스템 라이브러리를 추가할 필요가 없다. 논리 영역은 이 SDK 고유의 식별자 목록이며 C++ 표준 라이브러리와 기존 Qt Core의 `QList`·`QString`만으로 표현한다. 추가 외부 의존성이 없으므로 런타임 의존성과 라이선스 범위는 기존 Qt Core와 동일하다. 테스트에는 같은 Qt 6.8.3 배포본의 Qt Test를 사용하며, SDK의 공개 의존성에는 포함하지 않는다.
+## Dependency Review
 
-## 빌드, 테스트, 설치
+Path lookup and normalization use `QFileInfo` and `QDir` from the existing Qt Core. Because they use [Qt's path-normalization API](https://doc.qt.io/qt-6.8/qfileinfo.html#canonicalFilePath)and [relative-path API](https://doc.qt.io/qt-6.8/qdir.html#relativeFilePath), no separate file-system library is needed. Logical sections are a list of identifiers specific to this SDK, represented using only the C++ standard library and `QList`/`QString` from the existing Qt Core. With no additional external dependencies, runtime dependencies and licensing scope remain the same as for the existing Qt Core. Tests use Qt Test from the same Qt 6.8.3 distribution, which is not included in the SDK's public dependencies.
 
-CMake 3.24 이상, C++20 컴파일러, Qt **6.8.3** Core 개발 파일이 필요하다. 테스트를 빌드할 때에는 Qt Test 개발 파일도 필요하다. macOS에서는 기본으로 `/Volumes/Storage/Qt/6.8.3/macos`를 탐색한다.
+<a id="빌드-테스트-설치"></a>
+
+## Build, test, install
+
+CMake, 3.24 or higher, C++20 compiler, Qt **6.8.3** Core development files are required. When building tests, Qt Test development files are also required. macOS searches for `/Volumes/Storage/Qt/6.8.3/macos` by default.
 
 ```sh
 ./install.sh
 ```
 
-단독 빌드에서 기본 설치 경로를 적용하며, 상위 CMake 프로젝트에 포함할 때에는 상위 프로젝트의 설치 경로를 유지한다. 스크립트는 `build/`에서 Release 구성·빌드·CTest를 실행하고 `$HOME/.local/SDK/iiSocietyContainer`에 설치한다. 이어 설치된 CMake 패키지만 소비하는 별도 프로젝트를 `build/consumer/build/`에 구성하고 빌드·CTest를 실행한다. 원본 빌드와 설치 소비자 각각 인사 함수 호환성 테스트와 디렉터리 공간 테스트를 실행한다. SDK 설치 없이 작업 공간 안에서 검증하려면 `INSTALL_PREFIX="$PWD/build/install" ./install.sh`를 사용한다.
+In a standalone build, the default install path is applied, and when included in a parent CMake project, the parent project's install path is maintained. The script runs Release configuration, build, and CTest at `build/` and installs to `$HOME/.local/SDK/iiSocietyContainer`. Then, a separate project configured at `build/consumer/build/` consumes only the installed CMake package and runs build and CTest. The original build and install consumer each run the persona function compatibility test and directory space test. To verify within the workspace without SDK install, use `INSTALL_PREFIX="$PWD/build/install" ./install.sh`.
 
-테스트는 C++20 및 Qt 버전, 루트 지정, 내부·외부 판정, 상대 경로와 작업 디렉터리 변경, 독립 공간, 잘못된 입력, 공백·유니코드 이름, 폴더 내용 보존, 루트 삭제를 검증한다. Unix 계열에서는 심볼릭 링크 해석·외부 이탈·깨진 링크·루트 교체도 검증한다. Windows에서는 `QFile::link`가 바로가기를 만들기 때문에 심볼릭 링크 전용 테스트를 건너뛴다. 임시 테스트 디렉터리는 테스트 실행 디렉터리 아래에 생성하고 정리한다.
+Tests verify C++20 and Qt versions, root specification, internal and external verdicts, relative path and working directory changes, independent space, invalid input, whitespace and Unicode names, folder content preservation, and root deletion. On Unix systems, symbolic link interpretation, external exit, broken links, and root replacement are also verified. On Windows, `QFile::link` creates shortcuts, so the symbolic link-only test is skipped. The temporary test directory is created and cleaned up below the test execution directory.
 
-논리 영역 테스트는 8개 식별자와 이름·순서, 빈 컨테이너에서의 전체 영역 제공, 물리 파일 구성과의 독립성, 조회 시 파일 시스템 보존, 무효 컨테이너 및 잘못된 영역 값의 처리를 검증한다. 설치 소비자에서도 영역 헤더를 독립적으로 포함하고 동일한 테스트를 실행한다.
+Logical area tests verify 8 identifiers and names, order, full area provision in empty containers, independence from physical file configuration, file system preservation during query, and handling of invalid containers and incorrect area values. Install consumers also independently include area headers and run the same test.
 
-설정은 명령행 인자 대신 환경변수로 지정한다. `CMAKE_PREFIX_PATH`는 세미콜론으로 구분하는 추가 CMake 검색 경로이다.
+Settings are specified as environment variables instead of command-line arguments. `CMAKE_PREFIX_PATH` is an additional CMake search path separated by semicolons.
 
 ```sh
 INSTALL_PREFIX="$HOME/.local/SDK/iiSocietyContainer" \
@@ -188,7 +199,7 @@ CMAKE_PREFIX_PATH="/additional/prefix" \
 ./install.sh
 ```
 
-수동 실행도 가능하다. 모든 빌드 산출물은 `build/` 아래에 둔다.
+Manual execution is also possible. All build outputs are placed under `build/`.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
@@ -204,42 +215,44 @@ cmake --build build/consumer/build --config Release --parallel
 ctest --test-dir build/consumer/build -C Release --output-on-failure
 ```
 
-## 설치 패키지 사용
+<a id="설치-패키지-사용"></a>
+
+## Use install package
 
 ```cmake
 find_package(iiSocietyContainer 0.6.0 CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE iiSocietyContainer::iiSocietyContainer)
 ```
 
-소비자를 구성할 때 SDK 설치 경로와 Qt 경로를 `CMAKE_PREFIX_PATH`에 추가한다. 기본 설치 구성은 다음과 같다.
+When configuring consumers, add SDK install path and Qt path to `CMAKE_PREFIX_PATH`. The default install configuration is as follows.
 
-- `include/iiSocietyContainer.h`: 공개 헤더
-- `include/iiSocietyContainerExport.h`: 공통 export/import 매크로
-- `include/SocietyDrive.h`: 영속 드라이브 API
-- `include/src/Store/StoreSection.h`: 독립적으로 포함할 수 있는 논리 영역 공개 헤더
-- `lib/`: 버전이 있는 공유 라이브러리; Windows 런타임 DLL은 `bin/`
-- `lib/cmake/iiSocietyContainer/`: Config, ConfigVersion 및 Targets 패키지
-- `share/iiSocietyContainer/README.md`: 이 문서
-- `bin/iiSocietyContainerDriveTool`: 드라이브 초기화·조회·영역 카탈로그 CLI
-- macOS의 `share/iiSocietyContainer/Society.app`: 네이티브 호스트와 File Provider 확장
+- `include/iiSocietyContainer.h`: Public header
+- `include/iiSocietyContainerExport.h`: Common export/import macro
+- `include/SocietyDrive.h`: Persistent drive API
+- `include/src/Store/StoreSection.h`: Public header of logical area that can be included independently
+- `lib/`: Shared library with version; Windows runtime DLL is `bin/`
+- `lib/cmake/iiSocietyContainer/`: Config, ConfigVersion, and Targets package
+- `share/iiSocietyContainer/README.md`: This document
+- `bin/iiSocietyContainerDriveTool`: Drive initialization, query, and area catalog CLI
+- macOS's `share/iiSocietyContainer/Society.app`: Native host and File Provider extension
 
-드라이브 테스트는 초기화·재열기·ID 보존·8개 폴더·충돌 시 원본 보존·매니페스트 오류·영역 경계를 원본과 설치 소비자에서 검증한다. macOS 네이티브 테스트는 전체 원본의 파일 연산과 별도로 `Files/`의 루트 노출·비공개 ID 접근 거부·루트 파일 CRUD·버전 충돌·앱 접근 유지·재시작·기존 9개 영역 노출의 제거를 검증한다. 실제 Finder 연결 테스트는 일반 CTest와 분리하여 명시적으로 등록한 검증용 드라이브에서 수행한다.
+Drive tests verify initialization, re-open, ID preservation, 8 folder count, original preservation on conflict, manifest errors, and area boundaries from the original and install consumer. macOS Native tests verify file operations on the entire original separately, `Files/` root exposure, non-public ID access denial, root file CRUD, version conflicts, app access hold, restart, and removal of existing 9 area exposures.
 
-Qt 자체는 재설치하거나 번들링하지 않는다. 실행 환경에도 Qt 6.8.3 Core가 있어야 한다. 설치 RPATH에 링크 의존 경로를 반영한다. Qt 사용 조건은 기존 Qt 설치의 라이선스를 따른다.
+Actual Finder connection tests are performed on explicitly registered verification drives, separated from general CTest. Qt itself is not reinstalled or bundled. The execution environment must also have Qt 6.8.3 Core. Linked dependency paths reflect the install RPATH. Qt usage conditions follow the license of the existing Qt install.
 
 ## License
 
 SPDX-License-Identifier: AGPL-3.0-only
 
-iiSocietyContainer의 자체 작성 코드와 문서는 GNU Affero General Public License v3.0 전용으로
-배포한다. 전체 조건은 [LICENSE](LICENSE)를 따른다.
+Self-written code and documents of iiSocietyContainer are distributed exclusively under the GNU Affero General Public License v3.0. The full terms follow [LICENSE](LICENSE).
 
-Qt를 포함한 외부 라이브러리와 별도 고지가 있는 서드파티 코드는 각자의 라이선스를
-유지한다. 이 프로젝트의 라이선스 선언은 해당 서드파티 라이선스를 대체하지 않는다.
+External libraries including Qt and third-party code with separate notices maintain their own licenses. This project's license declaration does not replace the corresponding third-party license.
 
-## iOS / iPadOS 통합
+<a id="ios--ipados-통합"></a>
 
-iOS 16 이상에서는 Society 앱과 내장 File Provider 확장이 같은 App Group의 원본을 사용한다. 앱에서 9개 영역을 탐색하고 파일 앱에서는 Files 내용만 직접 노출한다. 공통 Swift 저장소와 공개 경계는 `platform/apple/`에 있으며, iOS 도메인 등록·번들·권한·설치 구성은 [iOS 문서](platform/ios/README.md)에 정의한다. iOS 기기 및 시뮬레이터별 빌드 preset은 Society 앱에서 제공한다.
+## iOS / iPadOS integration
+
+iOS 16 and above use the same App Group original for Society app and built-in File Provider extension. The app explores 9 areas, and the Files app directly exposes only Files content. Common Swift repository and public boundary are at `platform/apple/`, and iOS domain registration, bundle, permission, and install configuration are defined in [iOS document](platform/ios/README.md). iOS device and simulator-specific build presets are provided by Society app.
 
 ### Shared logical drive identity (0.10)
 
@@ -260,13 +273,15 @@ reject incomplete mirrors. The storage owner can resolve their location through
 `open(path, error, true)` to resume initialization, while consumer operations on
 that handle remain gated. No credentials or account models enter this manifest.
 
-Photos 경로·매니페스트 이전 계약은 [Photos.md](docs/Photos.md)를 따른다. `FileDirectoryKind::Photos`는 값 호환성만 유지하며 FilesView에서는 반환하지 않는다. `StoreSection::Photos`를 사용한다.
+Photos path and manifest migration contract follows [Photos.md](docs/Photos.md). `FileDirectoryKind::Photos` maintains only value compatibility and does not return at FilesView. `StoreSection::Photos` is used.
 
-## 공유 대시보드와 Society 앱 연결
+<a id="공유-대시보드와-society-앱-연결"></a>
 
-`Gui` 컴포넌트의 `DashboardFiles`는 Society와 Dreamscapes가 공유하는 읽기 전용 비동기 목록이다. `containerPath`에 유효한 로컬 Society 드라이브를 지정하고 `recentFiles`, `recentPublished`, `generationHistory`를 사용한다. Files와 Generation History는 최신 20개, Published는 모바일 대시보드용 최신 4개로 제한한다. 전체 스냅샷 검색, 원자적 이미지 교체 감시, 취소된 저장소 조회 폐기와 변경 없는 새로고침 시 목록 보존을 제공한다. 앱은 QML 등록과 표현만 담당한다.
+## Shared dashboard and Society app connection
 
-`SocietyApplication::openGenerationHistory()`는 `society://generation-history`를 운영체제로 전달하고 실행 요청 접수 여부를 반환한다. Society 호스트만 `listen()`을 호출하며 `generationHistoryRequested`를 Storage 화면에 연결한다. URL에는 파일 경로나 계정 정보가 없고 다른 host·path·query는 수락하지 않는다. macOS/iOS의 URL 이벤트, Android의 Qt URL 처리, 데스크톱 실행 인수를 지원한다. URL 등록은 Society 앱 패키지에서 처리하고 Windows는 Society 실행 시 현재 사용자에게 등록한다. 단위 테스트는 목록의 포함·제외·정렬·감시와 URL 전달을 검증한다.
+`Gui` component's `DashboardFiles` is a read-only asynchronous list shared by Society and Dreamscapes. Specify a valid local Society drive at `containerPath` and use `recentFiles`, `recentPublished`, `generationHistory`. Files and Generation History are limited to the latest 20, and Published is limited to the latest 4 for the mobile dashboard. It provides full snapshot search, atomic image replacement monitoring, and list preservation on cancelled repository query abandonment and refresh without changes. The app is responsible only for QML registration and expression.
+
+`SocietyApplication::openGenerationHistory()` delivers `society://generation-history` as the operating system and returns whether the execution request was accepted. Only Society hosts call `listen()` and connect `generationHistoryRequested` to the Storage screen. URLs do not accept file paths or account information, and other host·path·query parameters are not accepted. macOS / iOS support URL events, Android's Qt URL handling, and desktop execution arguments. URL registration is handled in the Society app package, and Windows registers it for the current user upon Society execution. Unit tests verify inclusion, exclusion, sorting, monitoring of the list, and URL delivery.
 
 ### Generation inventory reconciliation
 

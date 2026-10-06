@@ -10,6 +10,46 @@ using namespace iiSocietyContainer;
 class FileOperationsTests : public QObject {
     Q_OBJECT
 private slots:
+    void createsDirectoriesAndMovesCompleteTrees() {
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/tree-manage-XXXXXX"); QVERIFY(temp.isValid());
+        QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/tree-outside-XXXXXX"); QVERIFY(outside.isValid());
+        const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); FileOperations ops(*drive);
+        const auto project = ops.createDirectory(temp.filePath("Files"), QString::fromUtf8("자료 Project"));
+        QVERIFY2(project, qPrintable(project.error));
+        const auto sub = ops.createDirectory(project.path, "nested"); QVERIFY(sub);
+        QFile file(sub.path + "/note.txt"); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("preserved"); file.close();
+        QVERIFY(!ops.createDirectory(temp.filePath("Files"), QString::fromUtf8("자료 Project")));
+        for (const auto& name : {"", ".", "..", "../escape", "a/b", "a\\b", "scheme:name", ".society-sync"})
+            QVERIFY(!ops.createDirectory(project.path, name));
+        QVERIFY(!ops.createDirectory(temp.path(), "protected"));
+        QVERIFY(!ops.createDirectory(outside.path(), "escape"));
+        QVERIFY(!ops.createDirectory(file.fileName(), "child"));
+        QVERIFY(!ops.perform(FileOperations::Action::Move, project.path, sub.path));
+        QVERIFY(!ops.perform(FileOperations::Action::Move, project.path, outside.path()));
+        const auto destination = ops.createDirectory(temp.filePath("Files"), "archive"); QVERIFY(destination);
+        const auto moved = ops.perform(FileOperations::Action::Move, project.path, destination.path);
+        QVERIFY2(moved, qPrintable(moved.error)); QVERIFY(!QFileInfo::exists(project.path));
+        QFile preserved(moved.path + "/nested/note.txt"); QVERIFY(preserved.open(QIODevice::ReadOnly));
+        QCOMPARE(preserved.readAll(), QByteArray("preserved")); preserved.close();
+        const auto other = ops.createDirectory(temp.filePath("Files"), QString::fromUtf8("자료 Project")); QVERIFY(other);
+        QVERIFY(!ops.perform(FileOperations::Action::Move, other.path, destination.path));
+        QVERIFY(QFileInfo::exists(other.path)); QVERIFY(QFileInfo::exists(moved.path + "/nested/note.txt"));
+        QVERIFY(!ops.perform(FileOperations::Action::Move, temp.filePath("Models"), destination.path));
+        const auto crossSection = ops.perform(FileOperations::Action::Move, moved.path, temp.filePath("Forked"));
+        QVERIFY2(crossSection, qPrintable(crossSection.error));
+        const auto updated = drive->tree("Forked"); QVERIFY2(updated, updated.error.message().c_str());
+        QCOMPARE(updated.value->children.size(), std::size_t(1));
+        const auto nativeRelative = updated.value->children.front().relativePath / "nested/note.txt";
+        const auto* movedNode = updated.value->find(nativeRelative); QVERIFY(movedNode);
+        QCOMPARE(movedNode->size, std::uintmax_t(9));
+        const auto typed = drive->entry(QString::fromUtf8("Forked/자료 Project/nested/note.txt"));
+        QVERIFY2(typed, typed.error.message().c_str());
+        QVERIFY(updated.value->find(typed.value->relativePath));
+        QVERIFY(QFile::link(outside.path(), temp.filePath("Files/link")));
+        QVERIFY(!ops.createDirectory(temp.filePath("Files/link"), "escape"));
+        QVERIFY(!ops.perform(FileOperations::Action::Move, crossSection.path, temp.filePath("Files/link")));
+    }
+
     void deletionBypassesContentAndReplicationWork() {
         QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/direct-delete-XXXXXX"); QVERIFY(temp.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive);

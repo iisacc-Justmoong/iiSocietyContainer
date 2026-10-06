@@ -24,6 +24,8 @@ namespace {
 namespace fs = std::filesystem;
 constexpr auto marker = "Society.volume";
 constexpr auto signature = "iisacc.society.disk-image/1\n";
+constexpr auto imageName = "Society.societycontainer";
+constexpr auto legacyImageName = "Society.sparsebundle";
 constexpr auto filesImageName = "Society.Files.sparsebundle";
 constexpr auto layoutName = ".society-disk.plist";
 struct CommandOutput { std::string out, error; };
@@ -107,13 +109,28 @@ bool owned(const fs::path &image) {
     std::string value((std::istreambuf_iterator<char>(file)), {});
     return value == signature;
 }
+fs::path existingImage(const fs::path &input) {
+    if (!fs::exists(input) && !fs::is_symlink(fs::symlink_status(input))) {
+        if (input.filename() == filesImageName) {
+            const auto parent = existingImage(input.parent_path());
+            if (parent != input.parent_path() && owned(parent)) return parent / filesImageName;
+        }
+        auto alternate = input;
+        if (input.extension() == ".sparsebundle") alternate.replace_extension(".societycontainer");
+        else if (input.extension() == ".societycontainer") alternate.replace_extension(".sparsebundle");
+        if (alternate != input && owned(alternate)) return alternate;
+    }
+    return input;
+}
 std::vector<DiskVolume> volumes(bool includeFiles = false) {
     @autoreleasepool {
         const auto output = run({"/usr/bin/hdiutil", "info", "-plist"});
         NSDictionary *info = plist(output.out);
         std::vector<DiskVolume> result;
         for (NSDictionary *image in info[@"images"]) {
-            const auto path = resolvedPath(text(image[@"image-path"]));
+            // DiskImages can retain the pre-rename path while both APFS volumes
+            // remain mounted. Resolve the owned outer package and its Files image.
+            const auto path = resolvedPath(existingImage(text(image[@"image-path"])));
             if (!owned(path) && !(includeFiles && path.filename() == filesImageName && owned(path.parent_path()))) continue;
             std::string whole;
             for (NSDictionary *entity in image[@"system-entities"])
@@ -276,14 +293,19 @@ std::expected<DiskVolume, std::string> DiskImage::create(const fs::path &locatio
             if (!relative.empty() && *relative.begin() != "..")
                 throw std::runtime_error("Choose a location outside the mounted Society disk.");
         }
-        const auto image = parent / "Society.sparsebundle";
+        const auto image = parent / imageName;
         ImageLock lock(image);
         if (fs::exists(image) || fs::is_symlink(fs::symlink_status(image))) return mountImage(image);
+        const auto legacy = parent / legacyImageName;
+        if (fs::exists(legacy) || fs::is_symlink(fs::symlink_status(legacy))) return mountImage(legacy);
         if (!bytes) bytes = fs::space(parent).available;
         bytes = (bytes / (1024 * 1024)) * (1024 * 1024);
         if (bytes < 512ULL * 1024 * 1024) throw std::runtime_error("At least 512 MiB of available storage is required to create the disk.");
         run({"/usr/bin/hdiutil", "create", "-megabytes", std::to_string(bytes / (1024 * 1024)), "-type", "SPARSEBUNDLE",
-             "-fs", "APFS", "-volname", "Society Data", image.string()});
+             "-fs", "APFS", "-volname", "Society Data", legacy.string()});
+        // hdiutil always appends its native extension. Rename the unmounted
+        // package before publishing it; its APFS bytes and UUID stay unchanged.
+        fs::rename(legacy, image);
         std::ofstream file(image / marker, std::ios::binary); file << signature; file.close();
         if (!file) throw std::runtime_error("Could not save the Society disk identity.");
         return mountImage(image);
@@ -291,8 +313,11 @@ std::expected<DiskVolume, std::string> DiskImage::create(const fs::path &locatio
 }
 std::expected<DiskVolume, std::string> DiskImage::mount(const fs::path &image) {
     try {
-        if (!image.is_absolute() || !owned(image)) throw std::runtime_error("The Society disk image is missing or invalid.");
-        ImageLock lock(image); return mountImage(image);
+        if (!image.is_absolute()) throw std::runtime_error("The Society disk image is missing or invalid.");
+        ImageLock lock(image);
+        const auto existing = existingImage(image);
+        if (!owned(existing)) throw std::runtime_error("The Society disk image is missing or invalid.");
+        return mountImage(existing);
     }
     catch (const std::exception &error) { return std::unexpected(error.what()); }
 }
@@ -318,11 +343,12 @@ std::optional<fs::path> DiskImage::containerRoot(const fs::path &entry) {
 }
 std::expected<void, std::string> DiskImage::detach(const fs::path &image) {
     try {
-        if (!image.is_absolute() || !owned(image)) throw std::runtime_error("The Society disk image is missing or invalid.");
+        const auto existing = existingImage(image);
+        if (!image.is_absolute() || !owned(existing)) throw std::runtime_error("The Society disk image is missing or invalid.");
         ImageLock lock(image);
-        for (const auto &volume : volumes(true)) if (volume.imagePath == resolvedPath(image) / filesImageName)
+        for (const auto &volume : volumes(true)) if (volume.imagePath == resolvedPath(existing) / filesImageName)
             ejectDevice(volume.imageDevice);
-        for (const auto &volume : volumes()) if (volume.imagePath == resolvedPath(image)) {
+        for (const auto &volume : volumes()) if (volume.imagePath == resolvedPath(existing)) {
             ejectDevice(volume.imageDevice); return {};
         }
         return {};

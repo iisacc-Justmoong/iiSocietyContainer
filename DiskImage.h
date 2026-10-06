@@ -19,11 +19,11 @@ struct DiskVolume {
 class IISOCIETYCONTAINER_EXPORT DiskImage {
 public:
     static bool supported();
-    /// Create an owned sparse disk, or mount that same existing owned image.
+    /// Create Society.societycontainer, or reuse an owned legacy .sparsebundle.
     /// bytes == 0 uses available backing-store space (a ceiling, not a reservation).
     static std::expected<DiskVolume, std::string> create(
         const std::filesystem::path &location, std::uint64_t bytes = 0);
-    /// Never creates a missing image. Unknown files/images are preserved and rejected.
+    /// Resolve an extension-only rename; never create a missing or unknown image.
     static std::expected<DiskVolume, std::string> mount(const std::filesystem::path &image);
     static std::optional<DiskVolume> mountedAt(const std::filesystem::path &root);
     /// Actual public volume root for a private native container; no arbitrary links.

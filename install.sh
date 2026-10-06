@@ -34,3 +34,11 @@ cmake -S "$source_dir/tests/consumer" -B "$consumer_build_dir" \
     -DiiSocietyContainer_DIR="$install_prefix/lib/cmake/iiSocietyContainer"
 cmake --build "$consumer_build_dir" --config Release --parallel
 ctest --test-dir "$consumer_build_dir" -C Release --output-on-failure
+
+filetree_build_dir="$build_dir/consumer/filetree/build"
+cmake -S "$source_dir/tests/consumer/filetree" -B "$filetree_build_dir" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DiiSocietyContainer_DIR="$install_prefix/lib/cmake/iiSocietyContainer" \
+    -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=TRUE
+cmake --build "$filetree_build_dir" --config Release --parallel
+ctest --test-dir "$filetree_build_dir" -C Release --output-on-failure

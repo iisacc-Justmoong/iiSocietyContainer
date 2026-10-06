@@ -19,6 +19,64 @@ class SocietyDriveTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void createsOrdinaryStorageTreeAndReusesIdentity()
+    {
+        QString error;
+        const auto drive = SocietyDrive::createAt(workspace->path(), &error);
+        QVERIFY2(drive, qPrintable(error));
+        QCOMPARE(drive->rootPath(), workspace->filePath("Society"));
+        QVERIFY(!QFileInfo::exists(workspace->filePath("Society.societycontainer")));
+        QVERIFY(!QFileInfo::exists(drive->rootPath() + "/bands"));
+        for (const auto section : allStoreSections())
+            QCOMPARE(drive->sectionPath(section), drive->rootPath() + '/' + storeSectionName(section));
+        QCOMPARE(SocietyDrive::createAt(workspace->path())->identifier(), drive->identifier());
+        QCOMPARE(SocietyDrive::createAt(drive->rootPath())->identifier(), drive->identifier());
+        QVERIFY(!SocietyDrive::createAt(drive->sectionPath(StoreSection::Files), &error));
+        QVERIFY(!QFileInfo::exists(drive->sectionPath(StoreSection::Files) + "/Society"));
+    }
+    void refusesConflictingOrRedirectedStorageFolder()
+    {
+        QFile conflict(workspace->filePath("Society"));
+        QVERIFY(conflict.open(QIODevice::WriteOnly)); conflict.write("keep"); conflict.close();
+        QVERIFY(!SocietyDrive::createAt(workspace->path()));
+        QVERIFY(conflict.open(QIODevice::ReadOnly)); QCOMPARE(conflict.readAll(), QByteArray("keep")); conflict.close();
+        QVERIFY(conflict.remove());
+        QVERIFY(QDir().mkdir(workspace->filePath("outside")));
+        QVERIFY(QFile::link(workspace->filePath("outside"), workspace->filePath("Society")));
+        QVERIFY(!SocietyDrive::createAt(workspace->path()));
+        QVERIFY(!QFileInfo::exists(workspace->filePath("outside/.society-drive.json")));
+    }
+    void accessesLogicalSectionTreesAndRejectsReplacedIdentity()
+    {
+        const auto drive = SocietyDrive::create(workspace->path()); QVERIFY(drive);
+        QVERIFY(QDir().mkpath(workspace->filePath("Files/projects/empty")));
+        QFile file(workspace->filePath("Files/projects/note.txt"));
+        QVERIFY(file.open(QIODevice::WriteOnly)); file.write("tree bytes"); file.close();
+        auto snapshot = drive->tree(); QVERIFY(snapshot);
+        QCOMPARE(snapshot.value->children.size(), std::size_t(9));
+        const auto* note = snapshot.value->find("Files/projects/note.txt"); QVERIFY(note);
+        QCOMPARE(note->size, std::uintmax_t(10));
+        QVERIFY(note->parentPath == "Files/projects");
+        QVERIFY(note->path == std::filesystem::path(file.fileName().toStdString()));
+        QVERIFY(!snapshot.value->find(".society-drive.json"));
+        const auto subtree = drive->tree("Files/projects"); QVERIFY(subtree);
+        QVERIFY(subtree.value->relativePath == "Files/projects");
+        QVERIFY(subtree.value->find("Files/projects/empty")->childrenLoaded);
+        auto children = drive->entries("Files/projects"); QVERIFY(children);
+        QCOMPARE(children.value->size(), std::size_t(2));
+        QVERIFY(drive->entry("Files/projects/note.txt"));
+        QVERIFY(!drive->entries("Files/projects/note.txt"));
+        QVERIFY(!drive->tree("Files/projects/../../Models"));
+        QVERIFY(!drive->tree(".society-sync"));
+        QVERIFY(!drive->tree({}, {false, 64, 9}));
+        QVERIFY(drive->tree({}, {false, 1, 10}));
+        const auto host = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const auto replica = SocietyDrive::adoptReplicaIdentity(workspace->path(), drive->identifier(), host);
+        QVERIFY(replica); QVERIFY(!drive->tree()); QVERIFY(!replica->tree());
+        QVERIFY(SocietyDrive::completeReplica(workspace->path(), host));
+        QVERIFY(replica->tree());
+    }
+
     void init()
     {
         workspace = std::make_unique<QTemporaryDir>(QDir::current().filePath("society-drive-XXXXXX"));

@@ -1,57 +1,21 @@
-# File operations
+<a id="file-operations"></a>
 
-`FileOperations` is the blocking, drive-bound filesystem API. Call it on a worker thread.
-`FileActions`, in the optional `iiSocietyContainer::Gui` target, is its asynchronous
-Qt GUI adapter. Consumers request the `Gui` CMake component; Core-only consumers
-keep their existing Core link dependencies. `IISOCIETYCONTAINER_BUILD_GUI=OFF`
-omits clipboard and sharing support.
+# 파일 작업
 
-Supported operations are clipboard file-URL copy, path copy, paste, duplicate,
-rename, move to `Deleted`, and permanent removal from `Deleted`. macOS sharing
-uses `NSSharingServicePicker`; no recipient is selected or message sent by the SDK.
-Other platforms advertise `canShare=false` until a native adapter is supplied.
+0.15.0의 `FileOperations::createDirectory(parent, name)`와 `Action::Move`는 디렉터리 생성 및 파일·디렉터리 이동을 추가한다. 기존 이름을 덮어쓰지 않고, 섹션 루트를 보호하며, 이동은 같은 파일 시스템의 대체 없는 rename으로 수행한다. 경로·충돌·준비 상태와 트리 재조회 예시는 [컨테이너 파일 트리](FileTree.md)의 디렉터리 관리 계약을 따른다.
 
-Public section roots cannot be renamed,
-deleted, or replaced. Destinations cannot cross the selected drive or follow
-symlinks/junctions. Paste may read explicitly selected ordinary external files.
-Existing destination files are never overwritten; duplicate/paste/trash choose
-an unused name. Rename reports a collision. Permanent removal is accepted only
-under `Deleted`; the GUI obtains an explicit confirmation for that operation.
+`FileOperations`는 차단형 드라이브 바인딩 파일 시스템 API입니다. 워커 스레드에서 호출하십시오. `FileActions`는 옵션인 `iiSocietyContainer::Gui` 타깃에서 비동기 Qt GUI 어댑터입니다. 소비자는 `Gui` CMake 구성 요소를 요청합니다; Core 전용 소비자는 기존 Core 링크 의존성을 유지합니다. `IISOCIETYCONTAINER_BUILD_GUI=OFF`는 클립보드 및 공유 지원을 생략합니다.
 
-Copies use a hidden staging path and appear only after completion. APFS clones
-are used when available, with ordinary copying on other filesystems. A changed
-source or copy failure discards the staged output. Copy publication and ordinary
-rename share the replication operation lock.
+지원되는 작업은 클립보드 파일 - URL 복사, 경로 복사, 붙여넣기, 복제, 이름 바꾸기, `Deleted`로 이동, 그리고 `Deleted`에서 영구 삭제입니다. macOS 공유는 `NSSharingServicePicker`를 사용합니다; SDK에 의해 수신자가 선택되지 않거나 메시지가 전송되지 않습니다. 다른 플랫폼은 네이티브 어댑터가 제공될 때까지 `canShare=false`를 광고합니다.
 
-Delete bypasses materialization, residency checks, hashes, model/package inspection,
-and the replication lock. Trash normally uses a native no-replace rename into `Deleted`.
-On macOS native disks, Files and private Deleted use separate volumes. This case copies to
-a private staging path, checks the source, retains a temporary original on the Files volume,
-and publishes the Deleted copy before removing that original. Failed copies preserve the source.
-Permanent removal uses
-ordinary filesystem unlink/recursive directory removal, only inside `Deleted`.
-Directories may contain any number of files, so permanent removal costs directory
-traversal and unlink operations, not reading model contents. Partial local packages
-can be moved and removed as they stand. A remote-only item fails promptly with a
-host-deletion message; neither deletion action queues a download. Existing sync
-scans publish resulting changes later, independently of action completion.
+공개 섹션 루트는 이름을 변경하거나 삭제하거나 교체할 수 없습니다. 목적지는 선택한 드라이브를 교차하거나 심볼릭 링크/교차로를 따를 수 없습니다. 붙여넣기는 명시적으로 선택된 일반 외부 파일을 읽을 수 있습니다. 기존 대상 파일은 절대 덮어쓰지 않으며, 중복/붙여넣기/쓰레기할 때는 사용되지 않은 이름을 선택하십시오. 리네임은 충돌을 보고합니다. 영구 제거는 `Deleted`에 한해 허용됩니다; GUI는 해당 작업에 대한 명시적인 확인을 받습니다.
 
-The local authority is identified by its validated `.society-sync/primary.json`
-descriptor. Its model and directory views honor actual path existence immediately,
-so an old catalog cannot resurrect a deleted row. A stale tombstone also cannot
-hide a newly moved/restored file in its directory view. Replicas retain remote-only
-rows when their cache is absent; cache eviction is not treated as deletion.
+복사본은 숨겨진 스테이징 경로를 사용하며 완료된 후에만 나타납니다. APFS 클론은 사용 가능한 경우 사용되며, 다른 파일 시스템에서는 일반 복사가 이루어집니다. 소스가 변경되었거나 복사 실패가 발생하면 스테이징된 출력이 폐기됩니다. 복사 출판 및 일반 이름 변경은 복제 작업 잠금을 공유합니다.
 
-Opening a context menu does not request content. Actions that use an original
-materialize only the selected file or package through `StorageDirectoryModel`.
-Currently a remote-only item must finish materializing before a local
-rename operation; rename does not move a partially downloaded directory. Errors
-are visible and originals remain in place. No host-wide pull is started.
+삭제는 물질화, 거주성 확인, 해시, 모델/패키지 검사, 및 복제 잠금을 우회합니다. 휴지통은 일반적으로 `Deleted` 로 대체 없는 이름 변경을 사용합니다. macOS 네이티브 디스크에서는 파일과 개인 삭제용이 별도의 볼륨을 사용합니다. 이 경우 소스를 개인 임시 경로로 복사하고, 소스를 확인하며, 파일 볼륨에 임시 원본을 유지한 후 삭제용 복사를 게시한 다음 그 원본을 제거합니다. 실패한 복사는 소스를 보존합니다. 영구 제거는 일반 파일 시스템 언링크/재귀 디렉토리 제거를 사용하며, `Deleted` 내부에서만 수행됩니다. 디렉토리는 임의의 수의 파일을 포함할 수 있으므로 영구 제거는 디렉토리 탐색 및 언링크 작업 비용이며 모델 내용 읽기 비용이 아닙니다. 부분 로컬 패키지는 현재 상태로 이동 및 제거할 수 있습니다. 호스트 삭제 메시지가 있는 원격 전용 항목은 즉시 실패하며, 삭제 동작은 다운로드 대기열에 등록하지 않습니다. 기존 동기화 스캔은 동작 완료와 무관하게 결과 변경 사항을 나중에 게시합니다.
 
-`file_operations` covers packages, collisions, recoverable trash, permanent
-removal boundaries, protected roots, and path redirection. Sparse 8 GiB fixtures,
-stale catalogs, an occupied replication lock, partial packages, and nested symlinks
-verify deletion does not depend on content or follow links outside the selected tree.
-`file_actions` covers asynchronous clipboard/paste/rename/trash, selected remote
-materialization, and no-download deletion. `shared_storage` covers host listing
-updates before reindexing and preservation of remote-only replica rows.
+지방 당국은 검증된 `.society-sync/primary.json` 디스크립터에 의해 식별됩니다. 그 모델과 디렉터리 뷰는 실제 경로의 존재를 즉시 존중하므로, 오래된 카탈로그는 삭제된 행을 되살릴 수 없습니다. 오래된 묘비도 디렉터리 보기에서 새로 이동하거나 복원한 파일을 숨길 수 없습니다. 복제본은 캐시가 없을 경우 원격 전용 행을 유지하며, 캐시 퇴거는 삭제로 간주되지 않습니다.
+
+컨텍스트 메뉴를 열어도 콘텐츠를 요청하지 않습니다. 원본을 사용하는 작업은 `StorageDirectoryModel`를 통해 선택된 파일이나 패키지만 구체화합니다. 현재 원격 전용 항목은 로컬 이름 바꾸기 작업 전에 구현을 완료해야 하며, 이름 바꾸는 부분적으로 다운로드된 디렉터리를 이동하지 않습니다. 오류는 보이며 원본은 그대로 유지됩니다. 호스트 전체 풀은 시작되지 않습니다.
+
+`file_operations` 는 패키지, 충돌, 복구 가능한 휴지통, 영구 제거 경계, 보호된 루트, 및 경로 리디렉션 범위를 다룹니다. 희소 8 GiB 픽스처 픽스처, 오래된 카탈로그, 점유된 복제 잠금, 부분 패키지, 및 중첩된 심링크는 삭제가 콘텐츠에 의존하지 않거나 선택된 트리를 벗어난 링크를 따르지 않음을 확인합니다. `file_actions` 는 비동기 클립보드/붙여넣기/이름 변경/휴지통, 선택된 원격 구체화, 및 다운로드 없는 삭제를 다룹니다. `shared_storage` 는 재인덱싱 전 호스트 목록 업데이트 및 원격 전용 복제 행 보존을 다룹니다.

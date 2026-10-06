@@ -1,6 +1,7 @@
 #pragma once
 
 #include "iiSocietyContainerExport.h"
+#include "FileTree.h"
 #include "src/Store/StoreSection.h"
 
 #include <QtCore/QList>
@@ -35,6 +36,14 @@ public:
     /// Relative paths are resolved against rootPath(), not the working directory.
     /// Empty paths, missing entries and invalid containers return Outside.
     [[nodiscard]] PathKind classifyPath(const QString& path) const;
+
+    /// Live metadata, immediate children, and a bounded recursive tree snapshot.
+    /// Empty paths select the root; other paths are strict root-relative paths.
+    [[nodiscard]] FileTree::EntryResult entry(const QString& relativePath = {}) const;
+    [[nodiscard]] FileTree::ChildrenResult entries(const QString& relativeDirectory = {},
+                                                 bool includeHidden = false) const;
+    [[nodiscard]] FileTree::EntryResult tree(const QString& relativePath = {},
+                                            FileTree::Options options = {}) const;
 
     /// Returns all eight logical sections while the container is valid, else none.
     /// Sections exist independently of files, directories, and their names.

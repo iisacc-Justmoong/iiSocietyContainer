@@ -1,26 +1,32 @@
-# Windows와 Linux의 Society 드라이브
+<a id="windows와-linux의-society-드라이브"></a>
 
-`iiSocietyContainerMount`는 Society 앱과 분리된 사용자 세션 프로세스이다. Windows에서는 Dokan 2 드라이브 문자, Linux에서는 libfuse 3 마운트를 제공한다. 두 어댑터 모두 `FilesView`를 통해 **Society/Files의 내용만** 루트로 투영한다. 나머지 7개 영역과 `.society-drive.json`은 공개 드라이브에 나타나지 않는다. Society와 Helper는 원본의 8개 영역을 계속 사용한다.
+# Society drives of Windows and Linux
 
-일반 파일·폴더 생성, 열기, 읽기, 쓰기, 크기 변경, 이름 변경, 이동, 삭제, 메타데이터와 용량 조회를 구현한다. 심볼릭 링크, Windows junction/reparse point, 대체 데이터 스트림, 특수 파일은 제공하지 않는다. 원본을 일반 디렉터리로 직접 열 수 있는 동일 OS 사용자에게 ACL 격리를 추가하는 기능은 아니다. Linux는 `openat`과 `O_NOFOLLOW`로 하위 경로를 열고, 열린 Files 디렉터리의 장치·inode 및 컨테이너 UUID를 매번 검증한다.
+`iiSocietyContainerMount` is a user-session process separate from the Society app. It provides a Dokan 2 drive letter on Windows and a libfuse 3 mount on Linux. Both adapters use `FilesView` to project **only the contents of Society/Files** as the root. The remaining 7 sections and `.society-drive.json` do not appear in the public drive. Society and Helper continue to use the original 8 sections.
 
-## 빌드
+Implement general file and folder creation, open, read, write, size change, name change, move, delete, and metadata and capacity queries. Do not provide symbolic links, Windows junction/reparse point, alternate data streams, or special files. The feature of adding ACL isolation for the same OS user who can directly open the original as a general directory is not included. Linux opens sub-paths with `openat` and `O_NOFOLLOW` and verifies the device, inode, and container UUID of the opened Files directory each time.
 
-공통 의존성은 CMake 3.24+, C++20, Qt **6.8.3** Core·Network이다. 테스트는 Qt Test와 Python 3을 추가로 사용한다.
+<a id="빌드"></a>
 
-- Windows: [Dokan 2](https://github.com/dokan-dev/dokany/releases)의 SDK와 서명된 드라이버를 설치한다. CMake에 `-DDokan_ROOT=<SDK 경로>`를 지정한다. x64·ARM64·x86 라이브러리는 대상 아키텍처에 맞게 선택한다. 배포 시 `dokan2.dll`과 해당 버전의 드라이버가 필요하다. 사용자 모드 DLL만 복사해서 커널 드라이버 설치를 대신할 수는 없다.
-- Linux: `libfuse3-dev`, `fuse3`, `pkg-config`, C++ 빌드 도구를 설치한다. `fuse3 >= 3.10`과 사용 가능한 `/dev/fuse`가 필요하다. 사용자 마운트를 사용하며 `allow_other`를 켜지 않는다.
+## Build
+
+Common dependencies are CMake 3.24+, C++20, Qt **6.8.3** Core and Network. Tests additionally use Qt Test and Python 3.
+
+- Windows: Install the [Dokan 2](https://github.com/dokan-dev/dokany/releases)SDK and signed driver. Specify `-DDokan_ROOT=<SDK path>` in CMake. x64 · ARM64 ·x86 libraries are selected to match the target architecture. `dokan2.dll` and the corresponding version of the driver are required at deployment. Copying only the user-mode DLL cannot replace kernel driver installation.
+- Linux: Install `libfuse3-dev`, `fuse3`, `pkg-config`, C++ build tools. `fuse3 >= 3.10` and available `/dev/fuse` are required. Use user mounts and do not enable `allow_other`.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=<Qt 경로>
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=<Qt path>
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-설치 패키지는 `iiSocietyContainer_MOUNT_EXECUTABLE`로 헬퍼 실행 파일 경로를 제공한다. Society 앱은 이 실행 파일을 앱 실행 디렉터리에도 복사한다. 배포자는 Society와 동일한 Qt 런타임 및 SDK DLL/shared library를 패키징해야 한다.
+The installation package provides the helper executable path as `iiSocietyContainer_MOUNT_EXECUTABLE`. The Society app also copies this executable to the app execution directory. The deployer must package the same Qt runtime and SDK DLL /shared library as Society.
 
-## 등록과 수명
+<a id="등록과-수명"></a>
+
+## Registration and Lifecycle
 
 ```sh
 iiSocietyContainerMount register /absolute/path/to/Society
@@ -30,20 +36,22 @@ iiSocietyContainerMount refresh <container-uuid>
 iiSocietyContainerMount unregister <container-uuid>
 ```
 
-명령은 JSON을 반환한다. 성공 시 `identifier`, `sourcePath`, `systemPath`, `enabled`, 실패 시 `error`를 포함한다. 첫 명령은 필요할 때 사용자 세션 서비스를 시작한다. OS 사용자 전용 로컬 소켓과 잠금 파일로 단일 인스턴스 및 요청 접근을 제한한다. 등록 정보는 사용자 설정의 `iisacc/Society/mounts/drives.json`에 저장한다. 컨테이너 UUID가 바뀌면 기존 등록은 새 원본을 자동으로 수용하지 않는다.
+The command returns JSON. On success, it includes `identifier`, `sourcePath`, `systemPath`, `enabled`; on failure, it includes `error`. The first command starts the user session service when needed. OS restricts single instance and request access via a user-specific local socket and lock file. Registration information is stored in `iisacc/Society/mounts/drives.json` of user settings. If the container UUID changes, existing registrations do not automatically accommodate the new source.
 
-Windows는 S:부터 사용 가능한 드라이브 문자를 선택하고 현재 세션에 `Society` 볼륨을 만든다. Linux 기본 마운트 위치는 `$XDG_DATA_HOME/iisacc/Society/Drives/<uuid>`이며, 기본 XDG 위치를 지원한다. Linux에서 `..`는 일반 마운트처럼 외부 마운트 부모로 이동할 뿐 비공개 Society 원본 루트로 연결되지 않는다.
+Windows selects an available drive letter from S: and creates a `Society` volume for the current session. Linux default mount location is `$XDG_DATA_HOME/iisacc/Society/Drives/<uuid>` and supports default XDG location. In Linux, `..` moves as an external mount parent like a regular mount but does not connect to the private Society source root.
 
-최초 등록 시 Windows HKCU Run 또는 Linux XDG autostart에 `serve` 명령을 기록한다. 서비스 재시작 시 저장된 등록을 복원하며 Society 창이 닫혀도 마운트는 유지된다. Linux에서는 auto_unmount를 요청하고, 비정상 종료 후 남은 연결 끊긴 마운트도 재연결 때 복구한다. 이 복구는 현재 사용자 소유·Society 파일 시스템·UUID가 맞는 마운트만 해제하며 활성 마운트나 다른 파일 시스템은 건드리지 않는다. 원본이 없거나 드라이브 문자가 점유된 경우 오류를 반환하거나 빈 문자를 선택한다. `SOCIETY_MOUNT_STATE_DIRECTORY`는 격리된 테스트용 설정 경로이며, `SOCIETY_MOUNT_AUTOSTART=0`은 테스트에서 로그인 등록을 생략한다.
+At initial registration, Windows HKCU Run or Linux XDG autostart records the `serve` command. On service restart, saved registrations are restored and the mount is held even if Society window is closed. In Linux, auto_unmount is requested, and after abnormal termination, remaining disconnected mounts are recovered at reconnection. This recovery unmounts only mounts owned by the current user, Society file system, and matching UUID, without touching active mounts or other file systems. If the source is missing or the drive letter is occupied, an error is returned or an empty character is selected. `SOCIETY_MOUNT_STATE_DIRECTORY` is the isolated test configuration path, and `SOCIETY_MOUNT_AUTOSTART=0` omits login registration in tests.
 
-## 검사와 의존성 선택
+<a id="검사와-의존성-선택"></a>
 
-`files_view`는 공개 경계와 UUID 교체를 검사한다. `mount_service`는 스텁 마운트를 사용해 등록·영속화·재시작·해제를 검사한다. 실제 마운트는 별도 명령으로 검증한다.
+## Inspection and Dependency Selection
+
+`files_view` inspects the public boundary and UUID replacement. `mount_service` inspects registration, persistence, restart, and unmount using stub mounts. Actual mounts are verified with a separate command.
 
 ```sh
 python3 tests/native_mount.py <drive-tool> <mount-executable> <absolute-build-directory>
 ```
 
-이 검사는 임시 원본과 새 드라이브만 만들고 로그인 등록을 끈다. 실제 OS 마운트에서 읽기·쓰기·이름 변경·삭제·원본 변경 반영·비공개 영역 차단·서비스 재시작을 검사한 뒤 해제한다. Windows에서의 실행에는 실제 Dokan 커널 드라이버가 필요하며 교차 컴파일만으로 실행 검증을 대신하지 않는다.
+This check creates only temporary copies and new drives and disables login registration. It checks and then releases read-write-rename-delete-apply-original-changes-block-private-area-restart-service on actual OS mounts. Execution on Windows requires the actual Dokan kernel driver and does not substitute for execution verification via cross-compilation alone.
 
-직접 커널 드라이버를 만들지 않고 유지보수되는 [Dokan API](https://dokan-dev.github.io/dokany-doc/html/)와 [libfuse API](https://libfuse.github.io/doxygen/structfuse__operations.html)를 사용한다. Dokan 사용자 모드 라이브러리는 LGPL-3.0-or-later, libfuse 라이브러리는 LGPL-2.1-or-later이다. 라이브러리는 외부 동적 의존성으로 두며 해당 라이선스·교체 가능성·소스 제공 의무를 배포 구성에서 보존한다. 추가 클라우드 서비스나 사용량 과금은 필요하지 않다.
+Without creating a kernel driver directly, it uses maintained [Dokan API](https://dokan-dev.github.io/dokany-doc/html/)and [libfuse API](https://libfuse.github.io/doxygen/structfuse__operations.html). The Dokan user-mode library is LGPL-3.0 -or-later, and the libfuse library is LGPL-2.1 -or-later. The library is set as an external dynamic dependency, preserving the license, replaceability, and source provision obligation in the deployment configuration. No additional cloud services or usage fees are required.

@@ -1,8 +1,10 @@
 #include "SocietyDrive.h"
+#include "src/FileTreePaths.h"
 #include "ModelLayout.h"
 #include "FilesLayout.h"
 #include "PhotosLayout.h"
 #include "DiskImage.h"
+#include "DirectoryStorage.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -86,6 +88,29 @@ QJsonArray sectionDefinitions(bool legacy = false)
 SocietyDrive::SocietyDrive(QString root, QString identifier)
     : m_rootPath(std::move(root)), m_identifier(std::move(identifier))
 {
+}
+
+std::optional<SocietyDrive> SocietyDrive::createAt(const QString& parentDirectory, QString* error)
+{
+    setError(error, {});
+    const auto location = DirectoryStorage::prepare(detail::nativePath(parentDirectory));
+    if (!location) { setError(error, QString::fromStdString(location.error())); return {}; }
+#ifdef Q_OS_WIN
+    const auto directory = QString::fromStdWString(location->path.wstring());
+#else
+    const auto directory = QString::fromStdString(location->path.string());
+#endif
+    if (const auto message = sourceLocationError(directory); !message.isEmpty()) {
+        setError(error, message);
+        if (location->created) { std::error_code cleanup; std::filesystem::remove(location->path, cleanup); }
+        return {};
+    }
+    auto drive = create(directory, error);
+    if (!drive && location->created) {
+        std::error_code cleanup;
+        std::filesystem::remove(location->path, cleanup); // Empty directories only.
+    }
+    return drive;
 }
 
 std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, QString* error)
@@ -390,6 +415,70 @@ std::optional<StoreSection> SocietyDrive::sectionForPath(const QString& path) co
         }
     }
     return std::nullopt;
+}
+
+FileTree::EntryResult SocietyDrive::tree(const QString& relative, FileTree::Options options) const
+{
+    const auto invalid = [] { return FileTree::EntryResult{std::nullopt, std::make_error_code(std::errc::invalid_argument)}; };
+    const auto unavailable = [] { return FileTree::EntryResult{std::nullopt, std::make_error_code(std::errc::state_not_recoverable)}; };
+    if (!isReady()) return unavailable();
+    if (options.maxEntries == 0 || options.maxDepth > 256) return invalid();
+    const bool root = relative.isEmpty() || relative == ".";
+    if (!root && (resolvePath(relative).isEmpty() || relative.contains(':'))) return invalid();
+    auto rebase = [](auto&& self, FileTree::Entry& node, const std::filesystem::path& prefix) -> void {
+        node.relativePath = node.relativePath == "." ? prefix : prefix / node.relativePath;
+        node.parentPath = node.relativePath.parent_path();
+        if (node.parentPath.empty()) node.parentPath = ".";
+        for (auto& child : node.children) self(self, child, prefix);
+    };
+    auto count = [](auto&& self, const FileTree::Entry& node) -> std::size_t {
+        std::size_t total = 1;
+        for (const auto& child : node.children) total += self(self, child);
+        return total;
+    };
+    FileTree::EntryResult result;
+    if (root) {
+        result = FileTree(detail::nativePath(m_rootPath)).entry();
+        if (!result) return result;
+        if (options.maxDepth != 0) {
+            std::size_t remaining = options.maxEntries - 1;
+            for (const auto section : allStoreSections()) {
+                if (remaining == 0) return {std::nullopt, std::make_error_code(std::errc::value_too_large)};
+                auto childOptions = options;
+                --childOptions.maxDepth;
+                childOptions.maxEntries = remaining;
+                auto child = FileTree(detail::nativePath(sectionPath(section))).snapshot({}, childOptions);
+                if (!child) return child;
+                remaining -= count(count, *child.value);
+                rebase(rebase, *child.value, detail::nativePath(storeSectionName(section)));
+                result.value->children.push_back(std::move(*child.value));
+            }
+            result.value->childrenLoaded = true;
+        }
+    } else {
+        const auto name = relative.section('/', 0, 0);
+        // Resolve the section separately: the Files section may live on another volume.
+        const auto nativeRoot = resolvePath(name);
+        const auto tail = relative == name ? QString() : relative.mid(name.size() + 1);
+        result = FileTree(detail::nativePath(nativeRoot)).snapshot(detail::nativePath(tail), options);
+        if (!result) return result;
+        rebase(rebase, *result.value, detail::nativePath(name));
+    }
+    return isReady() ? result : unavailable();
+}
+
+FileTree::EntryResult SocietyDrive::entry(const QString& relative) const
+{
+    return tree(relative, FileTree::Options{false, 0, 1});
+}
+
+FileTree::ChildrenResult SocietyDrive::entries(const QString& relative, bool includeHidden) const
+{
+    auto result = tree(relative, FileTree::Options{includeHidden, 1, 100000});
+    if (!result) return {std::nullopt, result.error};
+    if (result.value->kind != FileTree::Kind::Directory)
+        return {std::nullopt, std::make_error_code(std::errc::not_a_directory)};
+    return {std::move(result.value->children), {}};
 }
 
 } // namespace iiSocietyContainer

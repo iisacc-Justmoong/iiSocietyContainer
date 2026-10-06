@@ -6,10 +6,12 @@ namespace iiSocietyContainer {
 // to the same drive and is published without replacing an existing entry.
 class IISOCIETYCONTAINER_EXPORT FileOperations final {
 public:
-    enum class Action { Duplicate, Copy, Rename, Trash, Remove };
+    enum class Action { Duplicate, Copy, Rename, Trash, Remove, Move };
     struct Result { QString path; QString error; explicit operator bool() const { return error.isEmpty() && !path.isEmpty(); } };
     explicit FileOperations(SocietyDrive drive);
     Result perform(Action action, const QString &source, const QString &argument = {}) const;
+    /// Creates one immediate child, without replacing an existing entry.
+    Result createDirectory(const QString &parent, const QString &name) const;
     bool editable(const QString &path) const;
     static std::optional<SocietyDrive> containingDrive(const QString &path);
 private:

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(iiSocietyContainer VERSION 0.14.1 LANGUAGES CXX)
+project(iiSocietyContainer VERSION 0.15.0 LANGUAGES CXX)
 
 if(APPLE)
     enable_language(OBJCXX)
@@ -26,6 +26,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 else()
     set(_library_type SHARED)
 endif()
+
+add_library(iiSocietyContainerFileTree ${_library_type} FileTree.h FileTree.cpp DirectoryStorage.h DirectoryStorage.cpp iiSocietyContainerExport.h)
+add_library(iiSocietyContainer::FileTree ALIAS iiSocietyContainerFileTree)
+target_compile_features(iiSocietyContainerFileTree PUBLIC cxx_std_23)
+target_compile_definitions(iiSocietyContainerFileTree PRIVATE IISOCIETYCONTAINER_FILETREE_BUILD)
+target_include_directories(iiSocietyContainerFileTree PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+set_target_properties(iiSocietyContainerFileTree PROPERTIES EXPORT_NAME FileTree
+    CXX_EXTENSIONS OFF VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR}
+    CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)
 
 add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyContainer.cpp DiskImage.h
         iiSocietyContainerExport.h
@@ -86,7 +97,7 @@ else()
     target_sources(iiSocietyContainer PRIVATE platform/desktop/DiskImageUnsupported.cpp)
 endif()
 target_compile_definitions(iiSocietyContainer PRIVATE IISOCIETYCONTAINER_BUILDING_LIBRARY)
-target_link_libraries(iiSocietyContainer PUBLIC Qt6::Core)
+target_link_libraries(iiSocietyContainer PUBLIC Qt6::Core iiSocietyContainer::FileTree)
 target_include_directories(iiSocietyContainer PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -210,6 +221,9 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_custom_target(iiSocietyContainerNative ALL DEPENDS ${_native_outputs})
     install(DIRECTORY "${_native_app}" DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer USE_SOURCE_PERMISSIONS)
     if(BUILD_TESTING)
+        add_test(NAME iiSocietyContainer.directory_migration COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_directory_migration.py")
+        set_tests_properties(iiSocietyContainer.directory_migration PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
         add_test(NAME iiSocietyContainer.shared_location COMMAND "${_native_directory}/SharedDriveLocationTests"
             "${_native_directory}" $<TARGET_FILE:iiSocietyContainerDriveTool>)
         add_test(NAME iiSocietyContainer.ios_package_contract COMMAND ${Python3_EXECUTABLE}
@@ -244,6 +258,12 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
 endif()
 
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+    add_executable(iiSocietyContainerDirectoryStorageTests tests/directory_storage.cpp)
+    target_link_libraries(iiSocietyContainerDirectoryStorageTests PRIVATE iiSocietyContainer::FileTree)
+    add_test(NAME iiSocietyContainer.directory_storage COMMAND iiSocietyContainerDirectoryStorageTests "${CMAKE_CURRENT_BINARY_DIR}")
+    add_executable(iiSocietyContainerFileTreeTests tests/file_tree.cpp)
+    target_link_libraries(iiSocietyContainerFileTreeTests PRIVATE iiSocietyContainer::FileTree)
+    add_test(NAME iiSocietyContainer.file_tree COMMAND iiSocietyContainerFileTreeTests "${CMAKE_CURRENT_BINARY_DIR}")
     find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Test)
     add_executable(iiSocietyContainerFileOperationsTests tests/file_operations.cpp)
     target_link_libraries(iiSocietyContainerFileOperationsTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
@@ -324,7 +344,7 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_test(NAME iiSocietyContainer.files_view COMMAND iiSocietyContainerFilesViewTests)
 endif()
 
-install(TARGETS iiSocietyContainer EXPORT iiSocietyContainerTargets
+install(TARGETS iiSocietyContainer iiSocietyContainerFileTree EXPORT iiSocietyContainerTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -332,12 +352,13 @@ install(TARGETS iiSocietyContainer EXPORT iiSocietyContainerTargets
 if(TARGET iiSocietyContainerDriveTool)
     install(TARGETS iiSocietyContainerDriveTool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-install(FILES iiSocietyContainer.h iiSocietyContainerExport.h SocietyDrive.h DiskImage.h SharedStorage.h FilesView.h FileOperations.h
+install(FILES iiSocietyContainer.h iiSocietyContainerExport.h FileTree.h DirectoryStorage.h SocietyDrive.h DiskImage.h SharedStorage.h FilesView.h FileOperations.h
     FileDirectory.h ModelType.h ModelClassifier.h ModelStore.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
-install(FILES docs/Models.md docs/Files.md docs/FileActions.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
+install(FILES tools/migrate_directory.py DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/tools)
+install(FILES docs/Models.md docs/Files.md docs/FileActions.md docs/FileTree.md docs/DirectoryStorage.md docs/DiskImage.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
 install(DIRECTORY platform/apple platform/ios platform/android DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform
     PATTERN "*Tests.swift" EXCLUDE PATTERN "._*" EXCLUDE PATTERN ".DS_Store" EXCLUDE)
 install(FILES platform/macos/README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform/macos)

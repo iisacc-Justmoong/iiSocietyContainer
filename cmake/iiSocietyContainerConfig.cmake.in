@@ -1,7 +1,10 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(Qt6 6.8.3 EXACT COMPONENTS Core)
+if(NOT iiSocietyContainer_FIND_COMPONENTS STREQUAL "FileTree")
+    find_dependency(Qt6 6.8.3 EXACT COMPONENTS Core)
+endif()
+set(iiSocietyContainer_FileTree_FOUND TRUE)
 if("Gui" IN_LIST iiSocietyContainer_FIND_COMPONENTS)
     find_dependency(Qt6 6.8.3 EXACT COMPONENTS Gui Concurrent Quick)
     set(iiSocietyContainer_Gui_FOUND @IISOCIETYCONTAINER_BUILD_GUI@)

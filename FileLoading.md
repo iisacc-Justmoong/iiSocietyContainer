@@ -1,87 +1,38 @@
-# File loading and app-local caches
+<a id="file-loading-and-app-local-caches"></a>
 
-`StorageDirectoryModel` and `DashboardFiles` expose filesystem-backed rows without
-running scans or image decoding on the GUI thread. A host directory is authoritative:
-it does not parse the whole synchronization catalogue to display its own files.
-Replicas retain the catalogue's metadata-first and on-demand-download semantics.
+# 파일 로딩 및 앱 로컬 캐시
 
-## Listing cache
+`StorageDirectoryModel`와 `DashboardFiles`는 GUI 스레드에서 스캔이나 이미지 디코딩을 실행하지 않고 파일 시스템 기반 행을 노출합니다. 호스트 디렉터리는 권한이 있습니다: 전체 동기화 카탈로그를 파싱하여 자체 파일을 표시하지 않습니다. 복제본은 카탈로그의 메타데이터 우선 및 주문형 다운로드 의미를 유지합니다.
 
-Directory snapshots live in the application's `CacheLocation/society/directories-v1`.
-The key includes the absolute folder and every filter/sort option; the record also
-binds to the current Society container ID. At most 128 snapshots of at most 16 MiB
-each, with a combined 128 MiB budget, are retained. Writes are atomic, private to the
-user, and skipped if unchanged.
+<a id="listing-cache"></a>
 
-A snapshot is provisional: it can paint names immediately, but `status == Ready`
-still requires a fresh scan. `activate()` cannot open an item while Loading. A fresh
-scan reconciles deletions, replacements, sizes, residency and ordering using row
-diffs, preserving selection/scroll contracts. `snapshotRestored()` identifies that
-first provisional publication. Missing/malformed caches fall back to a normal scan.
+## 목록 캐시
 
-Native file/directory notifications are coalesced for 100 ms. Up to 64 watch handles
-cover the current view and sync catalogue. A 10-second fallback covers watcher limits
-and unavailable network-filesystem notifications, replacing the prior full scan every
-second. The folder watch is installed before Ready; optional individual watches are
-installed eight at a time between frames, never as a large blocking GUI operation.
-Explicit refresh and download completion still reconcile immediately.
-Large local directories distribute metadata inspection over the available CPU cores
-(one worker per 256 entries up to the hardware thread count); small folders avoid
-thread-start overhead. This does not create parallel full-file reads.
+디렉터리 스냅샷은 애플리케이션의 `CacheLocation/society/directories-v1`에 저장되어 있습니다. 키에는 절대 폴더와 모든 필터/정렬 옵션이 포함되어 있으며, 레코드는 현재 Society 컨테이너 ID에 바인딩됩니다. 최대 128의 스냅샷은 각각 최대 16, MiB이며, 128와 MiB 예산을 합산하여 유지됩니다. 쓰기는 원자적이며 사용자에게만 비공개이고, 변경되지 않은 경우 건너뛰어집니다.
 
-Dashboard Files, Published and Generation History scans execute concurrently using
-C++ futures, preserving section boundaries and cancellation. Canonical-path boundary
-checks no longer reopen/validate the entire drive separately for every entry.
+스냅샷은 임시이며, 이름을 즉시 그릴 수 있지만 `status == Ready`는 여전히 새로운 스캔이 필요합니다. `activate()`는 로딩 중에 항목을 열 수 없습니다. 새로운 스캔은 행 차이를 사용하여 삭제, 교체, 크기, 레지던스 및 순서를 조정하고, 선택/스크롤 계약을 보존합니다. `snapshotRestored()`는 그 첫 번째 임시 출판물을 식별합니다. 누락되었거나 형식이 상이 아닌 캐시가 정상 스캔으로 되돌아가게 됩니다.
 
-## Hash and preview cache
+네이티브 파일/디렉토리 알림은 100 밀리초 동안 병합됩니다. 최대 64 개의 감시 핸들이 현재 뷰와 동기화 카탈로그를 덮습니다. A 10초 대체 경로 커버리지 워처 한도와 사용 불가능한 네트워크 파일 시스템 알림을 대체하며, 이전의 초당 전체 스캔을 대체합니다. 폴더 감시는 준비 완료 전에 설치되며, 개별 감시는 프레임 사이에 8 번씩 설치되어 큰 차단 GUI 작업으로 절대로 수행되지 않습니다. 명시적 새로고침과 다운로드 완료는 즉시 조정됩니다. 큰 로컬 디렉터리는 사용 가능한 CPU 코어에 걸쳐 메타데이터 검사 작업을 분산시키며 (하드웨어 스레드 수까지 256 엔트리에 대한 작업자 하나당); 작은 폴더는 스레드 시작 오버헤드를 피합니다. 이것은 병렬 전체 파일 읽기를 생성하지 않습니다.
 
-Register `PreviewProvider` as `society-preview` in the QML engine. Render the model's
-`fileThumbnailUrl` or Dashboard's `thumbnailSource`; keep `fileUrl`/`filePreviewUrl`
-and Dashboard's existing `previewSource` for original/open and older consumer
-contracts. Each cache URL binds the absolute canonical path, byte size,
-high-resolution modification time and metadata-change time. Symlinks, missing files
-and unsupported suffixes receive no thumbnail URL.
+대시보드 파일, 발행 및 생성 기록 스캔은 C++ 선물을 사용하여 동시에 실행되며, 섹션 경계와 취소를 유지합니다. 정규 경로 경계 검사는 이제 각 항목마다 전체 드라이브를 별도로 다시 열거나 검증하지 않습니다.
 
-Only requested images are decoded. The GUI adapter uses a dedicated standard C++23
-worker queue (available CPU count, capped at 8 desktop / 2 mobile to bound decoder
-memory). Cancellation skips queued work. No global Qt or synchronization pool is
-resized. Source files are never rewritten and placeholders are never downloaded just
-to paint a tile; existing downloaded remote previews can use the same cache.
+<a id="hash-and-preview-cache"></a>
 
-Cache misses generate a maximum 512-pixel lossless PNG and compute the source SHA-256.
-The manifest and PNG are atomically written under `CacheLocation/society/previews-v1`
-with owner-only permissions. Concurrent requests for the same revision are coalesced
-by striped locks. Hits decode the small cached PNG without rehashing the original.
-An edit during processing discards the result; missing/corrupt previews rebuild.
-This hash is a rendering-cache digest, not a replacement for authenticated sync hashes.
+## 해시 및 미리보기 캐시
 
-The preview store is bounded to approximately 512 MiB, pruning oldest written entries
-every 32 generated previews (there can be one batch of temporary overshoot). Sources
-over 256 MiB or 32 megapixels are not decoded by this lightweight preview path. They
-remain openable originals and use a placeholder in this path. Caches are rebuildable,
-not a backup, not shared/synced, and removable by the OS. No credentials are stored.
+`PreviewProvider` 를 `society-preview` 엔진의 QML 로 등록합니다. 모델의 `fileThumbnailUrl` 또는 대시보드의 `thumbnailSource` 를 렌더링하고, 원본/열린 및 이전 소비자 계약에 대한 `fileUrl` / `filePreviewUrl` 와 대시보드의 기존 `previewSource` 를 유지합니다. 각 캐시 URL 는 절대 정통 경로, 바이트 크기, 고해상도 수정 시간 및 메타데이터 변경 시간을 바인딩합니다. 심볼릭 링크, 누락된 파일 및 지원되지 않는 접미사는 썸네일 URL 를 받지 않습니다.
 
-`IISOCIETY_FILE_CACHE_DIRECTORY` can point to an absolute application/test cache root;
-otherwise the OS application CacheLocation is used. Tests put their fixtures/caches
-under `build/`. `iiSocietyContainerLoadingBenchmark [folder]` measures first rows and
-fully reconciled Ready for three model instances; without a folder it creates a
-2,000-file fixture in the current build directory. Cache and OS page-cache warmth
-must be reported separately when comparing timings.
+요청된 이미지만 디코딩됩니다. GUI 어댑터는 전용 표준 C++23 워커 큐를 사용합니다(사용 가능한 CPU 카운트이며, 8 데스크톱 / 2 모바일에서 바인딩된 디코더 메모리로 제한됩니다). 취소는 대기 중인 작업을 건너뜁니다. 글로벌 Qt 또는 동기화 풀은 크기가 조정되지 않았습니다. 소스 파일은 절대 다시 작성되지 않으며, 플레이스홀더도 타일을 그리기 위해 다운로드되지 않습니다; 기존에 다운로드된 원격 미리보기는 동일한 캐시를 사용할 수 있습니다.
 
-Regression targets: `preview_cache`, `shared_storage`, `dashboard`. They cover
-persistent hits, SHA-256, overwrite/delete invalidation, concurrent requests, corrupted
-previews, async completion/cancellation, snapshot reconciliation, and watcher refresh.
-The filesystem-backed model-catalog readiness assertion allows up to 30 seconds so
-external-volume contention does not turn a slow scan into a misleading five-second
-test failure; it still checks asynchronous completion before validating the rows.
-The Dashboard section-isolation regression repeatedly scans all three populated
-sections, verifies row ownership and size labels, and checks that internal scan
-fields do not escape into published model data. A heap-instrumented build may be
-configured under `build/address-check` to investigate concurrency failures without
-replacing the normal installed SDK.
+캐시 누락은 최대 512픽셀의 손실 없는 PNG 를 생성하고 소스 SHA-256 를 계산합니다. 마니페스트와 PNG 는 소유자 전용 권한으로 `CacheLocation/society/previews-v1` 하에서 원자적으로 작성됩니다. 동일한 리비전에 대한 동시 요청은 스트라이프 잠금에 의해 병합됩니다. 히트는 원래의 재해시를 다시 하지 않고 작은 캐시된 PNG 를 디코딩합니다. 처리 중 편집은 결과를 폐기하며, 누락된/부패한 미리보기는 재구성됩니다. 이 해시는 인증된 동기화 해시를 대체하는 렌더링 캐시 소스입니다.
 
-Always rebuild both the SDK and its test consumers before running cached test
-executables, especially after a GUI class layout changes:
+프리뷰 스토어는 한계가 설정된부터 약 512, MiB까지이며, 생성된 32의 미리보기마다 가장 오래된 작성된 항목을 가리핑합니다(임시 오버슈트가 한 번 있을 수 있습니다). 256, MiB 또는 32 메가픽셀을 초과하는 소스는 이 경량 미리보기 경로에 의해 디코딩되지 않습니다. 그들은 여전히 열 수 있는 원본이며 이 경로에서 자리 표시자를 사용합니다. 캐시는 재조립이 가능하며, 백업이 아니고, 공유·동기화되지 않으며, OS에 의해 제거됩니다. 자격 증명이 저장되지 않았습니다.
+
+`IISOCIETY_FILE_CACHE_DIRECTORY`는 절대 애플리케이션/테스트 캐시 루트를 가리키며, 그렇지 않으면 OS 애플리케이션 CacheLocation가 사용됩니다. 테스트는 그들의 픽스처 /caches를 `build/` 아래에 배치합니다. `iiSocietyContainerLoadingBenchmark [folder]`는 첫 번째 행을 측정하고 완전히 조정된 3 모델 인스턴스에 대한 준비가 완료됩니다; 폴더가 없으면 현재 빌드 디렉터리에 2,000-file 픽스처가 생성됩니다. 캐시와 OS 페이지 캐시 온열은 타이밍을 비교할 때 별도로 보고해야 합니다.
+
+회귀 대상: `preview_cache`, `shared_storage`, `dashboard`. 그들은 영구 히트, SHA-256, 덮어쓰기/무효화, 동시 요청, 손상된 미리보기, 비동기 완료/취소, 스냅샷 조정, 및 감시자 새로고침을 다룹니다. 파일 시스템 기반 모델 카탈로그 준비성 주장은 최대 30 초를 허용하여 외부 볼륨 경쟁이 느린 스캔을 오인하는 5초 테스트 실패로 만들지 않도록 합니다; 그것은 여전히 행을 유효성 검사하기 전에 비동기 완료를 확인합니다. 대시보드 섹션 격리 회귀 는 반복적으로 모든 3 채워진 섹션을 스캔하여 행 소유권과 크기 라벨을 확인하며 내부 스캔 필드가 게시된 모델 데이터로 새어나가는지 확인합니다. 힙 계측 빌드는 `build/address-check` 하에 구성될 수 있어 정상 설치된 SDK 를 교체하지 않고 동시성 실패를 조사할 수 있습니다.
+
+특히 GUI 클래스 레이아웃이 변경된 후에는 캐시된 테스트 실행 파일을 실행하기 전에 SDK와 해당 테스트 소비자를 모두 재구축하십시오.
 
 ```sh
 cmake --build build --parallel 6 --target iiSocietyContainerPreviewCacheTests iiSocietyContainerDashboardTests iiSocietyContainerSharedStorageTests
