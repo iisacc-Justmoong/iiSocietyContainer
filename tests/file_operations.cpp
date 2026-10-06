@@ -1,3 +1,4 @@
+#include "SymbolicLink.h"
 #include "FileOperations.h"
 #include "StorageMap.h"
 #include <QDir>
@@ -10,6 +11,14 @@ using namespace iiSocietyContainer;
 class FileOperationsTests : public QObject {
     Q_OBJECT
 private slots:
+    void ordinaryDirectoryWithoutDriveTerminates() {
+        QTemporaryDir directory(QString(SOCIETY_TEST_DIRECTORY) + "/ordinary-root-XXXXXX");
+        QVERIFY(directory.isValid());
+        QVERIFY(!FileOperations::containingDrive(directory.path()));
+        QDir root(directory.path());
+        while (!root.isRoot()) QVERIFY(root.cdUp());
+        QVERIFY(!FileOperations::containingDrive(root.absolutePath()));
+    }
     void createsDirectoriesAndMovesCompleteTrees() {
         QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/tree-manage-XXXXXX"); QVERIFY(temp.isValid());
         QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/tree-outside-XXXXXX"); QVERIFY(outside.isValid());
@@ -82,7 +91,7 @@ private slots:
         QVERIFY(QDir().mkpath(temp.filePath("Models/partial/sub")));
         QFile keep(outside.filePath("keep.txt")); QVERIFY(keep.open(QIODevice::WriteOnly)); keep.write("keep"); keep.close();
         QVERIFY(QFile::copy(keep.fileName(), temp.filePath("Models/partial/sub/present.bin")));
-        QVERIFY(QFile::link(outside.path(), temp.filePath("Models/partial/sub/link")));
+        QVERIFY(createTestSymbolicLink(outside.path(), temp.filePath("Models/partial/sub/link")));
         QVERIFY(map.publish({QJsonObject{{"path", "models/partial/missing.bin"}, {"kind", "file"}, {"resident", false}}}));
         FileOperations ops(*drive);
         const auto moved = ops.perform(FileOperations::Action::Trash, temp.filePath("Models/partial"));
@@ -136,9 +145,9 @@ private slots:
         const auto pasted = ops.perform(FileOperations::Action::Copy, external.fileName(), temp.filePath("Files/Documents"));
         QVERIFY2(pasted, qPrintable(pasted.error)); QVERIFY(QFileInfo::exists(external.fileName()));
         QVERIFY(!ops.perform(FileOperations::Action::Remove, f.fileName())); // Only Deleted allows permanent removal.
-        QVERIFY(QFile::link(outside.path(), temp.filePath("Models/link")));
+        QVERIFY(createTestSymbolicLink(outside.path(), temp.filePath("Models/link")));
         QVERIFY(!ops.perform(FileOperations::Action::Trash, temp.filePath("Models/link")));
-        QVERIFY(QFile::link(outside.path(), temp.filePath("Deleted/link")));
+        QVERIFY(createTestSymbolicLink(outside.path(), temp.filePath("Deleted/link")));
         QVERIFY(!ops.perform(FileOperations::Action::Copy, f.fileName(), temp.filePath("Deleted/link")));
         QVERIFY(QFileInfo::exists(f.fileName())); QVERIFY(QFileInfo::exists(temp.filePath("Files/Documents")));
     }

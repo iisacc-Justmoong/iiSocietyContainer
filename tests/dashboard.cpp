@@ -1,3 +1,4 @@
+#include "SymbolicLink.h"
 #include <iiSocietyContainer/DashboardFiles.h>
 #include <iiSocietyContainer/SocietyApplication.h>
 #include <SocietyDrive.h>
@@ -65,7 +66,7 @@ private slots:
         QVERIFY(image.save(root.filePath("Generation History/.hidden.png")));
         QVERIFY(QDir().mkpath(root.filePath("Generation History/legacy")));
         QVERIFY(image.save(root.filePath("Generation History/legacy/nested.png")));
-        QVERIFY(QFile::link(root.filePath("Files/separate.png"), root.filePath("Generation History/link.png")));
+        QVERIFY(createTestSymbolicLink(root.filePath("Files/separate.png"), root.filePath("Generation History/link.png")));
         QFile metadata(root.filePath("Generation History/request.json"));
         QVERIFY(metadata.open(QIODevice::WriteOnly)); metadata.write("{}"); metadata.close();
         DashboardFiles model; model.setContainerPath(root.path());

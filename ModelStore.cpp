@@ -126,6 +126,8 @@ QList<ModelEntry> ModelStore::scanDirectory(const QString &modelsDirectory, QStr
             for (const auto &path : ModelClassifier::companionFiles(child.absoluteFilePath())) companions.insert(path);
         for (const auto &child : children) {
             if (cancelled && cancelled->load()) return {};
+            // Dot-prefixed metadata is not marked Hidden on Windows.
+            if (child.fileName().startsWith('.')) continue;
             const auto path = child.canonicalFilePath();
             if (child.isSymLink() || child.isJunction() || !path.startsWith(base + '/') || companions.contains(path)) continue;
             const bool categoryRoot = directory.path() == base && modelTypeFromName(child.fileName()).has_value();

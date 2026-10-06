@@ -4,6 +4,12 @@
 #include <functional>
 #include <limits>
 #include <string>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace iiSocietyContainer {
 namespace {
@@ -21,9 +27,16 @@ bool validRelative(const fs::path& relative)
     const auto& text = relative.native();
     using Char = fs::path::value_type;
     if (relative.is_absolute() || relative.has_root_name() || relative.has_root_directory()
-        || text.find(Char{}) != text.npos || text.find(Char('\\')) != text.npos
+        || text.find(Char{}) != text.npos
+#ifndef _WIN32
+        || text.find(Char('\\')) != text.npos
+#endif
         || text.find(Char(':')) != text.npos
-        || text.find(std::basic_string<Char>(2, Char('/'))) != text.npos) return false;
+        || text.find(std::basic_string<Char>(2, Char('/'))) != text.npos
+#ifdef _WIN32
+        || text.find(std::basic_string<Char>(2, Char('\\'))) != text.npos
+#endif
+        ) return false;
     for (const auto& component : relative)
         if (component.empty() || component == "." || component == "..") return false;
     return true;
@@ -38,6 +51,12 @@ FileTree::EntryResult metadata(const fs::path& root, const fs::path& relative)
     // Pin the root and inspect every descendant before resolving its native
     // spelling. APFS may return a decomposed Unicode filename for a composed input.
     auto inspect = [&](bool rootEntry) {
+#ifdef _WIN32
+        const auto attributes = GetFileAttributesW(current.c_str());
+        if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+            error = std::make_error_code(std::errc::too_many_symbolic_link_levels); return false;
+        }
+#endif
         const auto status = fs::symlink_status(current, error);
         if (error) return false;
         if (fs::is_symlink(status)) { error = std::make_error_code(std::errc::too_many_symbolic_link_levels); return false; }

@@ -16,7 +16,7 @@ namespace iiSocietyContainer {
 class IISOCIETY_FILETREE_EXPORT FileTree final {
 public:
     enum class Kind { File, Directory };
-    struct Entry {
+    struct IISOCIETY_FILETREE_EXPORT Entry {
         std::filesystem::path path;
         std::filesystem::path relativePath;
         std::filesystem::path parentPath;

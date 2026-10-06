@@ -1,6 +1,7 @@
 #include "PreviewCache.h"
 #include <StorageDirectoryModel.h>
 #include <QCryptographicHash>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QImageReader>
@@ -46,7 +47,12 @@ public:
             }
         });
     }
-    ~Workers() { { std::lock_guard lock(mutex); stopping = true; } ready.notify_all(); }
+    ~Workers() { shutdown(); }
+    void shutdown() {
+        { std::lock_guard lock(mutex); stopping = true; }
+        ready.notify_all();
+        threads.clear(); // Join while Qt/CRT DLLs are still loaded.
+    }
     void submit(std::function<void()> work) {
         { std::lock_guard lock(mutex); queue.push_back(std::move(work)); } ready.notify_one();
     }
@@ -58,7 +64,15 @@ private:
     // Destroy/join before the queue and its synchronization primitives.
     std::vector<std::jthread> threads;
 };
-Workers &workers() { static Workers pool; return pool; }
+Workers &workers() {
+    static Workers pool;
+    static const bool registered = [] {
+        qAddPostRoutine([] { pool.shutdown(); });
+        return true;
+    }();
+    (void)registered;
+    return pool;
+}
 class Response final : public QQuickImageResponse {
 public:
     Response(std::shared_ptr<PreviewCache> cache, QString id, QSize size) {

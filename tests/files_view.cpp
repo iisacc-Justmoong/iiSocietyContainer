@@ -1,3 +1,4 @@
+#include "SymbolicLink.h"
 #include <FilesView.h>
 #include <QDir>
 #include <QFile>
@@ -107,7 +108,7 @@ private slots:
         QFile file(temporary.filePath("Files/Documents"));
         QVERIFY(file.open(QIODevice::WriteOnly)); file.write("ordinary file"); file.close();
 #ifndef Q_OS_WIN
-        QVERIFY(QFile::link(temporary.filePath("Models"), temporary.filePath("Files/Audios")));
+        QVERIFY(createTestSymbolicLink(temporary.filePath("Models"), temporary.filePath("Files/Audios")));
 #endif
         QFile manifest(temporary.filePath(".society-drive.json"));
         QVERIFY(manifest.open(QIODevice::ReadOnly));
@@ -191,7 +192,7 @@ private slots:
         auto view = FilesView::open(temporary.path());
         QVERIFY(view);
 #ifndef Q_OS_WIN
-        QVERIFY(QFile::link(temporary.filePath("Models"), temporary.filePath("Files/private-link")));
+        QVERIFY(createTestSymbolicLink(temporary.filePath("Models"), temporary.filePath("Files/private-link")));
         QVERIFY(view->resolve("private-link", true).isEmpty());
         QVERIFY(view->resolve("private-link/model", true).isEmpty());
         QCOMPARE(view->entries().size(), 0);

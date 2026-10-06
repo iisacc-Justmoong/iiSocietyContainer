@@ -46,7 +46,7 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
         while (!cancel->load() && iterator.hasNext()) {
             iterator.next();
             const auto file = iterator.fileInfo();
-            if (file.isSymLink()) continue;
+            if (file.isSymLink() || file.fileName().startsWith('.')) continue;
             // Recheck SDK boundaries in case an entry changed during the walk.
             const auto canonical = file.canonicalFilePath();
             if (!canonical.startsWith(sectionRoot + '/')) continue;

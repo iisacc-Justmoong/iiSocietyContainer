@@ -1,9 +1,23 @@
 #include "DirectoryStorage.h"
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace iiSocietyContainer {
 namespace {
 bool directDirectory(const std::filesystem::path& path)
 {
+#ifdef _WIN32
+    auto prefix = path.root_path();
+    for (const auto& part : path.relative_path()) {
+        prefix /= part;
+        const auto attributes = GetFileAttributesW(prefix.c_str());
+        if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) return false;
+    }
+#endif
     std::error_code error;
     const auto status = std::filesystem::symlink_status(path, error);
     if (error || !std::filesystem::is_directory(status)) return false;

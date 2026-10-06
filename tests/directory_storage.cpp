@@ -1,16 +1,18 @@
 #include "DirectoryStorage.h"
+#include "native_symlink.h"
 #include <fstream>
 #include <iostream>
+#include <chrono>
 
 int main(int argc, char** argv)
 {
     namespace fs = std::filesystem;
     using iiSocietyContainer::DirectoryStorage;
     if (argc != 2) return 1;
-    const auto root = fs::canonical(argv[1]) / "directory-storage-native-fixture";
+    const auto root = fs::canonical(argv[1]) / ("directory-storage-native-fixture-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     if (fs::exists(root)) return 2;
     fs::create_directory(root);
-    struct Cleanup { fs::path path; ~Cleanup() { fs::remove_all(path); } } cleanup{root};
+    struct Cleanup { fs::path path; ~Cleanup() { std::error_code error; fs::remove_all(path, error); } } cleanup{root};
     const auto check = [](bool valid) { if (!valid) throw std::runtime_error("Directory storage assertion failed"); };
     try {
         check(!DirectoryStorage::prepare("relative"));
@@ -27,8 +29,9 @@ int main(int argc, char** argv)
         std::ofstream(root / "conflict/Society") << "preserve";
         check(!DirectoryStorage::prepare(root / "conflict"));
         fs::create_directory(root / "redirect");
-        fs::create_directory_symlink(root / "conflict", root / "redirect/Society");
+        test_support::create_symlink(root / "conflict", root / "redirect/Society", true);
         check(!DirectoryStorage::prepare(root / "redirect"));
+        test_support::remove_symlink(root / "redirect/Society", true);
         fs::create_directory(root / "legacy");
         fs::create_directory(root / "legacy/bands");
         std::ofstream(root / "legacy/Info.plist") << "disk";

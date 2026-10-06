@@ -1,3 +1,4 @@
+#include "SymbolicLink.h"
 #include <SocietyDrive.h>
 
 #include <QtCore/QDir>
@@ -242,6 +243,7 @@ private slots:
         const auto data = QJsonDocument::fromJson(manifest.readAll()).object();
         QCOMPARE(data.value("localIdentifier").toString(), original->identifier());
         QVERIFY(data.value("replicaReady").toBool());
+        manifest.close();
         const auto repeatedAdoption = SocietyDrive::adoptReplicaIdentity(workspace->path(), host, host);
         QVERIFY(repeatedAdoption); QVERIFY(!repeatedAdoption->isReady());
         QVERIFY(SocietyDrive::completeReplica(workspace->path(), host));
@@ -300,7 +302,7 @@ private slots:
         QVERIFY(QFileInfo::exists(QDir(files).filePath(".society-drive.json")));
 #ifdef Q_OS_UNIX
         const auto alias = workspace->filePath("alias");
-        QVERIFY(QFile::link(files, alias));
+        QVERIFY(createTestSymbolicLink(files, alias));
         QVERIFY(!SocietyDrive::open(alias, &error));
 #endif
         QVERIFY(drive->isValid());
@@ -327,7 +329,7 @@ private slots:
         QVERIFY(!SocietyDrive::create(child, &error));
         QVERIFY(QDir(child).isEmpty());
         const auto alias = workspace->filePath("replica-alias");
-        QVERIFY(QFile::link(replica, alias));
+        QVERIFY(createTestSymbolicLink(replica, alias));
         QVERIFY(!SocietyDrive::open(alias, &error));
         const auto sibling = workspace->filePath("Library/CloudStorage-backup");
         QVERIFY(QDir().mkdir(sibling));
@@ -376,7 +378,7 @@ private slots:
     {
 #ifdef Q_OS_UNIX
         QVERIFY(QDir().mkdir(workspace->filePath("Files")));
-        QVERIFY(QFile::link(workspace->filePath("Files"), workspace->filePath("Models")));
+        QVERIFY(createTestSymbolicLink(workspace->filePath("Files"), workspace->filePath("Models")));
         QString error;
         QVERIFY(!SocietyDrive::create(workspace->path(), &error));
         QVERIFY(!error.isEmpty());

@@ -191,7 +191,8 @@ QJsonObject call(const QString &directory, const QString &action, const QString 
     }
     if (socket.state() != QLocalSocket::ConnectedState) return failure("Society Files did not start.");
     socket.write(QJsonDocument(QJsonObject{{"action", action}, {"argument", argument}}).toJson(QJsonDocument::Compact) + '\n');
-    if (socket.bytesToWrite() && !socket.waitForBytesWritten(5000)) return failure("Society Files did not accept the request.");
+    if (socket.bytesToWrite() && !socket.waitForBytesWritten(5000) && !socket.bytesAvailable())
+        return failure("Society Files did not accept the request.");
     QByteArray output;
     QElapsedTimer elapsed; elapsed.start();
     while (!output.endsWith('\n') && elapsed.elapsed() < 20000) {

@@ -35,10 +35,10 @@ with tempfile.TemporaryDirectory(prefix='mount-service-', dir=build) as temporar
     try:
         registered = call('register', str(container))
         identifier = registered['identifier']
-        assert registered['systemPath'] == str(container / 'Files')
+        assert Path(registered['systemPath']) == container / 'Files'
         assert registered['enabled']
         assert call('register', str(container))['identifier'] == identifier
-        assert call('path', identifier)['systemPath'] == str(container / 'Files')
+        assert Path(call('path', identifier)['systemPath']) == container / 'Files'
         assert len(call('list')['drives']) == 1
         call('register', str(temporary / 'missing'), success=False)
         process.terminate()
@@ -50,7 +50,8 @@ with tempfile.TemporaryDirectory(prefix='mount-service-', dir=build) as temporar
         subprocess.run([tool, 'create', str(container)], check=True, capture_output=True)
         call('refresh', identifier, success=False)
         assert call('unregister', identifier)['enabled'] is False
-        assert call('list')['drives'] == []
+        for _ in range(20):
+            assert call('list')['drives'] == []
         assert (container / 'Models/private.bin').read_bytes() == b'private'
     finally:
         process.terminate()

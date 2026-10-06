@@ -90,7 +90,20 @@ bool copyTree(const QString &source, const QString &destination, QString *error)
     return true;
 }
 bool removeTree(const QString &path) {
+#ifdef Q_OS_WIN
+    const QFileInfo info(path);
+    if (info.isDir()) {
+        if (info.isSymLink() || info.isJunction())
+            return RemoveDirectoryW(reinterpret_cast<LPCWSTR>(path.utf16())) != FALSE;
+        const auto children = QDir(path).entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
+        for (const auto &child : children)
+            if (!removeTree(child.absoluteFilePath())) return false;
+        return QDir().rmdir(path);
+    }
+    return QFile::remove(path);
+#else
     return QFileInfo(path).isDir() && !QFileInfo(path).isSymLink() ? QDir(path).removeRecursively() : QFile::remove(path);
+#endif
 }
 bool moveWithoutCopy(const QString &source, const QString &destination) {
     // QFile/QDir rename may fall back to copying file contents. Trash must be a
@@ -113,9 +126,11 @@ std::optional<SocietyDrive> FileOperations::containingDrive(const QString &path)
     if (!QFileInfo(path).isAbsolute()) return {};
     if (const auto root = DiskImage::containerRoot(path.toStdString())) return SocietyDrive::open(QString::fromStdString(root->string()));
     QString parent = QDir::cleanPath(path);
-    while (parent != QDir::rootPath()) {
+    for (;;) {
         if (QFileInfo::exists(QDir(parent).filePath(".society-drive.json"))) return SocietyDrive::open(parent);
-        parent = QFileInfo(parent).absolutePath();
+        const auto ancestor = QFileInfo(parent).absolutePath();
+        if (ancestor == parent) break; // Every Windows volume has its own root.
+        parent = ancestor;
     }
     return {};
 }

@@ -1,3 +1,4 @@
+#include "SymbolicLink.h"
 #include <SharedStorage.h>
 #include <StorageMap.h>
 #include <StorageDirectoryModel.h>
@@ -92,7 +93,7 @@ private slots:
         write(fixture.filePath("Models/Checkpoint/package/model.safetensors"), "package weights");
         QVERIFY(QDir().mkpath(fixture.filePath("Models/.society-runtime")));
         write(fixture.filePath("Models/.society-runtime/hidden.safetensors"), "hidden");
-        QVERIFY(QFile::link(fixture.filePath("Deleted/old.safetensors"), fixture.filePath("Models/Checkpoint/link.safetensors")));
+        QVERIFY(createTestSymbolicLink(fixture.filePath("Deleted/old.safetensors"), fixture.filePath("Models/Checkpoint/link.safetensors")));
         const auto models = storage->models(); QCOMPARE(models.size(), 2);
         QCOMPARE(models[0].id, "Checkpoint/new.safetensors"); QVERIFY(models[0].available);
         QCOMPARE(models[0].bytes, 11);
@@ -524,8 +525,8 @@ private slots:
         write(fixture.filePath("Models/regular"), "file");
         QVERIFY(storage->filePath(StoreSection::Models, "regular/child").isEmpty());
 #ifdef Q_OS_UNIX
-        QVERIFY(QFile::link(fixture.filePath("Files"), fixture.filePath("Models/redirect")));
-        QVERIFY(QFile::link(fixture.filePath("not-present"), fixture.filePath("Models/dangling")));
+        QVERIFY(createTestSymbolicLink(fixture.filePath("Files"), fixture.filePath("Models/redirect")));
+        QVERIFY(createTestSymbolicLink(fixture.filePath("not-present"), fixture.filePath("Models/dangling")));
         for (const auto &path : {"redirect", "redirect/escape", "dangling"})
             QVERIFY(storage->filePath(StoreSection::Models, path).isEmpty());
         QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 0);
@@ -543,7 +544,7 @@ private slots:
 #ifdef Q_OS_UNIX
         const auto moved = fixture.filePath("Moved");
         QVERIFY(QDir().rename(root, moved));
-        QVERIFY(QFile::link(moved, root));
+        QVERIFY(createTestSymbolicLink(moved, root));
         QVERIFY(!storage->drive().isValid());
         QVERIFY(storage->filePath(StoreSection::Files, "file").isEmpty());
         QVERIFY(QFile::remove(root));
@@ -627,7 +628,7 @@ private slots:
         QCOMPARE(client->ensureDirectory(StoreSection::AssetLibrary, "project"),
                  fixture.filePath("Asset Library/project"));
         QVERIFY(client->ensureDirectory(StoreSection::Models, "../Files/escape").isEmpty());
-        QVERIFY(QFile::link(fixture.filePath("Files"), fixture.filePath("Asset Library/redirect")));
+        QVERIFY(createTestSymbolicLink(fixture.filePath("Files"), fixture.filePath("Asset Library/redirect")));
         QVERIFY(client->ensureDirectory(StoreSection::AssetLibrary, "redirect/job").isEmpty());
         QCOMPARE(QDir(fixture.filePath("Files")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size(), 0);
     }

@@ -1,3 +1,4 @@
+#include "SymbolicLink.h"
 #include "ModelStore.h"
 #include "SharedStorage.h"
 
@@ -99,7 +100,7 @@ private slots:
         QCOMPARE(ModelClassifier::metadata(fixture.filePath("language.gguf")).value("general.architecture").toString(), QString("llama"));
         QVERIFY(write(fixture.filePath("invalid.safetensors"), QByteArray::fromHex("ffffffffffffffff")));
         QVERIFY(ModelClassifier::metadata(fixture.filePath("invalid.safetensors")).isEmpty());
-        QVERIFY(QFile::link(path, fixture.filePath("linked.safetensors")));
+        QVERIFY(createTestSymbolicLink(path, fixture.filePath("linked.safetensors")));
         QVERIFY(ModelClassifier::metadata(fixture.filePath("linked.safetensors")).isEmpty());
     }
 
@@ -513,14 +514,14 @@ private slots:
         QVERIFY(store->place("../Files/outside.safetensors", {}, &error).isEmpty());
         QVERIFY(store->place(fixture.filePath("Files/outside.safetensors"), {}, &error).isEmpty());
         QVERIFY(store->place("LoRA", ModelType::Checkpoint, &error).isEmpty());
-        QVERIFY(QFile::link(fixture.filePath("Files/outside.safetensors"), fixture.filePath("Models/link.safetensors")));
+        QVERIFY(createTestSymbolicLink(fixture.filePath("Files/outside.safetensors"), fixture.filePath("Models/link.safetensors")));
         QVERIFY(store->place("link.safetensors", {}, &error).isEmpty());
         QVERIFY(QDir().rmdir(fixture.filePath("Models/LoRA")));
-        QVERIFY(QFile::link(fixture.filePath("Files"), fixture.filePath("Models/LoRA")));
+        QVERIFY(createTestSymbolicLink(fixture.filePath("Files"), fixture.filePath("Models/LoRA")));
         QVERIFY(!store->ensureLayout(&error));
         QVERIFY(!store->organize().errors.isEmpty());
         QCOMPARE(read(path), bytes);
-        QVERIFY(QFile::remove(fixture.filePath("Models/LoRA")));
+        QVERIFY(removeTestSymbolicLink(fixture.filePath("Models/LoRA")));
         QVERIFY(store->ensureLayout(&error));
         QVERIFY(write(fixture.filePath("Models/.model-paths.json"), "not our journal"));
         QVERIFY(store->place(path, {}, &error).isEmpty());

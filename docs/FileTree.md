@@ -91,3 +91,10 @@ if (folder && archive) {
 `file_tree`는 Qt 없는 코어의 계층·부모 관계, Unicode 경로, 파일 크기·수정 시각·권한, 숨김 항목, 빈 디렉터리와 깊이 제한의 구분, 노드 예산, 변경 후 재조회, 링크 탈출·순환·깨진 링크·루트 교체를 검증한다. 기존 `directory_space`, `drive`, `file_operations`는 어댑터와 생성·이동·충돌·드라이브 교체를 검증한다. macOS `disk_image`는 테스트 전용 실제 APFS 이미지의 분리된 Files 볼륨이 논리 트리에 매핑되는지 검증한다. 설치 소비자와 Qt 검색을 비활성화한 `tests/consumer/filetree`는 설치된 공개 헤더·타깃·동적 라이브러리 계약을 검증한다.
 
 `install.sh`는 일반 설치 소비자 테스트 이후 `CMAKE_DISABLE_FIND_PACKAGE_Qt6=TRUE`로 독립 코어 소비자를 구성·빌드·실행한다. 따라서 이후 SDK 설치에서도 Qt 없는 공개 계약을 함께 확인한다.
+
+## Windows
+
+`FileTree::Entry`의 외부 `find` 호출도 DLL 내보내기 계약에 포함된다. `file_tree` 테스트는 별도 실행 파일에서 이 인터페이스를 연결하고 실행한다.
+# Windows 경로
+
+`std::filesystem::path`는 Windows에서 네이티브 역슬래시 구분자를 사용한다. 중첩 디렉터리를 조회할 때 이 구분자를 허용하되 절대 경로, `..`, `.` 구성 요소와 중복 구분자를 거부한다. 네이티브 구분자, 한글 파일 이름, 중첩 파일 이동은 실제 파일 시스템 테스트로 검증한다.

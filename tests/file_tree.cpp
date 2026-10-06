@@ -62,8 +62,14 @@ int main(int argc, char** argv)
         check(!tree.children("z.txt") && !tree.entry("missing"), "type and missing-entry errors");
         for (const auto& path : {fs::path("../root-other/keep.txt"), outside, fs::path("projects/../z.txt"),
                                  fs::path("projects/./empty"), fs::path("projects//empty"),
-                                 fs::path("projects\\empty"), fs::path("scheme:name")})
+                                 fs::path("scheme:name")})
             check(!tree.entry(path), "strict relative boundary");
+#ifdef _WIN32
+        check(bool(tree.entry(fs::path(L"projects\\empty"))), "native Windows child separators");
+        check(!tree.entry(fs::path(L"projects\\..\\z.txt")), "native Windows traversal rejected");
+#else
+        check(!tree.entry(fs::path("projects\\empty")), "foreign separator rejected");
+#endif
         check(!tree.entry(fs::path(std::string("z.txt\0extra", 11))), "null path rejected");
         // Snapshot ownership and fresh calls must distinguish removed/added items.
         fs::remove(root / "z.txt");

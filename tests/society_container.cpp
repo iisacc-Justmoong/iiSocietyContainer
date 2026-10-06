@@ -1,3 +1,4 @@
+#include "SymbolicLink.h"
 #include <src/Store/StoreSection.h>
 #include <iiSocietyContainer.h>
 
@@ -171,10 +172,10 @@ private slots:
         const QString inwardAlias = workspace->filePath(QStringLiteral("inward-alias"));
         const QString outwardAlias = root + QStringLiteral("/outward-alias");
         const QString brokenAlias = root + QStringLiteral("/broken-alias");
-        QVERIFY(QFile::link(root, rootAlias));
-        QVERIFY(QFile::link(root + QStringLiteral("/assets/note.txt"), inwardAlias));
-        QVERIFY(QFile::link(sibling + QStringLiteral("/child"), outwardAlias));
-        QVERIFY(QFile::link(root + QStringLiteral("/missing"), brokenAlias));
+        QVERIFY(createTestSymbolicLink(root, rootAlias));
+        QVERIFY(createTestSymbolicLink(root + QStringLiteral("/assets/note.txt"), inwardAlias));
+        QVERIFY(createTestSymbolicLink(sibling + QStringLiteral("/child"), outwardAlias));
+        QVERIFY(createTestSymbolicLink(root + QStringLiteral("/missing"), brokenAlias));
 
         const SocietyContainer container(rootAlias);
         QVERIFY(container.isValid());
@@ -187,7 +188,7 @@ private slots:
         QVERIFY(!SocietyContainer(brokenAlias).isValid());
 
         QVERIFY(QFile::remove(rootAlias));
-        QVERIFY(QFile::link(sibling, rootAlias));
+        QVERIFY(createTestSymbolicLink(sibling, rootAlias));
         QVERIFY(container.isValid());
         QCOMPARE(container.classifyPath(rootAlias), PathKind::Outside);
         QCOMPARE(container.classifyPath(root), PathKind::Root);
@@ -208,7 +209,7 @@ private slots:
         QVERIFY(!container.hasSection(StoreSection::Files));
 
 #ifdef Q_OS_UNIX
-        QVERIFY(QFile::link(sibling, root));
+        QVERIFY(createTestSymbolicLink(sibling, root));
         QVERIFY(!container.isValid());
         QVERIFY(!container.errorString().isEmpty());
         QCOMPARE(container.classifyPath(root), PathKind::Outside);
@@ -301,7 +302,9 @@ private slots:
 
     void supportsFilesystemRoot()
     {
-        const SocietyContainer container(QDir::rootPath());
+        QDir volumeRoot(root);
+        while (!volumeRoot.isRoot()) QVERIFY(volumeRoot.cdUp());
+        const SocietyContainer container(volumeRoot.absolutePath());
         QVERIFY(container.isValid());
         QCOMPARE(container.classifyPath(container.rootPath()), PathKind::Root);
         QCOMPARE(container.classifyPath(root), PathKind::Entry);
