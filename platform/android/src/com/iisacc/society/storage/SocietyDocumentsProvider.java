@@ -1,5 +1,7 @@
 package com.iisacc.society.storage;
 
+import com.iisacc.iifileprovider.FileStorage;
+
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
@@ -42,11 +44,12 @@ public final class SocietyDocumentsProvider extends DocumentsProvider {
     @SuppressWarnings("deprecation") private void watchTree(File directory) {
         FileObserver observer = new FileObserver(directory.getAbsolutePath(), FileObserver.CREATE | FileObserver.DELETE
                 | FileObserver.MOVED_FROM | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE | FileObserver.ATTRIB) {
-            @Override public void onEvent(int event, String path) { changed(); }
+            @Override public void onEvent(int event, String path) { if (path == null || !FileStorage.isControlFile(path)) changed(); }
         };
         observer.startWatching(); observers.add(observer);
         File[] children = directory.listFiles();
         if (children != null) for (File child : children) {
+            if (FileStorage.isControlFile(child.getName())) continue;
             try { DriveStore.checkFile(child); if (child.isDirectory()) watchTree(child); } catch (IOException ignored) { }
         }
     }
@@ -100,7 +103,7 @@ public final class SocietyDocumentsProvider extends DocumentsProvider {
                 File file = store.document(id);
                 if (!file.isFile()) throw new IOException("Cannot open a Society directory as a file");
                 int flags = ParcelFileDescriptor.parseMode(mode);
-                return ParcelFileDescriptor.open(file, flags, new Handler(Looper.getMainLooper()), error -> changed());
+                return FileStorage.openDescriptor(file, flags, new Handler(Looper.getMainLooper()), error -> changed());
             } catch (IOException error) { throw missing(error); }
         }
     }

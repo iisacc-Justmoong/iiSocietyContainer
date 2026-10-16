@@ -15,7 +15,7 @@ class FilesViewTests : public QObject {
 private slots:
     void filesStartEmptyAndStayEmptyAcrossReopenAndReplicaCompletion()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/empty-files-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/empty-files-XXXXXX.societycontainer");
         const auto drive = SocietyDrive::create(temporary.path()); QVERIFY(drive);
         auto view = FilesView::open(temporary.path()); QVERIFY(view);
         QVERIFY(view->entries().isEmpty()); QVERIFY(view->directories().isEmpty());
@@ -34,7 +34,7 @@ private slots:
 
     void formerDefaultNamesAreOrdinaryUserEntries()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/user-files-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/user-files-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(temporary.path()));
         for (const auto &name : {"Documents", "Audios", "3D objects"}) {
             QVERIFY(!FilesView::isProtectedPath(name));
@@ -53,7 +53,7 @@ private slots:
 
     void legacyUpgradeRemovesOnlyEmptyDefaultsOnce()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/legacy-files-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/legacy-files-XXXXXX.societycontainer");
         const auto drive = SocietyDrive::create(temporary.path()); QVERIFY(drive);
         for (const auto &name : {"Documents", "Audios", "3D objects", "Custom"})
             QVERIFY(QDir().mkdir(temporary.filePath("Files/" + QString(name))));
@@ -81,7 +81,7 @@ private slots:
 
     void legacyReplicasDeferCleanupUntilCompletion()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/legacy-files-replica-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/legacy-files-replica-XXXXXX.societycontainer");
         const auto initial = SocietyDrive::create(temporary.path()); QVERIFY(initial);
         const auto host = QUuid::createUuid().toString(QUuid::WithoutBraces);
         QVERIFY(SocietyDrive::adoptReplicaIdentity(temporary.path(), initial->identifier(), host));
@@ -103,7 +103,7 @@ private slots:
 
     void legacyUpgradePreservesFilesAndRedirectedEntries()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/legacy-file-names-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/legacy-file-names-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(temporary.path()));
         QFile file(temporary.filePath("Files/Documents"));
         QVERIFY(file.open(QIODevice::WriteOnly)); file.write("ordinary file"); file.close();
@@ -126,7 +126,7 @@ private slots:
 
     void projectsFilesAndPreservesPrivateSections()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX.societycontainer");
         auto drive = SocietyDrive::create(temporary.path());
         QVERIFY(drive);
         QFile privateFile(temporary.filePath("Models/private.safetensor"));
@@ -166,7 +166,7 @@ private slots:
     void rejectsPaths()
     {
         QFETCH(QString, path);
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(temporary.path()));
         auto view = FilesView::open(temporary.path());
         QVERIFY(view);
@@ -176,7 +176,7 @@ private slots:
     }
     void nestedNamesAndHiddenFiles()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(temporary.path()));
         QVERIFY(QDir().mkpath(temporary.filePath("Files/한글 folder/.hidden")));
         auto view = FilesView::open(temporary.path());
@@ -187,7 +187,7 @@ private slots:
     }
     void rejectsRedirectionAndDriveReplacement()
     {
-        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX");
+        QTemporaryDir temporary(SOCIETY_TEST_DIRECTORY "/files-view-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(temporary.path()));
         auto view = FilesView::open(temporary.path());
         QVERIFY(view);

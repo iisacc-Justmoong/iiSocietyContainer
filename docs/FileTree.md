@@ -1,5 +1,21 @@
 # 컨테이너 파일 트리
 
+## Provider-backed inspection
+
+`FileTree::presentation(relativePath)` returns iiFileProvider's typed file details
+and bounded preview on demand. It verifies a regular resident file, rejects
+control documents and redirects, prepares missing presentation data, and checks
+the source again before returning. Native installed consumers receive
+`iiFileProvider::Native` transitively; Qt remains optional and absent from the
+native FileTree/Maintenance package consumer. Metadata-only `entry`, `children`
+and `snapshot` behavior is unchanged. Rich classification and host transport are
+documented in [FilePresentation.md](FilePresentation.md).
+
+The reserved `.iisacc-temporary.lock` entry is internal coordination metadata.
+It is excluded from listings and snapshots even when hidden files are requested,
+and direct `entry()` lookup is rejected. Ordinary user hidden files remain
+available through the existing hidden-file option.
+
 0.15.0은 파일 존재 여부와 경로 분류에 더해, 실제 파일 시스템의 항목 메타데이터, 직계 자식 목록, 재귀 트리를 제공한다. 파일 본문을 읽거나 다운로드하지 않으며, 각 호출은 현재 로컬 파일 시스템을 다시 조회한다. 호출은 차단형이므로 큰 트리는 워커 스레드에서 조회한다.
 
 ## 조회 API

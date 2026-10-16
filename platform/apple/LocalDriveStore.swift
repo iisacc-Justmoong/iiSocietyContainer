@@ -165,6 +165,16 @@ final class LocalDriveStore {
 
     static func validateSourceLocation(_ root: URL, home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) throws {
         let resolved = root.resolvingSymlinksInPath().standardizedFileURL
+        guard resolved.pathExtension == "societycontainer" else {
+            throw DriveStoreError.invalid("Society manages only .societycontainer packages.")
+        }
+        for marker in ["Info.plist", "bands", ".society-disk.plist"] {
+            let item = resolved.appendingPathComponent(marker)
+            var attributes = stat()
+            guard lstat(item.path, &attributes) != 0, errno == ENOENT else {
+                throw DriveStoreError.invalid("Legacy Society disk images are not opened or restored.")
+            }
+        }
 #if os(macOS)
         let cloud = home.appendingPathComponent("Library/CloudStorage").resolvingSymlinksInPath().standardizedFileURL
         guard !resolved.pathComponents.starts(with: cloud.pathComponents) else {
@@ -186,7 +196,7 @@ final class LocalDriveStore {
     }
 
     static func validateName(_ name: String) throws {
-        guard !name.isEmpty, name != ".", name != "..", !name.contains("/"),
+        guard !name.isEmpty, name != ".", name != "..", !IisaccFileProvider.isControlFile(name), !name.contains("/"),
               !name.contains("\0"), name.utf8.count <= 255 else {
             throw DriveStoreError.invalid("Invalid file or folder name.")
         }
@@ -238,11 +248,13 @@ final class LocalDriveStore {
                     throw CocoaError(.fileReadNoSuchFile)
                 }
                 let identity = "\(attributes.st_dev):\(attributes.st_ino):\(attributes.st_birthtimespec.tv_sec):\(attributes.st_birthtimespec.tv_nsec)"
+                let directory = values.isDirectory == true
+                let created = values.creationDate?.timeIntervalSince1970 ?? 0
                 return DriveRecord(id: fixedID ?? "", parent: parent, name: path.isEmpty ? manifest.displayName : url.lastPathComponent,
-                                   path: path, directory: values.isDirectory == true, identity: identity,
-                                   size: Int64(values.fileSize ?? 0), modified: values.contentModificationDate?.timeIntervalSince1970 ?? 0,
-                                   created: values.creationDate?.timeIntervalSince1970 ?? 0,
-                                   generation: "\(attributes.st_mtimespec.tv_sec):\(attributes.st_mtimespec.tv_nsec)")
+                                   path: path, directory: directory, identity: identity,
+                                   size: directory ? 0 : Int64(values.fileSize ?? 0), modified: directory ? created : values.contentModificationDate?.timeIntervalSince1970 ?? 0,
+                                   created: created,
+                                   generation: directory ? "directory" : "\(attributes.st_mtimespec.tv_sec):\(attributes.st_mtimespec.tv_nsec)")
             }
 
             let rootRecord = try record(root, path: "", parent: "root", fixedID: "root")
@@ -262,9 +274,16 @@ final class LocalDriveStore {
                     throw DriveStoreError.invalid("The section cannot be enumerated.")
                 }
                 for case let child as URL in enumerator {
+                    if IisaccFileProvider.isControlFile(child.lastPathComponent) {
+                        // Foundation skips the last enumerated directory. Calling
+                        // this on a control file would hide its visible siblings.
+                        if (try? child.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { enumerator.skipDescendants() }
+                        continue
+                    }
                     let values = try child.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey])
                     if values.isSymbolicLink == true || (values.isDirectory != true && values.isRegularFile != true) {
-                        enumerator.skipDescendants(); continue
+                        if values.isDirectory == true { enumerator.skipDescendants() }
+                        continue
                     }
                     let relative = try Self.relativePath(of: child, under: root)
                     let parentPath = (relative as NSString).deletingLastPathComponent
@@ -302,7 +321,7 @@ final class LocalDriveStore {
             if index.snapshots.last?.anchor != anchor {
                 index.snapshots.append(result)
                 index.snapshots = Array(index.snapshots.suffix(8))
-                try encoder.encode(index).write(to: indexURL, options: .atomic)
+                try IisaccFileProvider.write(encoder.encode(index), to: indexURL, options: .atomic)
             }
             return result
 
@@ -329,7 +348,7 @@ final class LocalDriveStore {
             let item = try self.item(identifier)
             guard !item.directory else { throw DriveStoreError.invalid("A directory has no file content.") }
             let destination = directory.appendingPathComponent(UUID().uuidString)
-            try manager.copyItem(at: sourceURL(item), to: destination)
+            try IisaccFileProvider.copyItem(at: sourceURL(item), to: destination)
             return destination
 
         }
@@ -343,11 +362,11 @@ final class LocalDriveStore {
             let target = try sourceURL(parentItem).appendingPathComponent(name)
             guard !existsIncludingSymlink(target) else { throw DriveStoreError.conflict }
             if directory {
-                try manager.createDirectory(at: target, withIntermediateDirectories: false)
+                try IisaccFileProvider.createDirectory(at: target, withIntermediateDirectories: false)
             } else if let contents = contents {
-                try manager.copyItem(at: contents, to: target)
+                try IisaccFileProvider.copyItem(at: contents, to: target)
             } else {
-                guard manager.createFile(atPath: target.path, contents: Data()) else { throw CocoaError(.fileWriteUnknown) }
+                guard IisaccFileProvider.createFile(atPath: target.path, contents: Data()) else { throw CocoaError(.fileWriteUnknown) }
             }
             guard let created = try snapshot().records.values.first(where: { root.appendingPathComponent($0.path).path == target.path }) else { throw DriveStoreError.missing }
             return created
@@ -412,9 +431,25 @@ final class LocalDriveStore {
     }
 
     private func replaceContents(of destination: URL, with source: URL) throws {
+        // Share the SDK's cross-process lease before exposing a temporary copy.
+        let leaseURL = root.appendingPathComponent(".iisacc-temporary.lock")
+        let descriptor = leaseURL.withUnsafeFileSystemRepresentation {
+            IisaccFileProvider.open($0!, O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, mode_t(0o600))
+        }
+        if descriptor < 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { _ = Darwin.close(descriptor) }
+        var leaseInfo = stat()
+        guard fstat(descriptor, &leaseInfo) == 0,
+              (leaseInfo.st_mode & S_IFMT) == S_IFREG, leaseInfo.st_size == 0 else {
+            throw POSIXError(.EINVAL)
+        }
+        if flock(descriptor, LOCK_SH) != 0 {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { _ = flock(descriptor, LOCK_UN) }
         // Copy on disk, then rename atomically; large files are never loaded into memory.
         let temporary = root.appendingPathComponent(".society-write-" + UUID().uuidString)
-        try manager.copyItem(at: source, to: temporary)
+        try IisaccFileProvider.copyItem(at: source, to: temporary)
         defer { try? manager.removeItem(at: temporary) }
         let result = temporary.withUnsafeFileSystemRepresentation { temporaryPath in
             destination.withUnsafeFileSystemRepresentation { destinationPath in
@@ -422,5 +457,6 @@ final class LocalDriveStore {
             }
         }
         if result != 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        IisaccFileProvider.presentLater(destination)
     }
 }

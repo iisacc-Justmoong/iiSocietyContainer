@@ -1,5 +1,9 @@
+#include <iiFileProviderDevice.h>
 #include "PreviewCache.h"
+#include <iiFileProviderPresentation.h>
 #include <StorageDirectoryModel.h>
+#include <FileOperations.h>
+#include <SharedStorage.h>
 #include <QCryptographicHash>
 #include <QCoreApplication>
 #include <QDir>
@@ -7,7 +11,6 @@
 #include <QImageReader>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
 #include <QStandardPaths>
 #include <QQuickTextureFactory>
 #include <algorithm>
@@ -30,7 +33,7 @@ void prune(const QString &directory) {
     qint64 total = 0;
     for (const auto &file : files) {
         total += file.size();
-        if (total > cacheBudget) QFile::remove(file.absoluteFilePath());
+        if (total > cacheBudget) iiFileProvider::FileDevice::remove(file.absoluteFilePath());
     }
 }
 // Standard C++ executor, independent of Qt's global pool and sync/hash workers.
@@ -51,7 +54,9 @@ public:
     void shutdown() {
         { std::lock_guard lock(mutex); stopping = true; }
         ready.notify_all();
-        threads.clear(); // Join while Qt/CRT DLLs are still loaded.
+        for (auto &thread : threads)
+            if (thread.joinable()) thread.join(); // Join while Qt/CRT DLLs are still loaded.
+        threads.clear();
     }
     void submit(std::function<void()> work) {
         { std::lock_guard lock(mutex); queue.push_back(std::move(work)); } ready.notify_one();
@@ -62,7 +67,9 @@ private:
     std::deque<std::function<void()>> queue;
     bool stopping = false;
     // Destroy/join before the queue and its synchronization primitives.
-    std::vector<std::jthread> threads;
+    // NDK r27 does not expose std::jthread. The pool already owns its stop
+    // condition, so explicit std::thread joining preserves the same lifetime.
+    std::vector<std::thread> threads;
 };
 Workers &workers() {
     static Workers pool;
@@ -104,16 +111,27 @@ unsigned PreviewCache::workerCount() {
 #endif
 }
 PreviewCache::PreviewCache(QString directory)
-    : m_directory(directory.isEmpty() ? QDir(StorageDirectoryModel::cacheDirectory()).filePath("previews-v1") : std::move(directory)) {}
+    : m_directory(std::move(directory)) {}
 PreviewCache::Result PreviewCache::load(const QString &path) const {
     Result result;
+    const auto drive = FileOperations::containingDrive(path);
+    if (!drive) return result;
+    const auto storage = SharedStorage::open(drive->rootPath());
+    if (!storage) return result;
+    const auto cache = StorageDirectoryModel::cacheDirectory(path);
+    if (cache.isEmpty()) return result;
+    const auto directory = m_directory.isEmpty() ? QDir(cache).filePath("previews-v1") : m_directory;
+    const auto relative = QDir(storage->runtimePath()).relativeFilePath(directory);
+    if (storage->runtimePath(relative) != directory) return result;
+    std::optional<iiFileProvider::native::PresentationRecord> presentation;
+    try { presentation = iiFileProvider::native::Presentation::prepare(std::filesystem::path(path.toStdU16String())); } catch (...) {}
     const auto url = StorageDirectoryModel::thumbnailUrl(path);
     if (url.isEmpty()) return result;
     const auto key = QCryptographicHash::hash(url.toEncoded(), QCryptographicHash::Sha256).toHex();
     std::lock_guard lock(entryLocks[qHash(key) % entryLocks.size()]);
-    const auto prefix = QDir(m_directory).filePath(QString::fromLatin1(key));
+    const auto prefix = QDir(directory).filePath(QString::fromLatin1(key));
     result.previewPath = prefix + ".png";
-    QFile metadata(prefix + ".json");
+    iiFileProvider::FileDevice metadata(prefix + ".json");
     if (metadata.size() < 4096 && metadata.open(QIODevice::ReadOnly)) {
         const auto record = QJsonDocument::fromJson(metadata.readAll()).object();
         const auto hash = record.value("sha256").toString().toLatin1();
@@ -126,32 +144,38 @@ PreviewCache::Result PreviewCache::load(const QString &path) const {
         }
     }
     metadata.close();
-    QImageReader reader(path); reader.setAutoTransform(true);
-    const auto dimensions = reader.size();
-    if (!dimensions.isValid() || qint64(dimensions.width()) * dimensions.height() > 32ll * 1024 * 1024
-        || QFileInfo(path).size() > 256ll * 1024 * 1024) return {};
-    reader.setScaledSize(dimensions.scaled(QSize(512, 512), Qt::KeepAspectRatio));
-    result.image = reader.read();
+    if (presentation && presentation->preview.kind == "image") {
+        const auto &bytes = presentation->preview.bytes;
+        result.image = QImage::fromData(reinterpret_cast<const uchar *>(bytes.data()), qsizetype(bytes.size()));
+    }
+    if (result.image.isNull()) {
+        QImageReader reader(path); reader.setAutoTransform(true);
+        const auto dimensions = reader.size();
+        if (!dimensions.isValid() || qint64(dimensions.width()) * dimensions.height() > 32ll * 1024 * 1024
+            || QFileInfo(path).size() > 256ll * 1024 * 1024) return {};
+        reader.setScaledSize(dimensions.scaled(QSize(512, 512), Qt::KeepAspectRatio));
+        result.image = reader.read();
+    }
     if (result.image.isNull()) return {};
     if (result.image.width() > 512 || result.image.height() > 512) result.image = result.image.scaled(512, 512, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    QFile source(path); QCryptographicHash hash(QCryptographicHash::Sha256);
+    iiFileProvider::FileDevice source(path); QCryptographicHash hash(QCryptographicHash::Sha256);
     if (!source.open(QIODevice::ReadOnly) || !hash.addData(&source)) return {};
     result.contentHash = hash.result().toHex();
     if (StorageDirectoryModel::thumbnailUrl(path) != url) return {}; // Concurrent edit: never publish the wrong revision.
-    if (!QDir().mkpath(m_directory) || QFileInfo(m_directory).isSymLink()) return result;
-    QFile::setPermissions(m_directory, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
-    QSaveFile preview(result.previewPath);
-    if (!preview.open(QIODevice::WriteOnly) || !preview.setPermissions(QFile::ReadOwner | QFile::WriteOwner)
+    if (storage->ensureRuntimeDirectory(relative) != directory) return result;
+    iiFileProvider::FileDevice::setPermissions(directory, iiFileProvider::FileDevice::ReadOwner | iiFileProvider::FileDevice::WriteOwner | iiFileProvider::FileDevice::ExeOwner);
+    iiFileProvider::SaveFile preview(result.previewPath);
+    if (!preview.open(QIODevice::WriteOnly) || !preview.setPermissions(iiFileProvider::FileDevice::ReadOwner | iiFileProvider::FileDevice::WriteOwner)
         || !result.image.save(&preview, "PNG") || !preview.commit()) return result;
-    QSaveFile manifest(prefix + ".json");
+    iiFileProvider::SaveFile manifest(prefix + ".json");
     const auto bytes = QJsonDocument(QJsonObject{{"version", 1}, {"source", url.toString()},
         {"sha256", QString::fromLatin1(result.contentHash)}}).toJson(QJsonDocument::Compact);
     if (manifest.open(QIODevice::WriteOnly)) {
-        manifest.setPermissions(QFile::ReadOwner | QFile::WriteOwner);
+        manifest.setPermissions(iiFileProvider::FileDevice::ReadOwner | iiFileProvider::FileDevice::WriteOwner);
         if (manifest.write(bytes) == bytes.size()) manifest.commit();
     }
     static std::atomic_uint writes = 0;
-    if (++writes % 32 == 1) prune(m_directory);
+    if (++writes % 32 == 1) prune(directory);
     return result;
 }
 PreviewProvider::PreviewProvider(QString directory) : m_cache(std::make_shared<PreviewCache>(std::move(directory))) {}

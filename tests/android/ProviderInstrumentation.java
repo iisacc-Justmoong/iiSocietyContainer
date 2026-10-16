@@ -54,13 +54,29 @@ public final class ProviderInstrumentation extends Instrumentation {
         try {
             ContentResolver resolver = getTargetContext().getContentResolver();
             DriveStore store = DriveStore.get(getTargetContext());
+            File managed = new File(store.rootPath());
+            check(managed.getName().equals("Society.societycontainer"), "The managed source must be one container package");
+            check(new File(managed, ".society-runtime/android-provider/society-files-index.db").isFile(),
+                "Provider state must remain inside its container");
+            org.json.JSONObject connection = new org.json.JSONObject(SocietyStorage.request(
+                getTargetContext(), "register", store.rootPath(), store.identifier()));
+            check(!connection.has("error") && connection.getBoolean("enabled"), "System Files registration failed: " + connection);
+            check(connection.getString("connectionKind").equals("documentsProvider") && !connection.getBoolean("isMounted"),
+                "Android must identify its actual DocumentsProvider connection");
+            check(connection.getString("systemPath").equals(DocumentsContract.buildRootUri(
+                SocietyDocumentsProvider.AUTHORITY, store.identifier()).toString()), "Connected URI must identify Society's public root");
+            org.json.JSONObject refreshed = new org.json.JSONObject(SocietyStorage.request(
+                getTargetContext(), "refresh", store.rootPath(), store.identifier()));
+            check(refreshed.getString("systemPath").equals(connection.getString("systemPath")), "Reconnect changed the public root");
+            check(new org.json.JSONObject(SocietyStorage.request(getTargetContext(), "register", store.rootPath(),
+                java.util.UUID.randomUUID().toString())).has("error"), "An unrelated identity was connected");
             if (phase.equals("restart")) {
                 String id = getTargetContext().getSharedPreferences("society-provider-tests", 0).getString("persistent", "");
                 check(read(resolver, document(id)).equals("survives restart"), "Document ID did not survive process restart");
                 DocumentsContract.deleteDocument(resolver, document(id));
             } else {
                 File source = new File(store.rootPath());
-                for (String name : new String[]{"Asset Library", "Deleted", "Files", "Forked", "Generation History", "Models", "Published", "Thinking Space"})
+                for (String name : new String[]{"Asset Library", "Deleted", "Files", "Photos", "Forked", "Generation History", "Models", "Published", "Thinking Space"})
                     check(new File(source, name).isDirectory(), "Missing logical area: " + name);
                 try (OutputStream output = new FileOutputStream(new File(source, "Models/private.safetensor"))) { output.write(42); }
                 String root;
@@ -70,7 +86,7 @@ public final class ProviderInstrumentation extends Instrumentation {
                     check(string(rows, Root.COLUMN_TITLE).equals("Society"), "Drive label must be Society");
                 }
                 List<String> visible = children(resolver, root);
-                for (String hidden : new String[]{"Models", "Asset Library", "Deleted", "Files", "Forked", "Generation History", "Published", "Thinking Space", ".society-drive.json"})
+                for (String hidden : new String[]{"Models", "Photos", "Asset Library", "Deleted", "Files", "Forked", "Generation History", "Published", "Thinking Space", ".society-drive.json"})
                     check(!visible.contains(hidden), "Private source layout leaked: " + hidden);
                 Uri rootUri = document(root);
                 for (String name : new String[]{"Documents", "Audios", "3D objects"}) {

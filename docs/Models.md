@@ -1,6 +1,6 @@
 # Models 유형 관리
 
-0.11.0의 `ModelStore`는 Society 컨테이너 내부 `Models/`의 분류·목록·이동·이전 경로 해석을 담당한다. `SocietyDrive::create()`는 다음 23개 하위 디렉터리를 생성한다. 기존 컨테이너의 `open()`은 읽기 전용이며, 기존 파일을 정리하려면 `ModelStore::organize()`를 호출한다. 컨테이너 UUID와 8개 최상위 영역, 시스템 파일 공급자의 `Files/` 공개 범위는 유지한다.
+`ModelStore`는 Society 컨테이너 내부 `Models/`의 분류·목록·이동·이전 경로 해석을 담당한다. 다음 23개 유형은 논리적 분류 계약이다. `SocietyDrive::create()`와 재열기, `ModelStore::ensureLayout()`은 미사용 분류 폴더를 미리 생성하지 않는다. 실제 모델을 가져오거나 분류 이동할 때 필요한 유형 폴더만 생성한다. 기존 파일을 정리하려면 `ModelStore::organize()`를 호출한다. 컨테이너 UUID와 9개 최상위 영역, 시스템 파일 공급자의 `Files/` 공개 범위는 유지한다.
 
 ```text
 Models/
@@ -31,7 +31,7 @@ Models/
 
 `ModelType.h`의 `allModelTypes()`, `modelTypeName()`, `modelTypeFromName()`이 이 목록의 공통 계약이다. 열거형 `ControlNet`의 실제 디렉터리 표기는 이미지와 같은 `Controlnet`이다.
 
-디렉터리 생성·충돌 검사는 내부 `ModelLayout`에 모아 `SocietyDrive`와 `ModelStore`가 공유한다. `ModelStore`가 드라이브 식별·준비 상태에 의존하며 `SocietyDrive`는 관리 객체를 참조하지 않는다.
+기존 분류 디렉터리의 충돌 검사는 내부 `ModelLayout`에 모아 `SocietyDrive`와 `ModelStore`가 공유한다. `ModelStore::categoryPath(type)`는 모델 발행 전에 요청한 유형 한 개만 준비하며, `place()`는 선택된 목적 경로의 부모만 생성한다. `ModelStore`가 드라이브 식별·준비 상태에 의존하며 `SocietyDrive`는 관리 객체를 참조하지 않는다. 이미 존재하는 모델·부속 파일·사용자 디렉터리는 유지하며, 기존 빈 분류 폴더를 SDK가 자동 삭제하지 않는다.
 
 ## 관리 API
 
@@ -54,7 +54,8 @@ if (auto models = ModelStore::open(containerPath, &error)) {
 }
 ```
 
-- `ensureLayout()`은 누락된 유형 폴더만 생성한다. 동명 파일·리디렉션 충돌은 오류로 반환한다.
+- `ensureLayout()`은 기존 유형 경로를 검증하며 미사용 유형 폴더를 생성하지 않는다. 동명 파일·리디렉션 충돌은 오류로 반환한다.
+- `categoryPath(type)`는 요청한 유형 디렉터리만 잠금 아래 생성하여 가져오기 목적 경로를 반환한다. 드라이브 변경·경로 충돌은 오류로 반환한다.
 - `entries()`와 독립 `scanDirectory()`는 읽기 전용이다. 항목에는 파일명, 절대/상대 경로, 저장 형식, 패키지 종류, 분류 근거가 있다. `ModelClassifier::classify()`로 파일 하나의 판정도 조회할 수 있다.
 - 0.11.1의 `ModelClassifier::metadata(path)`는 safetensors 헤더의 메타데이터와 `tensor_dtypes`, GGUF의 `general.architecture`·`general.name`·`general.file_type`, 패키지 설정과 모델 부속 JSON을 반환한다. 파일 헤더는 최대 16 MiB, JSON은 최대 1 MiB이며 텐서를 로드하거나 레거시 가중치를 역직렬화하지 않는다. 패키지의 `society.model.json` 또는 파일의 `.model.json`에서 `society.modality`를 `image`, `video`, `audio`, `language`로 명시할 수 있다. 이 표시는 기존 23개 저장 유형과 독립적이다. `model_store` 테스트가 정상 헤더·패키지·GGUF·부속 메타데이터·손상 및 링크 입력을 검증한다.
 - `place()`는 `Models/` 내부의 기존 파일·패키지를 자동 또는 명시적 유형으로 이동한다. 외부 파일 가져오기와 네트워크 전송은 소비 앱이 담당한다.
@@ -95,7 +96,7 @@ Anima는 Cosmos 계열의 `blocks.0.mlp.layer1.weight`, `llm_adapter.blocks.0.cr
 
 기존 Qt Core의 파일·JSON API로 제한된 메타데이터만 검사한다. 공개 [Safetensors 형식](https://github.com/safetensors/safetensors), [GGUF 형식](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md), [PEFT 체크포인트 계약](https://huggingface.co/docs/peft/developer_guides/checkpoint)을 사용한다. Safetensors/GGUF 검사는 최대 16 MiB, 일반 JSON·sidecar는 1 MiB로 제한하며 텐서 데이터 로드나 Pickle 역직렬화·모델 실행을 하지 않는다. 전체 모델 로더의 Python·ML 의존성과 별도 라이선스 의존성을 추가할 필요가 없어 기존 Qt Core를 재사용했다.
 
-`iiSocietyContainer.model_store`와 설치 소비자 `installed_models`는 23개 유형, 레거시 레이아웃, 메타데이터·텐서 키·패키지·GGUF·문서 판정, 손상·크기 제한, 원본/부속 파일 보존, 충돌, 반복 실행, 이전 참조와 동일 UUID 복제본, 취소·경계 위반을 검사한다. 실제 기기 간 전송 완료나 모델 추론 품질을 대신하는 검사는 아니다.
+`iiSocietyContainer.model_store`와 설치 소비자 `installed_models`는 23개 논리 유형과 필요시 생성, 신규·재사용·빈 정리의 미사용 폴더 생성 방지, 원본·부속 파일·기존 빈 폴더·UUID·9개 영역 보존, 레거시 레이아웃, 메타데이터·텐서 키·패키지·GGUF·문서 판정, 손상·크기 제한, 충돌, 반복 실행, 이전 참조와 동일 UUID 복제본, 취소·경계 위반을 검사한다. 실제 기기 간 전송 완료나 모델 추론 품질을 대신하는 검사는 아니다.
 
 Anima 회귀 검사는 원본·파생·통합 체크포인트, 이름 변경과 파일 공급자의 임시 확장자, 불완전하거나 차원이 충돌하는 구조, LoRA 구분, 기존 `Other` 재정리와 이전 참조·원본 바이트·부속 파일 보존을 포함한다. 이미 `LLM` 같은 명시적 유형 폴더에 있는 파일은 일반 정리에서 자동 이동하지 않으므로, 내부 판정을 확인한 뒤 `place(path, ModelType::Checkpoint)`로 수정한다.
 
@@ -129,4 +130,6 @@ Krea2 가져오기는 검증된 텐서 시그니처(`txtfusion.projector.weight`
 
 `ModelClassifier::validateSafetensors(path)`는 텐서 페이로드를 읽지 않고 불완전하거나 유효하지 않은 파일에 대한 진단을 반환합니다. 가져오기 호출자는 다중 기가바이트 복사를 수행하기 전에 잘린 다운로드를 거부할 수 있습니다.
 
-지역 당국에서는 물리적 모델 카테고리 폴더의 얕은 파일 메타데이터가 동기화 카탈로그와 병합됩니다. 새로 게시된 체크포인트가 즉시 나타나며, 다수의 기가바이트 동기화 체크섬을 기다리지 않습니다. 이것은 텐서 내용이나 패키지 내부의 스캔을 절대 읽지 않습니다. 복제본은 카탈로그 전용이며, 변경되지 않은 스냅샷은 여전히 모델/로딩 재설정 신호를 발생시키지 않습니다.
+일반 로컬 원본 패키지와 명시적으로 선언된 로컬 호스트에서는 실제 모델 유형 폴더의 얕은 파일 메타데이터를 동기화 카탈로그와 병합한다. 호스트 등록이나 `.society-sync/primary.json` 생성 전에도 사용자가 넣은 체크포인트와 LoRA가 즉시 나타나며, 다중 기가바이트 파일의 동기화 체크섬을 기다리지 않는다. 이 조회는 텐서 내용이나 패키지 내부를 읽지 않으며 카탈로그·호스트 메타데이터나 다운로드 요청을 생성하지 않는다. 복제 식별 정보를 가진 패키지는 초기 복제 완료 전후 모두 카탈로그 전용으로 조회하므로, 빈 카탈로그의 미색인 로컬 잔여 파일은 표시하지 않는다. 변경되지 않은 스냅샷은 모델/로딩 재설정 신호를 발생시키지 않는다.
+
+`shared_storage`의 `originalModelFilesRemainVisibleWithAPartialCatalogAndNoRegisteredHost`는 디렉터리만 색인된 카탈로그에서도 실제 체크포인트 2개와 LoRA 6개를 UI와 공통 모델 조회에서 표시하고 원본 바이트 및 메타데이터를 보존함을 검사한다. `replicaCatalogDoesNotExposeUnindexedLocalModels`는 미완성·완료된 실제 복제본에서 빈 카탈로그가 잔여 모델을 노출하지 않음을 검사한다.

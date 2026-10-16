@@ -1,9 +1,10 @@
+#include <iiFileProviderStorage.h>
+#include <iiFileProviderDevice.h>
 #define FUSE_USE_VERSION 31
 #include <fuse.h>
 #include "platform/desktop/NativeMount.h"
+#include "SharedStorage.h"
 #include <QCoreApplication>
-#include <QDir>
-#include <QSaveFile>
 #include <QStandardPaths>
 #include <QProcess>
 #include <atomic>
@@ -13,6 +14,8 @@
 #include <mntent.h>
 #include <sys/mount.h>
 #include <sys/statvfs.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 #include <thread>
 #include <unistd.h>
 
@@ -36,17 +39,23 @@ public:
             fuse_destroy(instance);
         }
         if (root >= 0) ::close(root);
-        QDir().rmdir(point);
+        iiFileProvider::Directory().rmdir(point);
     }
     QString path() const override { return point; }
     bool validRoot() const
     {
         struct stat opened{}, current{};
         return view.isValid() && !::fstat(root, &opened)
-            && !::lstat(QFile::encodeName(view.rootPath()).constData(), &current)
+            && !::lstat(iiFileProvider::FileDevice::encodeName(view.rootPath()).constData(), &current)
             && S_ISDIR(current.st_mode) && opened.st_dev == current.st_dev && opened.st_ino == current.st_ino;
     }
     bool isRunning() const override { return running && validRoot(); }
+    QString filesystemType() const override
+    {
+        struct statfs info{};
+        return isRunning() && !::statfs(iiFileProvider::FileDevice::encodeName(point).constData(), &info) && info.f_type == FUSE_SUPER_MAGIC
+            ? QStringLiteral("fuse.society") : QString();
+    }
     static FuseMount &self() { return *static_cast<FuseMount *>(fuse_get_context()->private_data); }
 
     // Keep traversal relative to an open Files directory. Every intermediate
@@ -61,7 +70,7 @@ public:
         int fd = ::dup(root);
         if (fd < 0) return -errno;
         for (const auto &part : parts) {
-            const int next = ::openat(fd, part.constData(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+            const int next = iiFileProvider::native::openFileAt(fd, part.constData(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
             const int saved = errno;
             ::close(fd);
             if (next < 0) return -saved;
@@ -79,7 +88,7 @@ public:
         QByteArray leaf;
         const int directory = parent(path, leaf);
         if (directory < 0) return directory;
-        const int fd = ::openat(directory, leaf.constData(), flags | O_NOFOLLOW | O_CLOEXEC, mode);
+        const int fd = iiFileProvider::native::openFileAt(directory, leaf.constData(), flags | O_NOFOLLOW | O_CLOEXEC, mode);
         const int saved = errno;
         ::close(directory);
         return fd < 0 ? -saved : fd;
@@ -152,7 +161,7 @@ int makeDirectory(const char *path, mode_t mode)
     if (FilesView::isProtectedPath(QString::fromUtf8(path + 1))) return -EEXIST;
     QByteArray leaf; const int parent = FuseMount::self().parent(path, leaf);
     if (parent < 0) return parent;
-    const int result = ::mkdirat(parent, leaf.constData(), mode & 0777) ? -errno : 0;
+    const int result = iiFileProvider::native::makeDirectoryAt(parent, leaf.constData(), mode & 0777) ? -errno : 0;
     ::close(parent); return result;
 }
 int removeEntry(const char *path, int flags)
@@ -190,7 +199,7 @@ template<class Action> int withFile(const char *path, fuse_file_info *file, int 
 bool prepareMountPoint(const FilesView &view, const QString &point, QString *error)
 {
     bool mounted = false, ours = false;
-    const auto encoded = QFile::encodeName(point);
+    const auto encoded = iiFileProvider::FileDevice::encodeName(point);
     if (FILE *table = ::setmntent("/proc/self/mounts", "r")) {
         while (const auto *entry = ::getmntent(table)) {
             if (encoded != entry->mnt_dir) continue;
@@ -199,7 +208,7 @@ bool prepareMountPoint(const FilesView &view, const QString &point, QString *err
             ours = !strcmp(entry->mnt_type, "fuse.society")
                 && (!strcmp(entry->mnt_fsname, "Society") || !strcmp(entry->mnt_fsname, "Society Container"))
                 && QByteArray(entry->mnt_opts).split(',').contains(user)
-                && QFileInfo(point).fileName() == view.drive().identifier();
+                && point == defaultMountPoint(view.drive().rootPath(), view.drive().identifier());
         }
         ::endmntent(table);
     }
@@ -222,22 +231,22 @@ bool prepareMountPoint(const FilesView &view, const QString &point, QString *err
 }
 }
 
-QString defaultMountPoint(const QString &identifier)
+QString defaultMountPoint(const QString &source, const QString &identifier)
 {
-    const auto base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
-    return QDir(base).filePath("iisacc/Society/Drives/" + identifier);
+    return iiFileProvider::Directory(source).filePath(".society-runtime/mounts/" + identifier + "/Society");
 }
 std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &point, QString *error)
 {
     if (!prepareMountPoint(view, point, error)) return {};
-    if (!QDir::isAbsolutePath(point) || !QDir().mkpath(point) || !QDir(point).isEmpty() || QFileInfo(point).isSymLink()
-        || QFileInfo(point).canonicalFilePath() == view.drive().rootPath()
-        || QFileInfo(point).canonicalFilePath().startsWith(view.drive().rootPath() + '/')) {
-        if (error) *error = "Choose an empty, separate mount directory.";
+    auto storage = SharedStorage::open(view.drive().rootPath(), error);
+    const auto prepared = storage ? storage->ensureRuntimeDirectory("mounts/" + view.drive().identifier() + "/Society", error) : QString();
+    if (point != defaultMountPoint(view.drive().rootPath(), view.drive().identifier())
+        || prepared != point || !iiFileProvider::Directory(point).isEmpty()) {
+        if (error && error->isEmpty()) *error = "Use the empty mount directory inside this Society container.";
         return {};
     }
     auto mount = std::make_unique<FuseMount>(std::move(view), point);
-    mount->root = ::open(QFile::encodeName(mount->view.rootPath()).constData(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    mount->root = iiFileProvider::native::openFile(iiFileProvider::FileDevice::encodeName(mount->view.rootPath()).constData(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (mount->root < 0) { if (error) *error = QString::fromLocal8Bit(strerror(errno)); return {}; }
     fuse_operations operations{};
     operations.getattr = statEntry;
@@ -278,7 +287,7 @@ std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &point, QS
     fuse_opt_add_arg(&args, "fsname=Society,subtype=society,default_permissions,auto_unmount");
     mount->instance = fuse_new(&args, &operations, sizeof(operations), mount.get());
     fuse_opt_free_args(&args);
-    if (!mount->instance || fuse_mount(mount->instance, QFile::encodeName(point).constData()) != 0) {
+    if (!mount->instance || fuse_mount(mount->instance, iiFileProvider::FileDevice::encodeName(point).constData()) != 0) {
         if (error) *error = "Could not mount Society Files. Install libfuse3/fusermount3 and allow access to /dev/fuse.";
         return {};
     }
@@ -291,11 +300,11 @@ std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &point, QS
 }
 bool installMountAutostart(const QString &executable, QString *error)
 {
-    const auto directory = QDir(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)).filePath("autostart");
-    if (!QDir().mkpath(directory)) { if (error) *error = "Could not create the session autostart directory."; return false; }
+    const auto directory = iiFileProvider::Directory(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)).filePath("autostart");
+    if (!iiFileProvider::Directory().mkpath(directory)) { if (error) *error = "Could not create the session autostart directory."; return false; }
     QString quoted = executable;
     quoted.replace('\\', "\\\\").replace('"', "\\\"").replace('`', "\\`").replace('$', "\\$").replace('%', "%%");
-    QSaveFile file(QDir(directory).filePath("com.iisacc.society.files.desktop"));
+    iiFileProvider::SaveFile file(iiFileProvider::Directory(directory).filePath("com.iisacc.society.files.desktop"));
     const auto bytes = QString("[Desktop Entry]\nType=Application\nName=Society\nExec=\"%1\" serve\nTerminal=false\nNoDisplay=true\n").arg(quoted).toUtf8();
     if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
         if (error) *error = file.errorString(); return false;

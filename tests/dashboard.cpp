@@ -18,8 +18,23 @@ using namespace iiSocietyContainer;
 class DashboardTests : public QObject {
     Q_OBJECT
 private slots:
+    void editorCanvasesDoNotDuplicateGeneratedImagesInHistory() {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/native-history-XXXXXX.societycontainer");
+        QVERIFY(SocietyDrive::create(root.path()));
+        QFile canvas(root.filePath("Generation History/generated.iisc"));
+        QVERIFY(canvas.open(QIODevice::WriteOnly)); canvas.write("native document"); canvas.close();
+        QImage png(16, 16, QImage::Format_RGB32); png.fill(Qt::cyan);
+        QVERIFY(png.save(root.filePath("Generation History/generated.png")));
+        DashboardFiles model; model.setContainerPath(root.path());
+        QTRY_VERIFY(!model.loading());
+        QCOMPARE(model.generationHistory().size(), 1);
+        const auto row = model.generationHistory().first().toMap();
+        QCOMPARE(row.value("name").toString(), "generated.png");
+        QCOMPARE(row.value("previewSource").toUrl().toLocalFile(), root.filePath("Generation History/generated.png"));
+        QVERIFY(row.value("metadata1").toString().startsWith("PNG"));
+    }
     void concurrentSectionsKeepMetadataIndependent() {
-        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/parallel-dashboard-XXXXXX");
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/parallel-dashboard-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(root.path()));
         QImage image(16, 16, QImage::Format_RGB32); image.fill(Qt::cyan);
         for (const auto &section : {"Files", "Published", "Generation History"})
@@ -47,7 +62,7 @@ private slots:
         }
     }
     void historyIsPersistedBoundedAndObserved() {
-        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/history-XXXXXX");
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/history-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(root.path()));
         QImage image(16, 16, QImage::Format_RGB32); image.fill(Qt::cyan);
         for (int i = 0; i < 25; ++i) {

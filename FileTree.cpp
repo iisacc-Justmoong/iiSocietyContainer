@@ -1,4 +1,5 @@
 #include "FileTree.h"
+#include <iiFileProviderPresentation.h>
 
 #include <algorithm>
 #include <functional>
@@ -38,7 +39,7 @@ bool validRelative(const fs::path& relative)
 #endif
         ) return false;
     for (const auto& component : relative)
-        if (component.empty() || component == "." || component == "..") return false;
+        if (component.empty() || component == "." || component == ".." || iiFileProvider::native::Presentation::isControlFile(component)) return false;
     return true;
 }
 
@@ -127,6 +128,26 @@ FileTree::EntryResult FileTree::entry(const std::filesystem::path& relative) con
     if (m_error) return failed<Entry>(m_error);
     return metadata(m_root, relative);
 }
+FileTree::PresentationResult FileTree::presentation(const std::filesystem::path& relative) const
+{
+    const auto file = entry(relative);
+    if (!file) return failed<iiFileProvider::native::PresentationRecord>(file.error);
+    if (file.value->kind != Kind::File)
+        return failed<iiFileProvider::native::PresentationRecord>(std::make_error_code(std::errc::is_a_directory));
+    try {
+        auto record = iiFileProvider::native::Presentation::prepare(file.value->path);
+        const auto after = entry(relative);
+        const auto verified = iiFileProvider::native::Presentation::load(file.value->path);
+        if (!after || after.value->path != file.value->path || after.value->size != record.details.size
+            || !verified || verified->document != record.document)
+            return failed<iiFileProvider::native::PresentationRecord>(std::make_error_code(std::errc::state_not_recoverable));
+        return {std::move(record), {}};
+    } catch (const std::filesystem::filesystem_error &e) {
+        return failed<iiFileProvider::native::PresentationRecord>(e.code());
+    } catch (...) {
+        return failed<iiFileProvider::native::PresentationRecord>(std::make_error_code(std::errc::io_error));
+    }
+}
 
 FileTree::ChildrenResult FileTree::children(const std::filesystem::path& relative, bool includeHidden) const
 {
@@ -147,6 +168,7 @@ FileTree::ChildrenResult FileTree::readChildren(const std::filesystem::path& rel
     for (; iterator != end; iterator.increment(error)) {
         if (error) return failed<std::vector<Entry>>(error);
         const auto name = iterator->path().filename();
+        if (iiFileProvider::native::Presentation::isControlFile(name)) continue;
         if (!includeHidden && name.native().starts_with(std::filesystem::path(".").native())) continue;
         const auto status = iterator->symlink_status(error);
         if (error) return failed<std::vector<Entry>>(error);

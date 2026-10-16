@@ -32,7 +32,23 @@ public:
     // the section directory. Only the final component may be missing; no writes.
     // Rejects traversal, redirected paths and a replaced/unavailable drive.
     QString filePath(StoreSection section, const QString &relativePath = {}, QString *error = nullptr) const;
+    /// Provider-owned details, bounded preview and validated classification for
+    /// one resident regular asset. No catalog creation or original download.
+    /// Blocking: callers serving a GUI should run this on their I/O worker.
+    /// Returns no native host path. Empty on unavailable/redirected/control data.
+    QJsonObject fileInformation(StoreSection section, const QString &relativePath, QString *error = nullptr) const;
+    static constexpr qsizetype maximumFileInformationBytes = 3 * 1024 * 1024;
     QString ensureDirectory(StoreSection section, const QString &relativePath, QString *error = nullptr) const;
+    /// Publish an already validated PNG directly in Generation History. Preserve
+    /// source bytes and atomically reject existing names; never create a canvas.
+    /// fileName is one visible .png leaf. Image decoding belongs to the caller.
+    QString publishGeneratedImage(const QString &source, const QString &fileName, QString *error = nullptr) const;
+    /// Resolve private application state beneath .society-runtime without writes.
+    /// Missing intermediate directories are allowed; existing redirects are not.
+    /// Available to the storage owner before a replica's public data is ready.
+    QString runtimePath(const QString &relativePath = {}, QString *error = nullptr) const;
+    /// Create only the requested private runtime directory inside this package.
+    QString ensureRuntimeDirectory(const QString &relativePath = {}, QString *error = nullptr) const;
 
 private:
     explicit SharedStorage(SocietyDrive drive);

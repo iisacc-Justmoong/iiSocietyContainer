@@ -1,5 +1,6 @@
 #include "FileActions.h"
 #include <QClipboard>
+#include <QDir>
 #include <QFile>
 #include <QGuiApplication>
 #include <QMimeData>
@@ -12,9 +13,10 @@ class FileActionsTests : public QObject {
     Q_OBJECT
 private slots:
     void deletionNeverQueuesDownloads() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/delete-no-pull-XXXXXX"); QVERIFY(temp.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/delete-no-pull-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); StorageMap map(*drive);
         const auto source = temp.filePath("Models/Checkpoint/model.safetensors");
+        QVERIFY(QDir().mkdir(temp.filePath("Models/Checkpoint")));
         QFile file(source); QVERIFY(file.open(QIODevice::WriteOnly)); QVERIFY(file.resize(8LL * 1024 * 1024 * 1024)); file.close();
         QJsonObject entry{{"path", "models/Checkpoint/model.safetensors"}, {"kind", "file"},
             {"size", "1"}, {"resident", false}, {"version", QString(64, 'a')}};
@@ -37,7 +39,7 @@ private slots:
         QCOMPARE(failed.size(), 1); QCOMPARE(done.size(), 2); QVERIFY(map.pendingRequests().isEmpty());
     }
     void copiesUrlsAndPastesWithoutOverwriting() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/clipboard-XXXXXX"); QVERIFY(temp.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/clipboard-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
         QVERIFY(SocietyDrive::create(temp.path()));
         const auto source = temp.filePath("Models/test.safetensors");
         QFile file(source); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("weights"); file.close();
@@ -53,7 +55,7 @@ private slots:
         QVERIFY(QFileInfo::exists(temp.filePath("Deleted/updated.safetensors"))); QVERIFY(failed.isEmpty());
     }
     void metadataMenuDoesNotPullAndCopyWaitsForSelectedObject() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/remote-actions-XXXXXX"); QVERIFY(temp.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/remote-actions-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); StorageMap map(*drive);
         QJsonObject entry{{"path", "models/remote.bin"}, {"kind", "file"}, {"size", "3"}, {"version", QString(64, 'a')}, {"resident", false}};
         QVERIFY(map.publish({entry})); FileActions actions; actions.setPath(temp.filePath("Models/remote.bin"));

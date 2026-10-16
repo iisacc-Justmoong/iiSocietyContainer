@@ -12,6 +12,7 @@ def main():
     parser.add_argument('--platform', type=pathlib.Path, required=True)
     parser.add_argument('--catalog-tool', required=True)
     parser.add_argument('--build', type=pathlib.Path, required=True)
+    parser.add_argument('--file-provider', type=pathlib.Path)
     args = parser.parse_args()
     output = args.build.resolve() / 'ios-package-contract'
     output.mkdir(parents=True, exist_ok=True)
@@ -68,7 +69,8 @@ add_executable(Dreamscapes empty.cpp)
 set_target_properties(Dreamscapes PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER com.iisacc.dreamscapes)
 iiSocietyContainer_configure_ios_client(Dreamscapes APP_GROUP {group} DISPLAY_NAME Dreamscapes)
 ''')
-    subprocess.run(['cmake', '-S', str(client), '-B', str(client / 'build')], check=True, stdout=subprocess.DEVNULL)
+    provider_args = [f'-DiiFileProviderSwift_DIR={args.file_provider}'] if args.file_provider else []
+    subprocess.run(['cmake', '-S', str(client), '-B', str(client / 'build'), *provider_args], check=True, stdout=subprocess.DEVNULL)
     generated = client / 'build/ios-society-client/Dreamscapes'
     client_info = plistlib.loads((generated / 'App.Info.plist').read_bytes())
     client_rights = plistlib.loads((generated / 'App.entitlements').read_bytes())
@@ -109,7 +111,7 @@ target_sources(SocietyFileProvider PRIVATE probe.cpp)
         subprocess.run(['cmake', '-S', str(native), '-B', str(native / 'build'), '-G', 'Xcode',
                         '-DCMAKE_SYSTEM_NAME=iOS', '-DCMAKE_OSX_SYSROOT=iphoneos',
                         '-DCMAKE_OSX_ARCHITECTURES=arm64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0',
-                        '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO'], check=True)
+                        '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO', *provider_args], check=True)
         subprocess.run(['cmake', '--build', str(native / 'build'), '--config', 'Debug',
                         '--target', 'SocietyIosDriveBridge', 'SocietyFileProvider', 'SocietyActivityBridge', 'SocietyLiveActivity',
                         '--parallel', '2'], check=True)

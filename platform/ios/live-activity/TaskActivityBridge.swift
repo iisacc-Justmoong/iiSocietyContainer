@@ -63,8 +63,8 @@ import UIKit
             "activeCount": Activity<SocietyTaskAttributes>.activities.filter { $0.activityState == .active || $0.activityState == .stale }.count]
         if let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
            let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try? data.write(to: directory.appendingPathComponent("live-activity-state.json"), options: .atomic)
+            try? IisaccFileProvider.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? IisaccFileProvider.write(data, to: directory.appendingPathComponent("live-activity-state.json"), options: .atomic)
         }
         NSLog("Society ActivityKit: %@ %@ %@", event, activity?.id ?? "", state?.phase ?? "")
     }

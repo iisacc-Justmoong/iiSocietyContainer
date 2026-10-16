@@ -37,10 +37,10 @@ enum FilesDriveStoreTests {
     }
     static func main() throws {
         let base = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
-        let root = base.appendingPathComponent("files-test-" + UUID().uuidString)
+        let root = base.appendingPathComponent("files-test-" + UUID().uuidString + ".societycontainer")
         let manager = FileManager.default
         try manager.createDirectory(at: root, withIntermediateDirectories: false)
-        defer { try? manager.removeItem(at: root) }
+        defer { _ = IisaccFileProvider.waitForPresentations(); try? manager.removeItem(at: root) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: CommandLine.arguments[2])
         process.arguments = ["create", root.path]
@@ -48,13 +48,31 @@ enum FilesDriveStoreTests {
         try process.run(); process.waitUntilExit()
         try check(process.terminationStatus == 0, "SDK drive creation failed")
         let catalog = try JSONDecoder().decode([DriveSection].self, from: Data(contentsOf: base.appendingPathComponent("Sections.json")))
+        let emptyStore = try LocalDriveStore(root: root, catalog: catalog)
+        try check(emptyStore.snapshot().records.count == 9 + 1, "A new store must contain only nine section roots and the drive root")
+        try check(emptyStore.children("section:models").isEmpty, "Unused model categories must remain lazy")
+        try check(manager.contentsOfDirectory(atPath: root.appendingPathComponent("Models").path).isEmpty,
+                  "Opening the native store must not create physical model categories")
+        // A legacy source may already contain user categories. Supply those
+        // explicitly to keep the full retirement regression under lazy creation.
+        let modelCategories = ["Checkpoint", "Embedding", "Hypernetwork", "Aesthetic Gradient",
+                               "LoRA", "LyCORIS", "DoRA", "Controlnet", "Upscaler", "Motion", "VAE", "Text Encoder",
+                               "UNet", "CLIP Vision", "Poses", "Wildcards", "Workflows", "ComfyUI Workflows",
+                               "Detection", "VLM", "CLIP", "LLM", "Other"]
+        for name in modelCategories {
+            try manager.createDirectory(at: root.appendingPathComponent("Models/" + name), withIntermediateDirectories: false)
+        }
         for section in catalog {
             try Data(section.id.utf8).write(to: root.appendingPathComponent(section.path + "/Example.txt"))
         }
         try manager.createDirectory(at: root.appendingPathComponent("Files/Nested"), withIntermediateDirectories: false)
         try Data("nested".utf8).write(to: root.appendingPathComponent("Files/Nested/Child.txt"))
+        try Data("derived fixture".utf8).write(to: root.appendingPathComponent("Files/Nested/.Child.txt.iisacc-preview"))
+        try Data().write(to: root.appendingPathComponent("Files/Nested/.iisacc-temporary.lock"))
         try Data("unassigned".utf8).write(to: root.appendingPathComponent("Unassigned.txt"))
         let legacy = try LocalDriveStore(root: root, catalog: catalog).snapshot()
+        let legacyCategories = legacy.records.values.filter { $0.parent == "section:models" && $0.directory }
+        try check(Set(legacyCategories.map { $0.name }) == Set(modelCategories), "The legacy snapshot must retain all 23 supplied user categories")
         let store = try FilesDriveStore(root: root, catalog: catalog)
         let initial = try store.snapshot()
         try check(store.root.path == root.appendingPathComponent("Files").path, "The public source root must be Society/Files")
@@ -67,7 +85,8 @@ enum FilesDriveStoreTests {
         try check(publicFile.id == legacy.records.values.first { $0.path == "Files/Example.txt" }?.id, "Upgrading must preserve public file IDs")
         let previous = store.previousSnapshot(forChangesFrom: legacy.anchor)!
         let retired = Set(previous.records.keys).subtracting(initial.records.keys)
-        try check(retired.contains("section:files") && retired.count == 17 + 23, "Legacy changes must retire all nine section roots, seven private files, and 23 model categories")
+        try check(retired.contains("section:files") && retired.count == 17 + 23, "Legacy changes must retire all nine section roots, eight private files, and 23 supplied model categories")
+        try check(Set(legacyCategories.map { $0.id }).isSubset(of: retired), "Every legacy model category ID must be retired from the public view")
         try check(store.previousSnapshot(forChangesFrom: initial.anchor)?.records == initial.records, "New anchors must return only the public snapshot")
         try check(store.previousSnapshot(forChangesFrom: "unknown") == nil, "Unknown anchors must expire")
         let rootEnumeration = EnumerationResult()
@@ -94,6 +113,9 @@ enum FilesDriveStoreTests {
             try check(capabilities.contains(.allowsDeleting) && capabilities.contains(.allowsRenaming)
                 && capabilities.contains(.allowsReparenting), "User folders must expose normal mutation capabilities")
             let nested = initial.records.values.first { $0.path == "Nested" }!
+            let stable = try store.snapshot()
+            try check(stable.records[directory.id]?.path == name, "New directory identity changed: \(name)")
+            try check(stable.records[nested.id]?.path == "Nested", "Existing parent identity changed while file previews were published")
             let moved = try store.modify(directory.id, name: name + " moved", parent: nested.id, contents: nil, baseContentVersion: nil, baseMetadataVersion: nil)
             try store.remove(moved.id, baseContentVersion: nil, baseMetadataVersion: nil)
             try check(!store.children("root").contains { $0.name == name }, "Deleted folders must not be restored")
@@ -180,6 +202,8 @@ enum FilesDriveStoreTests {
         for section in catalog where section.id != "files" {
             try check(Data(contentsOf: root.appendingPathComponent(section.path + "/Example.txt")) == Data(section.id.utf8), "Private content must remain intact for Society")
         }
+        try check(Set(appStore.children("section:models").filter { $0.directory }.map { $0.name }) == Set(modelCategories),
+                  "Public retirement must preserve all 23 physical user model categories for Society")
         print("FilesDriveStore: direct root, private access denial, CRUD, versions, migration, app access and restart passed")
     }
 }

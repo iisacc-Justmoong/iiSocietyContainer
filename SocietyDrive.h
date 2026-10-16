@@ -6,23 +6,25 @@
 
 namespace iiSocietyContainer {
 
-/// A persistent drive with nine independent, ordinary directory sections.
+/// A persistent .societycontainer directory package with nine section directories.
 /// Native system adapters and application browsers share this same layout.
 class IISOCIETYCONTAINER_EXPORT SocietyDrive
 {
 public:
-    /// Creates the ordinary Society folder beneath an existing parent directory.
+    /// Creates Society.societycontainer beneath an existing parent directory.
     /// Selecting an existing drive reuses its identity. No disk image is created.
     [[nodiscard]] static std::optional<SocietyDrive> createAt(
         const QString& parentDirectory, QString* error = nullptr);
-    /// Initializes an existing directory, or opens its existing valid drive.
+    /// Initializes an existing .societycontainer package, or opens its valid drive.
     /// Conflicting entries and unknown manifests are preserved and rejected.
     /// Finder CloudStorage replicas and descendants of another drive are rejected
     /// before initialization; open() enforces the same source-location boundary.
     [[nodiscard]] static std::optional<SocietyDrive> create(
         const QString& directoryPath, QString* error = nullptr);
-    /// Opening a ready drive creates any missing fixed Files directories.
-    /// Existing contents and the manifest are preserved; conflicting entries fail.
+    /// Opens only a canonical .societycontainer package with a valid manifest.
+    /// Bare directories, redirected roots and legacy disk images are rejected.
+    /// Empty current layouts create no extra state; supported layout upgrades
+    /// preserve the existing contents and UUID.
     [[nodiscard]] static std::optional<SocietyDrive> open(
         const QString& directoryPath, QString* error = nullptr);
 
@@ -46,7 +48,8 @@ public:
     [[nodiscard]] QList<StoreSection> sections() const;
     [[nodiscard]] QString sectionPath(StoreSection section) const;
     [[nodiscard]] std::optional<StoreSection> sectionForPath(const QString& path) const;
-    /// Map the logical section namespace to native paths, including the Files volume.
+    /// Map the logical section namespace to paths within the current package.
+    /// Missing components are allowed; replaced identity and existing redirects fail.
     [[nodiscard]] QString resolvePath(const QString& relative) const;
     [[nodiscard]] QString relativePath(const QString& absolute) const;
 

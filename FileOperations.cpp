@@ -1,11 +1,10 @@
+#include <iiFileProviderStorage.h>
+#include <iiFileProviderDevice.h>
 #include "FileOperations.h"
 #include "StorageMap.h"
 #include "DiskImage.h"
 #include "src/FileTreePaths.h"
-#include <QDir>
-#include <QFile>
 #include <QFileInfo>
-#include <QLockFile>
 #include <QScopeGuard>
 #include <QUuid>
 #if defined(Q_OS_DARWIN)
@@ -24,7 +23,7 @@
 namespace iiSocietyContainer {
 namespace {
 bool confined(const SocietyDrive &drive, const QString &path, bool section = false) {
-    if (!drive.isValid() || !QFileInfo(path).isAbsolute() || path != QDir::cleanPath(path)) return false;
+    if (!drive.isValid() || !QFileInfo(path).isAbsolute() || path != iiFileProvider::Directory::cleanPath(path)) return false;
     const auto relative = drive.relativePath(path);
     if (relative.isEmpty()) return false;
     bool known = false;
@@ -36,7 +35,8 @@ bool confined(const SocietyDrive &drive, const QString &path, bool section = fal
     bool first = true;
     for (const auto &part : relative.split('/')) {
         if (part.isEmpty() || part == "." || part == ".." || part.contains('\\') || part.contains(':')
-            || part.contains(QChar::Null) || part.startsWith(".society-") || part.startsWith(".iiserverhost-")) return false;
+            || part.contains(QChar::Null) || part.startsWith(".society-") || part.startsWith(".iiserverhost-")
+            || part == ".iisacc-temporary.lock") return false;
         if (first) { first = false; continue; }
         current += '/' + part; const QFileInfo info(current);
         if (info.isSymLink() || info.isJunction() || (info.exists() && info.canonicalFilePath() != current)) return false;
@@ -47,10 +47,10 @@ QString uniquePath(const QString &parent, const QString &name, bool duplicate) {
     const QFileInfo info(name); const auto suffix = info.suffix();
     const auto ext = suffix.isEmpty() ? QString() : '.' + suffix;
     const auto stem = ext.isEmpty() ? name : name.chopped(ext.size());
-    auto result = QDir(parent).filePath(duplicate ? stem + " copy" + ext : name);
+    auto result = iiFileProvider::Directory(parent).filePath(duplicate ? stem + " copy" + ext : name);
     for (int n = 2; QFileInfo::exists(result) || QFileInfo(result).isSymLink(); ++n) {
         if (n > 10000) return {};
-        result = QDir(parent).filePath(stem + (duplicate ? " copy " : " ") + QString::number(n) + ext);
+        result = iiFileProvider::Directory(parent).filePath(stem + (duplicate ? " copy " : " ") + QString::number(n) + ext);
     }
     return result;
 }
@@ -60,14 +60,15 @@ bool copyTree(const QString &source, const QString &destination, QString *error)
         *error = "This item contains an unavailable file or a symbolic link."; return false;
     }
     if (before.isDir()) {
-        if (!QDir().mkdir(destination)) { *error = "Could not create the copy."; return false; }
-        const QDir directory(source);
-        const auto entries = directory.entryList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot, QDir::Name);
+        if (!iiFileProvider::Directory().mkdir(destination)) { *error = "Could not create the copy."; return false; }
+        const iiFileProvider::Directory directory(source);
+        const auto entries = directory.entryList(iiFileProvider::Directory::AllEntries | iiFileProvider::Directory::Hidden | iiFileProvider::Directory::System | iiFileProvider::Directory::NoDotAndDotDot, iiFileProvider::Directory::Name);
         if (!before.isReadable()) { *error = "The source folder cannot be read."; return false; }
         for (const auto &name : entries) {
-            if (!copyTree(directory.filePath(name), QDir(destination).filePath(name), error)) return false;
+            if (name == ".iisacc-temporary.lock") continue;
+            if (!copyTree(directory.filePath(name), iiFileProvider::Directory(destination).filePath(name), error)) return false;
         }
-        if (entries != directory.entryList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot, QDir::Name)) {
+        if (entries != directory.entryList(iiFileProvider::Directory::AllEntries | iiFileProvider::Directory::Hidden | iiFileProvider::Directory::System | iiFileProvider::Directory::NoDotAndDotDot, iiFileProvider::Directory::Name)) {
             *error = "The folder changed while it was being copied. Try again."; return false;
         }
     } else {
@@ -75,10 +76,10 @@ bool copyTree(const QString &source, const QString &destination, QString *error)
 #ifdef Q_OS_MACOS
         // APFS clones avoid rereading multi-GB model weights. Other filesystems
         // transparently fall back to copyfile's ordinary data copy.
-        copied = ::copyfile(QFile::encodeName(source).constData(), QFile::encodeName(destination).constData(),
+        copied = ::copyfile(iiFileProvider::FileDevice::encodeName(source).constData(), iiFileProvider::FileDevice::encodeName(destination).constData(),
                             nullptr, COPYFILE_ALL | COPYFILE_CLONE | COPYFILE_EXCL | COPYFILE_NOFOLLOW_SRC) == 0;
 #else
-        copied = QFile::copy(source, destination);
+        copied = iiFileProvider::FileDevice::copy(source, destination);
 #endif
         if (!copied) { *error = "Could not copy this file. Check available space and access."; return false; }
     }
@@ -95,26 +96,26 @@ bool removeTree(const QString &path) {
     if (info.isDir()) {
         if (info.isSymLink() || info.isJunction())
             return RemoveDirectoryW(reinterpret_cast<LPCWSTR>(path.utf16())) != FALSE;
-        const auto children = QDir(path).entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
+        const auto children = iiFileProvider::Directory(path).entryInfoList(iiFileProvider::Directory::AllEntries | iiFileProvider::Directory::Hidden | iiFileProvider::Directory::System | iiFileProvider::Directory::NoDotAndDotDot);
         for (const auto &child : children)
             if (!removeTree(child.absoluteFilePath())) return false;
-        return QDir().rmdir(path);
+        return iiFileProvider::Directory().rmdir(path);
     }
-    return QFile::remove(path);
+    return iiFileProvider::FileDevice::remove(path);
 #else
-    return QFileInfo(path).isDir() && !QFileInfo(path).isSymLink() ? QDir(path).removeRecursively() : QFile::remove(path);
+    return QFileInfo(path).isDir() && !QFileInfo(path).isSymLink() ? iiFileProvider::Directory(path).removeRecursively() : iiFileProvider::FileDevice::remove(path);
 #endif
 }
 bool moveWithoutCopy(const QString &source, const QString &destination) {
-    // QFile/QDir rename may fall back to copying file contents. Trash must be a
+    // iiFileProvider::FileDevice/iiFileProvider::Directory rename may fall back to copying file contents. Trash must be a
     // single, no-replace filesystem rename, including when another writer races.
 #if defined(Q_OS_DARWIN)
-    return ::renamex_np(QFile::encodeName(source).constData(), QFile::encodeName(destination).constData(), RENAME_EXCL) == 0;
+    return ::renamex_np(iiFileProvider::FileDevice::encodeName(source).constData(), iiFileProvider::FileDevice::encodeName(destination).constData(), RENAME_EXCL) == 0;
 #elif defined(Q_OS_WIN)
     return ::MoveFileW(reinterpret_cast<LPCWSTR>(source.utf16()), reinterpret_cast<LPCWSTR>(destination.utf16()));
 #elif defined(Q_OS_LINUX) && defined(SYS_renameat2)
-    return ::syscall(SYS_renameat2, AT_FDCWD, QFile::encodeName(source).constData(),
-                     AT_FDCWD, QFile::encodeName(destination).constData(), 1 /* RENAME_NOREPLACE */) == 0;
+    return ::syscall(SYS_renameat2, AT_FDCWD, iiFileProvider::FileDevice::encodeName(source).constData(),
+                     AT_FDCWD, iiFileProvider::FileDevice::encodeName(destination).constData(), 1 /* RENAME_NOREPLACE */) == 0;
 #else
     Q_UNUSED(source); Q_UNUSED(destination);
     return false; // Never silently copy a model or overwrite a destination.
@@ -125,9 +126,9 @@ FileOperations::FileOperations(SocietyDrive drive) : m_drive(std::move(drive)) {
 std::optional<SocietyDrive> FileOperations::containingDrive(const QString &path) {
     if (!QFileInfo(path).isAbsolute()) return {};
     if (const auto root = DiskImage::containerRoot(path.toStdString())) return SocietyDrive::open(QString::fromStdString(root->string()));
-    QString parent = QDir::cleanPath(path);
+    QString parent = iiFileProvider::Directory::cleanPath(path);
     for (;;) {
-        if (QFileInfo::exists(QDir(parent).filePath(".society-drive.json"))) return SocietyDrive::open(parent);
+        if (QFileInfo::exists(iiFileProvider::Directory(parent).filePath(".society-drive.json"))) return SocietyDrive::open(parent);
         const auto ancestor = QFileInfo(parent).absolutePath();
         if (ancestor == parent) break; // Every Windows volume has its own root.
         parent = ancestor;
@@ -143,17 +144,17 @@ FileOperations::Result FileOperations::createDirectory(const QString &parent, co
         return failed("Choose an available folder in this Society container.");
     if (name.isEmpty() || name.startsWith('.') || name.contains('/') || name.contains('\\')
         || name.contains(':') || name.contains(QChar::Null)) return failed("Enter a valid folder name.");
-    const auto destination = QDir(parent).filePath(name);
+    const auto destination = iiFileProvider::Directory(parent).filePath(name);
     if (!editable(destination)) return failed("The destination is unavailable or protected.");
     const auto syncDirectory = m_drive.rootPath() + "/.society-sync";
-    if (QFileInfo(syncDirectory).isSymLink() || !QDir().mkpath(syncDirectory))
+    if (QFileInfo(syncDirectory).isSymLink() || !iiFileProvider::Directory().mkpath(syncDirectory))
         return failed("The Society operation directory is unavailable.");
-    QLockFile lock(syncDirectory + "/operation.lock"); lock.setStaleLockTime(0);
+    iiFileProvider::LockFile lock(syncDirectory + "/operation.lock"); lock.setStaleLockTime(0);
     if (!lock.tryLock(2000)) return failed("Another Society operation is in progress. Try again.");
     if (!m_drive.isReady() || !confined(m_drive, parent, true) || !QFileInfo(parent).isDir() || !editable(destination))
         return failed("The selected folder changed. Try again.");
     std::error_code error;
-    if (!std::filesystem::create_directory(detail::nativePath(destination), error))
+    if (!iiFileProvider::native::createDirectory(detail::nativePath(destination), error))
         return failed(error ? QString::fromStdString(error.message()) : QStringLiteral("An item with that name already exists."));
     return {destination, {}};
 }
@@ -208,21 +209,21 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
     // Never move a partial model package and leave its remote children behind.
     if (!keys.isEmpty() && !map.available(keys)) return failed("The selected item is not fully downloaded yet.");
     const auto syncDirectory = m_drive.rootPath() + "/.society-sync";
-    if (QFileInfo(syncDirectory).isSymLink() || !QDir().mkpath(syncDirectory)) return failed("The Society operation directory is unavailable.");
-    QLockFile lock(syncDirectory + "/operation.lock"); lock.setStaleLockTime(0);
+    if (QFileInfo(syncDirectory).isSymLink() || !iiFileProvider::Directory().mkpath(syncDirectory)) return failed("The Society operation directory is unavailable.");
+    iiFileProvider::LockFile lock(syncDirectory + "/operation.lock"); lock.setStaleLockTime(0);
     const bool copy = action == Action::Duplicate || action == Action::Copy;
     QString destination;
     const auto parent = QFileInfo(source).absolutePath();
     if (action == Action::Rename) {
         if (argument.isEmpty() || argument.startsWith('.') || argument.contains('/') || argument.contains('\\')
             || argument.contains(':') || argument.contains(QChar::Null)) return failed("Enter a valid file name.");
-        destination = QDir(parent).filePath(argument);
+        destination = iiFileProvider::Directory(parent).filePath(argument);
         if (destination == source) return {source, {}};
     } else {
         const auto folder = action == Action::Copy || action == Action::Move ? argument : parent;
         if (!confined(m_drive, folder, true) || !QFileInfo(folder).isDir()) return failed("Choose a folder in this Society container.");
         if (folder == source || folder.startsWith(source + '/')) return failed("An item cannot be copied into itself.");
-        destination = action == Action::Move ? QDir(folder).filePath(sourceInfo.fileName())
+        destination = action == Action::Move ? iiFileProvider::Directory(folder).filePath(sourceInfo.fileName())
                                             : uniquePath(folder, sourceInfo.fileName(), action == Action::Duplicate);
         if (action == Action::Move && destination == source) return {source, {}};
     }
@@ -239,7 +240,7 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
     if (action == Action::Move) {
         if (!m_drive.isReady() || !moveWithoutCopy(source, destination))
             return failed("Could not move this item without replacement. Check access and that both folders are on the same filesystem.");
-    } else if (!QDir().rename(copy ? staged : source, destination)) {
+    } else if (!iiFileProvider::Directory().rename(copy ? staged : source, destination)) {
         return failed("Could not move this item. Check access and try again.");
     }
     staged.clear(); return {destination, {}};

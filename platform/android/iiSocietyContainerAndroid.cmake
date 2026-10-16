@@ -26,6 +26,7 @@ function(iiSocietyContainer_configure_android_client target)
     configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/src/com/iisacc/society/storage/SocietyClient.java"
         "${package}/src/com/iisacc/society/storage/SocietyClient.java" COPYONLY)
     set_target_properties(${target} PROPERTIES QT_ANDROID_PACKAGE_SOURCE_DIR "${package}")
+    iiFileProvider_add_android_storage(${target})
 endfunction()
 
 # Society is the single Android owner. Client apps must use URI grants; installing
@@ -45,4 +46,5 @@ function(iiSocietyContainer_add_android_file_provider target)
     configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/AndroidManifest.xml" "${package}/AndroidManifest.xml" COPYONLY)
     set_target_properties(${target} PROPERTIES QT_ANDROID_PACKAGE_SOURCE_DIR "${package}"
         QT_ANDROID_PACKAGE_NAME "com.iisacc.society" QT_ANDROID_MIN_SDK_VERSION 28 QT_ANDROID_TARGET_SDK_VERSION 35)
+    iiFileProvider_add_android_storage(${target})
 endfunction()

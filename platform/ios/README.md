@@ -6,20 +6,20 @@ At iOS   16  and above, Apple's [replicated File Provider](https://developer.app
 
 ## Storage location and exposure scope
 
-The app and extension use the same App Group. The default identifier is `group.com.iisacc.society` . `Library/Application Support/Society/` is used as the original container under the group path provided by iOS . At first execution, C++   `SocietyDrive::create(path)` configures UUID , manifest, and 8 areas in this path, and subsequent executions reuse the same UUID.
+The app and extension use the same App Group. The default identifier is `group.com.iisacc.society`. Its source is one `Society.societycontainer` package directly inside the OS-provided group. First preparation creates no outside `Library/Application Support` scaffolding. C++ `SocietyDrive::create(path)` initializes the UUID manifest and nine sections, and subsequent execution reuses the same UUID. If the previous managed `Library/Application Support/Society` directory exists, preparation validates its schema-1 manifest and section directories, rejects image markers or redirects, and moves it into the package without copying or rewriting the manifest. Unrelated directories are not managed.
 
 |Access path|Actual content|
 | --- | --- |
-|File app → Society  → `/`|Child of original `Society/Files/`|
-|File app → Society  → `/Example.txt`|Original `Society/Files/Example.txt`|
-|Society app → container home|8 areas in total|
-|Society App → Models|Original  `Society/Models/`|
+|File app → Society → `/`|Children of `Society.societycontainer/Files/`|
+|File app → Society → `/Example.txt`|`Society.societycontainer/Files/Example.txt`|
+|Society app → container home|Nine source sections|
+|Society app → Models|`Society.societycontainer/Models/`|
 
 Do not add an intermediate folder named  `Files` to the file app root. Asset Library, Deleted, Forked, Generation History, Models, Published, Thinking Space are excluded from the file app's enumeration, item lookup, download, creation, modification, move, and deletion paths. Originals and indexes are also not published. If a regular folder with the same name is created on the public drive, it is created inside Files as  `Files/Models` . No additional specifications are provided by area.
 
 Originals are separated from the app's Documents and File Provider replica storage locations. The app's  `UIFileSharingEnabled` is false. Other regular apps cannot read the Original App Group and access documents via the picker in Files items published by Society. Apps and extensions with App Group entitlement can access  Society  Original areas and  8  Original areas.
 
-C++  Container API determines the directory as transmitted before. The system drive connection of  iOS  requires the above shared container path. Do not pass bookmarks of arbitrary external folders to the extension or automatically move the original. This is the storage location for the app and extension to continuously read the same original within the mobile sandbox.  macOS  maintains the existing path selection and bookmark connection.
+The iOS system Files connection requires the shared package path. Arbitrary external-folder bookmarks are not passed to the extension. OS-managed File Provider replicas and temporary materialization remain under iOS control; source files, the provider index, and Society-managed application state belong to the package. macOS retains package selection and security-scoped connection.
 
 <a id="연결과-변경-반영"></a>
 

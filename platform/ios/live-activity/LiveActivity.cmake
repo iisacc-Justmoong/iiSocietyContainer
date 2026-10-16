@@ -26,7 +26,10 @@ function(iiSocietyContainer_add_ios_live_activity target)
 
     set(common "${native}/TaskActivityState.swift" "${native}/TaskActivityAttributes.swift")
     set(bridge "${target}ActivityBridge")
-    add_library(${bridge} STATIC ${common} "${native}/TaskActivityBridge.swift")
+    find_package(iiFileProviderSwift 0.6 CONFIG REQUIRED
+        HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider"
+        NO_CMAKE_FIND_ROOT_PATH)
+    add_library(${bridge} STATIC ${iiFileProviderSwift_SOURCE} ${common} "${native}/TaskActivityBridge.swift")
     target_compile_options(${bridge} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>")
     target_link_libraries(${bridge} PRIVATE "-framework ActivityKit" "-framework Foundation" "-framework UIKit")
     set_target_properties(${bridge} PROPERTIES Swift_LANGUAGE_VERSION 5 AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)

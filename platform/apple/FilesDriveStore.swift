@@ -29,6 +29,7 @@ final class FilesDriveStore {
         }
         let prefix = section.path + "/"
         guard record.path.hasPrefix(prefix), !record.id.hasPrefix("section:") else { return nil }
+        guard !record.path.split(separator: "/").contains(where: { IisaccFileProvider.isControlFile(String($0)) }) else { return nil }
         return DriveRecord(id: record.id, parent: record.parent == sectionID ? "root" : record.parent,
                            name: record.name, path: String(record.path.dropFirst(prefix.count)),
                            directory: record.directory, identity: record.identity, size: record.size,

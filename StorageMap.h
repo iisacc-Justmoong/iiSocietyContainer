@@ -10,7 +10,8 @@ class IISOCIETYCONTAINER_EXPORT StorageMap final {
 public:
     explicit StorageMap(const SocietyDrive &drive);
     QJsonArray objects(QString *error = nullptr) const;
-    // A declared local host browses its actual files while its index catches up.
+    // An original package or declared local host browses its actual files while
+    // its index catches up, including before host registration.
     // Replicas continue to display absent, remote-only objects from the catalog.
     bool isLocalAuthority() const;
     QJsonObject object(const QString &key) const;

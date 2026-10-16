@@ -1,8 +1,8 @@
+#include <iiFileProviderDevice.h>
 #include <SocietyDrive.h>
 #include <ModelStore.h>
 
 #include <QtCore/QCoreApplication>
-#include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
@@ -13,7 +13,7 @@ int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
     const auto args = app.arguments();
-    QFile output;
+    iiFileProvider::FileDevice output;
     output.open(stdout, QIODevice::WriteOnly);
     if (args.size() == 2 && args[1] == QStringLiteral("catalog")) {
         QJsonArray sections;
@@ -46,11 +46,11 @@ int main(int argc, char** argv)
         output.write(QJsonDocument(QJsonObject{{"models", models}, {"error", error}}).toJson()); return error.isEmpty() ? 0 : 1;
     }
     if (args.size() != 3 || (args[1] != "create" && args[1] != "open")) {
-        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <directory> | open <directory> | models <directory> | organize-models <directory>\n");
+        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <existing-absolute-parent-or-package> | open <existing-package> | models <directory> | organize-models <directory>\n");
         return 2;
     }
     QString error;
-    const auto drive = args[1] == "create" ? SocietyDrive::create(args[2], &error)
+    const auto drive = args[1] == "create" ? SocietyDrive::createAt(args[2], &error)
                                           : SocietyDrive::open(args[2], &error);
     if (!drive) {
         output.write(QJsonDocument(QJsonObject{{"error", error}}).toJson());

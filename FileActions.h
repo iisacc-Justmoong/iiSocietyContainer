@@ -1,16 +1,12 @@
 #pragma once
 #include "StorageDirectoryModel.h"
+#include "iiSocietyContainerExport.h"
 #include <QThreadPool>
 
-#if defined(IISOCIETYCONTAINER_GUI_BUILD)
-#define IISOCIETY_GUI_EXPORT Q_DECL_EXPORT
-#else
-#define IISOCIETY_GUI_EXPORT Q_DECL_IMPORT
-#endif
 namespace iiSocietyContainer {
 // GUI-thread adapter; payload materialization and mutations run asynchronously.
 // Used by any Society consumer without putting filesystem logic in its QML.
-class IISOCIETY_GUI_EXPORT FileActions : public QObject {
+class IISOCIETY_SHARING_EXPORT FileActions : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString path READ path WRITE setPath NOTIFY pathChanged)
     Q_PROPERTY(bool editable READ editable NOTIFY pathChanged)

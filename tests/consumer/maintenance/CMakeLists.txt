@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.24)
+project(iiSocietyContainerMaintenanceConsumer LANGUAGES CXX)
+find_package(iiSocietyContainer 0.15.0 CONFIG REQUIRED COMPONENTS Maintenance)
+add_executable(NativeMaintenanceConsumer ../../maintenance.cpp)
+target_link_libraries(NativeMaintenanceConsumer PRIVATE iiSocietyContainer::Maintenance iiFileProvider::Temporary)
+enable_testing()
+add_test(NAME iiSocietyContainer.qt_free_maintenance COMMAND NativeMaintenanceConsumer "${CMAKE_CURRENT_BINARY_DIR}")

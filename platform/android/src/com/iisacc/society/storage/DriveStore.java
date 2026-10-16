@@ -1,5 +1,7 @@
 package com.iisacc.society.storage;
 
+import com.iisacc.iifileprovider.FileStorage;
+
 import android.content.Context;
 import android.content.ContentValues;
 import android.database.Cursor;
@@ -39,22 +41,22 @@ public final class DriveStore {
     }
 
     private DriveStore(Context context) throws IOException {
-        root = new File(context.getFilesDir(), "Society").getCanonicalFile();
+        root = managedRoot(context);
         try (InputStream input = context.getAssets().open("society/Sections.json")) {
             catalog = new JSONArray(new String(readAll(input), StandardCharsets.UTF_8));
             if (catalog.length() != 9) throw new IOException("Invalid Society section catalog");
-            if (!root.isDirectory() && !root.mkdirs()) throw new IOException("Cannot create Society storage");
+            if (!root.isDirectory() && !FileStorage.mkdirs(root)) throw new IOException("Cannot create Society storage");
             File manifest = new File(root, ".society-drive.json");
             if (!manifest.exists()) {
                 for (int i = 0; i < catalog.length(); ++i) {
                     File section = new File(root, catalog.getJSONObject(i).getString("path"));
-                    if (!section.isDirectory() && !section.mkdir()) throw new IOException("Cannot create Society area");
+                    if (!section.isDirectory() && !FileStorage.mkdir(section)) throw new IOException("Cannot create Society area");
                     checkFile(section);
                 }
                 JSONObject data = new JSONObject().put("type", "SocietyDrive").put("schemaVersion", 1).put("filesLayoutVersion", 1)
                     .put("identifier", UUID.randomUUID().toString()).put("displayName", DISPLAY_NAME)
                     .put("sections", catalog);
-                AtomicFile atomic = new AtomicFile(manifest);
+                AtomicFile atomic = new FileStorage.AtomicFile(manifest);
                 FileOutputStream output = atomic.startWrite();
                 try { output.write(data.toString().getBytes(StandardCharsets.UTF_8)); atomic.finishWrite(output); }
                 catch (Exception error) { atomic.failWrite(output); throw error; }
@@ -62,10 +64,72 @@ public final class DriveStore {
             identity = manifest().getString("identifier");
             UUID.fromString(identity);
             validate();
-            index = context.openOrCreateDatabase("society-files-index.db", Context.MODE_PRIVATE, null);
+            File runtime = new File(root, ".society-runtime");
+            if (!runtime.exists() && !FileStorage.mkdir(runtime)) throw new IOException("Cannot prepare Society runtime");
+            checkFile(runtime);
+            File provider = new File(runtime, "android-provider");
+            if (!provider.exists() && !FileStorage.mkdir(provider)) throw new IOException("Cannot prepare Society provider state");
+            checkFile(provider);
+            File database = new File(provider, "society-files-index.db");
+            migrateIndex(context.getDatabasePath("society-files-index.db"), database);
+            index = SQLiteDatabase.openOrCreateDatabase(database, null);
             index.execSQL("CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, drive TEXT NOT NULL, path TEXT NOT NULL, device INTEGER NOT NULL, inode INTEGER NOT NULL, UNIQUE(drive,path))");
             index.execSQL("CREATE INDEX IF NOT EXISTS document_identity ON documents(drive,device,inode)");
         } catch (Exception error) { throw failure(error); }
+    }
+
+    private static File managedRoot(Context context) throws IOException {
+        File parent = context.getFilesDir().getCanonicalFile();
+        File target = new File(parent, "Society.societycontainer");
+        File previous = new File(parent, "Society");
+        if (!target.exists() && previous.exists()) {
+            checkFile(previous);
+            if (!previous.isDirectory()) throw new IOException("The previous Society source is not a directory");
+            rejectLegacyMarkers(previous);
+            File manifest = new File(previous, ".society-drive.json");
+            checkFile(manifest);
+            try (InputStream input = new FileInputStream(manifest)) {
+                JSONObject data = new JSONObject(new String(readAll(input), StandardCharsets.UTF_8));
+                if (!data.getString("type").equals("SocietyDrive") || data.getInt("schemaVersion") != 1)
+                    throw new IOException("The previous Society source is unsupported");
+                UUID.fromString(data.getString("identifier"));
+            } catch (Exception error) { throw failure(error); }
+            if (!previous.renameTo(target)) throw new IOException("Cannot move Society data into its container package");
+        }
+        if (target.exists()) checkFile(target);
+        rejectLegacyMarkers(target);
+        return target;
+    }
+
+    private static void rejectLegacyMarkers(File root) throws IOException {
+        for (String marker : new String[]{"Info.plist", "bands", ".society-disk.plist"}) {
+            try {
+                Os.lstat(new File(root, marker).getAbsolutePath());
+            } catch (android.system.ErrnoException error) {
+                if (error.errno == OsConstants.ENOENT) continue;
+                throw failure(error);
+            }
+            throw new IOException("Legacy Society disk images are not restored");
+        }
+    }
+
+    private static void migrateIndex(File previous, File target) throws IOException {
+        if (target.exists()) { checkFile(target); return; }
+        if (!previous.exists()) return;
+        List<File[]> moved = new ArrayList<>();
+        try {
+            for (String suffix : new String[]{"", "-wal", "-shm", "-journal"}) {
+                File from = new File(previous.getPath() + suffix), to = new File(target.getPath() + suffix);
+                if (!from.exists()) continue;
+                checkFile(from);
+                if (to.exists() || !from.renameTo(to)) throw new IOException("Cannot move Society provider index into its container");
+                moved.add(new File[]{from, to});
+            }
+        } catch (IOException error) {
+            Collections.reverse(moved);
+            for (File[] pair : moved) if (!pair[1].renameTo(pair[0])) error.addSuppressed(new IOException("Could not restore provider index"));
+            throw error;
+        }
     }
 
     static byte[] readAll(InputStream input) throws IOException {
@@ -91,6 +155,7 @@ public final class DriveStore {
     synchronized void validate() throws IOException {
         try {
             checkFile(root);
+            if (!root.getName().endsWith(".societycontainer")) throw new IOException("Society manages only container packages");
             JSONObject data = manifest();
             if (!data.getString("identifier").equals(identity) || !data.getString("type").equals("SocietyDrive")
                 || data.getInt("schemaVersion") != 1
@@ -155,7 +220,7 @@ public final class DriveStore {
         for (String component : path.split("/", -1)) {
             name(component); accumulated += (accumulated.isEmpty() ? "" : "/") + component;
             File directory = internal(key, accumulated, true);
-            if (!directory.exists() && !directory.mkdir()) throw new IOException("Cannot create Society directory");
+            if (!directory.exists() && !FileStorage.mkdir(directory)) throw new IOException("Cannot create Society directory");
             checkFile(directory);
             if (!directory.isDirectory()) throw new IOException("Society path is not a directory");
         }
@@ -173,7 +238,7 @@ public final class DriveStore {
     }
     static void name(String name) throws IOException {
         if (name == null || name.isEmpty() || name.equals(".") || name.equals("..") || name.indexOf('/') >= 0
-            || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0 || name.indexOf('\0') >= 0)
+            || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0 || name.indexOf('\0') >= 0 || FileStorage.isControlFile(name))
             throw new IOException("Invalid Society filename");
     }
     private File relative(String path) throws IOException {
@@ -244,7 +309,7 @@ public final class DriveStore {
         if (!parent.isDirectory()) throw new IOException("Not a Society directory");
         File file = new File(parent, displayName);
         boolean directory = android.provider.DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
-        if (directory ? !file.mkdir() : !file.createNewFile()) throw new IOException("A file with this name already exists");
+        if (directory ? !FileStorage.mkdir(file) : !FileStorage.createNewFile(file)) throw new IOException("A file with this name already exists");
         return idFor(file);
     }
     synchronized String move(String id, String parentId, String displayName) throws IOException {

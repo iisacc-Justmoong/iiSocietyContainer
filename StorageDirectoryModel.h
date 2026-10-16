@@ -47,6 +47,8 @@ public:
     // Revision-bound image-provider URL; empty for missing, redirected or non-image files.
     static QUrl thumbnailUrl(const QString &path);
     static QString cacheDirectory();
+    // Derive a cache from the source's container; never create an external cache.
+    static QString cacheDirectory(const QString &sourcePath);
 signals:
     // One publication boundary per changed snapshot; polling alone emits neither.
     void contentsAboutToChange();

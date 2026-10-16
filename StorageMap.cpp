@@ -1,9 +1,7 @@
+#include <iiFileProviderDevice.h>
 #include "StorageMap.h"
-#include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
-#include <QSaveFile>
 #include <QUuid>
 #include <QRegularExpression>
 
@@ -43,7 +41,7 @@ bool StorageMap::prepare(QString *error) const {
     auto path = m_drive.rootPath();
     for (const auto *part : {".society-sync", "requests"}) {
         path += '/' + QString::fromLatin1(part);
-        if (!ordinary(path) || (!QFileInfo::exists(path) && !QDir().mkdir(path)) || !QFileInfo(path).isDir()) {
+        if (!ordinary(path) || (!QFileInfo::exists(path) && !iiFileProvider::Directory().mkdir(path)) || !QFileInfo(path).isDir()) {
             fail(error, "The Society storage map is unavailable or redirected."); return false;
         }
     }
@@ -53,19 +51,19 @@ QJsonObject StorageMap::read(const QString &relative, qint64 limit) const {
     if (!m_drive.isValid()) return {};
     QString path = m_drive.rootPath();
     for (const auto &part : relative.split('/')) { path += '/' + part; if (!ordinary(path)) return {}; }
-    QFile input(path);
+    iiFileProvider::FileDevice input(path);
     if (input.size() > limit || !input.open(QIODevice::ReadOnly)) return {};
     return QJsonDocument::fromJson(input.readAll()).object();
 }
 bool StorageMap::write(const QString &relative, const QJsonObject &value, QString *error) const {
     if (!prepare(error)) return false;
-    const auto path = QDir(m_drive.rootPath()).filePath(".society-sync/" + relative);
+    const auto path = iiFileProvider::Directory(m_drive.rootPath()).filePath(".society-sync/" + relative);
     if (!ordinary(path)) { fail(error, "The Society metadata path is redirected."); return false; }
     const auto bytes = QJsonDocument(value).toJson(QJsonDocument::Compact);
-    QFile old(path);
+    iiFileProvider::FileDevice old(path);
     if (old.open(QIODevice::ReadOnly) && old.size() == bytes.size() && old.readAll() == bytes) return true;
-    old.close(); QSaveFile output(path);
-    if (!output.open(QIODevice::WriteOnly) || !output.setPermissions(QFile::ReadOwner | QFile::WriteOwner)
+    old.close(); iiFileProvider::SaveFile output(path);
+    if (!output.open(QIODevice::WriteOnly) || !output.setPermissions(iiFileProvider::FileDevice::ReadOwner | iiFileProvider::FileDevice::WriteOwner)
         || output.write(bytes) != bytes.size() || !output.commit()) { fail(error, output.errorString()); return false; }
     return true;
 }
@@ -80,8 +78,15 @@ bool StorageMap::isLocalAuthority() const {
     const auto primary = read(".society-sync/primary.json", 8192);
     static const QRegularExpression scope("\\A[a-f0-9]{64}\\z");
     const auto host = primary.value("host").toString();
-    return primary.value("schema") == 1 && primary.value("container") == m_drive.identifier()
-        && !host.isEmpty() && host.size() <= 128 && scope.match(primary.value("scope").toString()).hasMatch();
+    if (primary.value("schema") == 1 && primary.value("container") == m_drive.identifier()
+        && !host.isEmpty() && host.size() <= 128 && scope.match(primary.value("scope").toString()).hasMatch()) return true;
+    // An ordinary source package owns the files its user placed there, even
+    // before registering a host or hashing those files into the sync catalog.
+    // Replica identity is explicit in the manifest; an absent host descriptor
+    // alone must not turn a source into a catalog-only replica.
+    const auto manifest = read(".society-drive.json", 65536);
+    return manifest.value("identifier") == m_drive.identifier()
+        && !manifest.contains("localIdentifier") && !manifest.contains("replicaReady");
 }
 QJsonObject StorageMap::object(const QString &key) const {
     for (const auto &value : objects()) if (value.toObject().value("path") == key) return value.toObject();
@@ -123,7 +128,7 @@ QString StorageMap::previewPath(const QJsonObject &object) const {
     const auto hash = object.value("hash").toString();
     static const QRegularExpression hex("\\A[a-f0-9]{64}\\z");
     if (!hex.match(hash).hasMatch() || !m_drive.isValid()) return {};
-    const auto directory = QDir(m_drive.rootPath()).filePath(".society-sync/previews");
+    const auto directory = iiFileProvider::Directory(m_drive.rootPath()).filePath(".society-sync/previews");
     const auto path = directory + '/' + hash + ".jpg";
     return ordinary(QFileInfo(directory).absolutePath()) && ordinary(directory) && ordinary(path) && QFileInfo(path).isFile() ? path : QString();
 }
@@ -150,9 +155,9 @@ bool StorageMap::cancel(const QString &id) const {
 }
 QJsonArray StorageMap::pendingRequests() const {
     QJsonArray result;
-    const auto dir = QDir(m_drive.rootPath()).filePath(".society-sync/requests");
+    const auto dir = iiFileProvider::Directory(m_drive.rootPath()).filePath(".society-sync/requests");
     if (!ordinary(QFileInfo(dir).absolutePath()) || !ordinary(dir)) return result;
-    for (const auto &file : QDir(dir).entryList({"*.json"}, QDir::Files, QDir::Name)) {
+    for (const auto &file : iiFileProvider::Directory(dir).entryList({"*.json"}, iiFileProvider::Directory::Files, iiFileProvider::Directory::Name)) {
         const auto value = requestState(file.chopped(5));
         if (value.value("state") == "queued") result.append(value);
     }

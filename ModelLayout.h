@@ -1,9 +1,10 @@
 #pragma once
 
-#include <QStringList>
+#include "ModelType.h"
 
 namespace iiSocietyContainer::detail {
-// Internal filesystem layout shared by drive initialization and model management.
+// Validate existing categories without materializing unused taxonomy folders.
 bool validateModelLayout(const QString &root, QString *error);
-bool createModelLayout(const QString &root, QString *error, QStringList *created = nullptr);
+// A writer prepares only the category it is about to use.
+bool ensureModelCategory(const QString &root, ModelType type, QString *error);
 }

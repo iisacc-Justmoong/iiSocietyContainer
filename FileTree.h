@@ -1,6 +1,7 @@
 #pragma once
 
 #include "iiSocietyContainerExport.h"
+#include <iiFileProviderPresentation.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -11,8 +12,9 @@
 
 namespace iiSocietyContainer {
 
-/// Native filesystem traversal with no Qt dependency. Calls read current metadata;
-/// snapshots do not read file contents and do not follow redirected entries.
+/// Native filesystem traversal with no Qt dependency. Entry/list/snapshot calls
+/// read metadata only; presentation() explicitly reads a bounded provider preview.
+/// Traversal does not follow redirected entries.
 class IISOCIETY_FILETREE_EXPORT FileTree final {
 public:
     enum class Kind { File, Directory };
@@ -42,6 +44,7 @@ public:
     };
     using EntryResult = Result<Entry>;
     using ChildrenResult = Result<std::vector<Entry>>;
+    using PresentationResult = Result<iiFileProvider::native::PresentationRecord>;
 
     /// Pins the canonical native directory. Invalid roots remain invalid.
     explicit FileTree(const std::filesystem::path& root);
@@ -49,6 +52,9 @@ public:
     [[nodiscard]] bool isValid() const;
     /// Empty and "." select the root. Other paths must be strict relative paths.
     [[nodiscard]] EntryResult entry(const std::filesystem::path& relative = {}) const;
+    /// On-demand provider details and bounded preview for an existing regular
+    /// file. Traversal/listing remain payload-free. Rejects control/redirect paths.
+    [[nodiscard]] PresentationResult presentation(const std::filesystem::path& relative) const;
     [[nodiscard]] ChildrenResult children(const std::filesystem::path& relative = {},
                                           bool includeHidden = false) const;
     [[nodiscard]] EntryResult snapshot(const std::filesystem::path& relative,

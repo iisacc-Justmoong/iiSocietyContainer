@@ -1,3 +1,4 @@
+#include <iiFileProviderDevice.h>
 #include "SocietyDrive.h"
 #include "src/FileTreePaths.h"
 #include "ModelLayout.h"
@@ -5,15 +6,11 @@
 #include "PhotosLayout.h"
 #include "DiskImage.h"
 #include "DirectoryStorage.h"
-
-#include <QtCore/QDir>
-#include <QtCore/QFile>
+#include "StorageMaintenance.h"
 #include <QtCore/QFileInfo>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
-#include <QtCore/QLockFile>
-#include <QtCore/QSaveFile>
 #include <QtCore/QUuid>
 
 #include <utility>
@@ -25,11 +22,7 @@ constexpr auto manifestName = ".society-drive.json";
 
 QString sectionRoot(const QString& root, StoreSection section)
 {
-    if (section == StoreSection::Files && QFileInfo::exists(root + "/.society-disk.plist")) {
-        const auto files = DiskImage::filesRoot(root.toStdString());
-        return files ? QString::fromStdString(files->string()) : QString();
-    }
-    return QDir(root).filePath(storeSectionName(section));
+    return iiFileProvider::Directory(root).filePath(storeSectionName(section));
 }
 
 void setError(QString* error, const QString& message)
@@ -48,10 +41,15 @@ bool isDirectDirectory(const QString& path)
 
 QString sourceLocationError(const QString& path)
 {
+    if (QFileInfo::exists(iiFileProvider::Directory(path).filePath(".society-disk.plist"))
+        || QFileInfo::exists(iiFileProvider::Directory(path).filePath("Society.volume"))
+        || (QFileInfo::exists(iiFileProvider::Directory(path).filePath("Info.plist"))
+            && QFileInfo(iiFileProvider::Directory(path).filePath("bands")).isDir()))
+        return QStringLiteral("Legacy Society disk images are not restored. Choose a .societycontainer directory package.");
     if (const auto container = DiskImage::containerRoot(path.toStdString()))
-        return QStringLiteral("Society Files is a public volume. Open the original Society disk image in the app.");
+        return QStringLiteral("This legacy Society Files volume is unmanaged. Choose a .societycontainer directory package.");
 #ifdef Q_OS_MACOS
-    const QFileInfo cloudStorage(QDir::home().filePath(QStringLiteral("Library/CloudStorage")));
+    const QFileInfo cloudStorage(iiFileProvider::Directory::home().filePath(QStringLiteral("Library/CloudStorage")));
     const auto cloudRoot = cloudStorage.canonicalFilePath();
     if (!cloudRoot.isEmpty() && (path == cloudRoot || path.startsWith(cloudRoot + '/'))) {
         return QStringLiteral("Finder's CloudStorage drive is a public replica. Choose the original Society source folder.");
@@ -59,13 +57,16 @@ QString sourceLocationError(const QString& path)
 #endif
     // A Files replica was previously accepted as a new eight-section drive.
     // Also reject the corresponding native Files path and deeper descendants.
-    QDir ancestor(path);
+    iiFileProvider::Directory ancestor(path);
     while (ancestor.cdUp()) {
         const QFileInfo manifest(ancestor.filePath(QLatin1String(manifestName)));
-        if (manifest.exists() || manifest.isSymLink() || manifest.isJunction()) {
+        if (manifest.exists() || manifest.isSymLink() || manifest.isJunction()
+            || QFileInfo(ancestor.path()).suffix().compare("societycontainer", Qt::CaseInsensitive) == 0) {
             return QStringLiteral("A Society source cannot be inside another container. Choose its original source folder.");
         }
     }
+    if (!DirectoryStorage::isPackageDirectory(detail::nativePath(path)))
+        return QStringLiteral("The Society source must be an existing, unredirected .societycontainer directory package without legacy disk-image markers.");
     return {};
 }
 
@@ -88,6 +89,7 @@ QJsonArray sectionDefinitions(bool legacy = false)
 SocietyDrive::SocietyDrive(QString root, QString identifier)
     : m_rootPath(std::move(root)), m_identifier(std::move(identifier))
 {
+    StorageMaintenance::monitor(detail::nativePath(m_rootPath), m_identifier.toStdString());
 }
 
 std::optional<SocietyDrive> SocietyDrive::createAt(const QString& parentDirectory, QString* error)
@@ -97,6 +99,8 @@ std::optional<SocietyDrive> SocietyDrive::createAt(const QString& parentDirector
     if (!location) { setError(error, QString::fromStdString(location.error())); return {}; }
 #ifdef Q_OS_WIN
     const auto directory = QString::fromStdWString(location->path.wstring());
+#elif defined(Q_OS_MACOS)
+    const auto directory = iiFileProvider::FileDevice::decodeName(QByteArray::fromStdString(location->path.string()));
 #else
     const auto directory = QString::fromStdString(location->path.string());
 #endif
@@ -116,6 +120,10 @@ std::optional<SocietyDrive> SocietyDrive::createAt(const QString& parentDirector
 std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, QString* error)
 {
     setError(error, {});
+    if (const auto locationError = sourceLocationError(directoryPath); !locationError.isEmpty()) {
+        setError(error, locationError);
+        return std::nullopt;
+    }
     const SocietyContainer container(directoryPath);
     if (!container.isValid()) {
         setError(error, container.errorString());
@@ -127,8 +135,8 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
         return std::nullopt;
     }
 
-    const QDir root(container.rootPath());
-    QLockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
+    const iiFileProvider::Directory root(container.rootPath());
+    iiFileProvider::LockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
     if (!lock.tryLock()) {
         setError(error, QStringLiteral("The drive is being initialized by another process."));
         return std::nullopt;
@@ -139,11 +147,11 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
         if (!drive) return {};
         if (!drive->isReady()) return drive;
         const auto modelsRoot = drive->sectionPath(StoreSection::Models);
-        QLockFile modelsLock(QDir(modelsRoot).filePath(".society-models.lock"));
+        iiFileProvider::LockFile modelsLock(iiFileProvider::Directory(modelsRoot).filePath(".society-models.lock"));
         if (!modelsLock.tryLock(5000)) {
             setError(error, QStringLiteral("Another process is organizing Models.")); return {};
         }
-        if (!drive->isReady() || !detail::createModelLayout(modelsRoot, error)) return {};
+        if (!drive->isReady() || !detail::validateModelLayout(modelsRoot, error)) return {};
         return drive;
     }
 
@@ -160,7 +168,7 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
     QStringList createdDirectories;
     const auto rollback = [&createdDirectories] {
         for (auto it = createdDirectories.crbegin(); it != createdDirectories.crend(); ++it) {
-            QDir().rmdir(*it); // Only removes empty directories created by this call.
+            iiFileProvider::Directory().rmdir(*it); // Only removes empty directories created by this call.
         }
     };
     const auto modelsRoot = root.filePath(storeSectionName(StoreSection::Models));
@@ -169,7 +177,7 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
     for (const auto section : allStoreSections()) {
         const QString path = sectionRoot(root.path(), section);
         if (!QFileInfo::exists(path)) {
-            if (!QDir().mkdir(path)) {
+            if (!iiFileProvider::Directory().mkdir(path)) {
                 rollback();
                 setError(error, QStringLiteral("The drive section could not be created: %1").arg(path));
                 return std::nullopt;
@@ -177,7 +185,7 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
             createdDirectories.append(path);
         }
     }
-    if (!detail::createModelLayout(modelsRoot, error, &createdDirectories)) { rollback(); return {}; }
+    if (!detail::validateModelLayout(modelsRoot, error)) { rollback(); return {}; }
     if (!detail::migratePhotosLayout(root.path(), error, filesRoot)) { rollback(); return {}; }
 
     const QString identifier = QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -190,7 +198,7 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
         {"sections", sectionDefinitions()}
     });
     const QByteArray data = document.toJson();
-    QSaveFile output(manifest.filePath());
+    iiFileProvider::SaveFile output(manifest.filePath());
     if (!output.open(QIODevice::WriteOnly) || output.write(data) != data.size() || !output.commit()) {
         rollback();
         setError(error, QStringLiteral("The drive manifest could not be saved: %1").arg(output.errorString()));
@@ -202,6 +210,10 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
 std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QString* error)
 {
     setError(error, {});
+    if (const auto locationError = sourceLocationError(directoryPath); !locationError.isEmpty()) {
+        setError(error, locationError);
+        return std::nullopt;
+    }
     const SocietyContainer container(directoryPath);
     if (!container.isValid()) {
         setError(error, container.errorString());
@@ -213,9 +225,9 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
         return std::nullopt;
     }
 
-    const QDir root(container.rootPath());
+    const iiFileProvider::Directory root(container.rootPath());
     const QFileInfo manifest(root.filePath(QLatin1String(manifestName)));
-    QFile input(manifest.filePath());
+    iiFileProvider::FileDevice input(manifest.filePath());
     if (!manifest.isFile() || manifest.isSymLink() || manifest.size() > 65536
         || !input.open(QIODevice::ReadOnly)) {
         setError(error, QStringLiteral("The directory has no readable Society drive manifest."));
@@ -248,7 +260,7 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
     }
     const bool legacyFiles = !data.contains("filesLayoutVersion") && data.value("replicaReady") != QJsonValue(false);
     if (legacyPhotos || legacyFiles) {
-        QLockFile layoutLock(root.filePath(".society-layout.lock"));
+        iiFileProvider::LockFile layoutLock(root.filePath(".society-layout.lock"));
         if (!layoutLock.tryLock(5000)) {
             setError(error, QStringLiteral("Another process is upgrading the Society layout.")); return {};
         }
@@ -264,7 +276,7 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
             data.insert("filesLayoutVersion", 1);
         }
         const auto bytes = QJsonDocument(data).toJson();
-        QSaveFile output(manifest.filePath());
+        iiFileProvider::SaveFile output(manifest.filePath());
         if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
             setError(error, QStringLiteral("Could not save the upgraded Society manifest: %1").arg(output.errorString())); return {};
         }
@@ -284,8 +296,8 @@ std::optional<SocietyDrive> SocietyDrive::adoptReplicaIdentity(
     }
     const auto current = open(directoryPath, error);
     if (!current) return std::nullopt;
-    const QDir root(current->rootPath());
-    QLockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
+    const iiFileProvider::Directory root(current->rootPath());
+    iiFileProvider::LockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
     if (!lock.tryLock()) {
         setError(error, QStringLiteral("The drive is being changed by another process."));
         return std::nullopt;
@@ -296,7 +308,7 @@ std::optional<SocietyDrive> SocietyDrive::adoptReplicaIdentity(
         setError(error, QStringLiteral("The drive identity changed before adoption."));
         return std::nullopt;
     }
-    QFile input(root.filePath(QLatin1String(manifestName)));
+    iiFileProvider::FileDevice input(root.filePath(QLatin1String(manifestName)));
     if (!input.open(QIODevice::ReadOnly)) {
         setError(error, input.errorString()); return std::nullopt;
     }
@@ -310,7 +322,7 @@ std::optional<SocietyDrive> SocietyDrive::adoptReplicaIdentity(
         manifest.insert("previousIdentifier", checked->identifier());
     manifest.insert("replicaReady", false);
     const auto bytes = QJsonDocument(manifest).toJson();
-    QSaveFile output(input.fileName());
+    iiFileProvider::SaveFile output(input.fileName());
     if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
         setError(error, output.errorString()); return std::nullopt;
     }
@@ -321,14 +333,14 @@ bool SocietyDrive::completeReplica(const QString& directoryPath, const QString& 
 {
     const auto drive = open(directoryPath, error);
     if (!drive) return false;
-    const QDir root(drive->rootPath());
-    QLockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
+    const iiFileProvider::Directory root(drive->rootPath());
+    iiFileProvider::LockFile lock(root.filePath(QStringLiteral(".society-drive.lock")));
     if (!lock.tryLock()) { setError(error, QStringLiteral("The drive is being changed by another process.")); return false; }
     const auto checked = open(root.path(), error);
     if (!checked || checked->identifier() != expectedIdentifier) {
         setError(error, QStringLiteral("The replica identity changed.")); return false;
     }
-    QFile input(root.filePath(QLatin1String(manifestName)));
+    iiFileProvider::FileDevice input(root.filePath(QLatin1String(manifestName)));
     if (!input.open(QIODevice::ReadOnly)) { setError(error, input.errorString()); return false; }
     auto manifest = QJsonDocument::fromJson(input.readAll()).object(); input.close();
     if (QUuid(manifest.value("localIdentifier").toString()).isNull()) {
@@ -339,7 +351,7 @@ bool SocietyDrive::completeReplica(const QString& directoryPath, const QString& 
         manifest.insert("filesLayoutVersion", 1);
     }
     manifest.insert("replicaReady", true);
-    const auto bytes = QJsonDocument(manifest).toJson(); QSaveFile output(input.fileName());
+    const auto bytes = QJsonDocument(manifest).toJson(); iiFileProvider::SaveFile output(input.fileName());
     if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
         setError(error, output.errorString()); return false;
     }
@@ -359,7 +371,7 @@ bool SocietyDrive::isValid() const
 bool SocietyDrive::isReady() const
 {
     if (!isValid()) return false;
-    QFile file(QDir(m_rootPath).filePath(QLatin1String(manifestName)));
+    iiFileProvider::FileDevice file(iiFileProvider::Directory(m_rootPath).filePath(QLatin1String(manifestName)));
     if (!file.open(QIODevice::ReadOnly) || file.size() > 65536) return false;
     const auto manifest = QJsonDocument::fromJson(file.readAll()).object();
     return manifest.value("identifier") == m_identifier && manifest.value("replicaReady") != QJsonValue(false);
@@ -378,7 +390,7 @@ QString SocietyDrive::sectionPath(StoreSection section) const
 
 QString SocietyDrive::relativePath(const QString& absolute) const
 {
-    if (!QDir::isAbsolutePath(absolute) || QDir::cleanPath(absolute) != absolute) return {};
+    if (!isValid() || !iiFileProvider::Directory::isAbsolutePath(absolute) || iiFileProvider::Directory::cleanPath(absolute) != absolute) return {};
     for (const auto section : allStoreSections()) {
         const auto root = sectionRoot(m_rootPath, section);
         if (root.isEmpty()) continue;
@@ -390,13 +402,24 @@ QString SocietyDrive::relativePath(const QString& absolute) const
 
 QString SocietyDrive::resolvePath(const QString& relative) const
 {
-    if (relative.isEmpty() || QDir::isAbsolutePath(relative) || relative.contains('\\') || relative.contains(QChar::Null)) return {};
+    if (!isValid() || relative.isEmpty() || iiFileProvider::Directory::isAbsolutePath(relative)
+        || relative.contains('\\') || relative.contains(':') || relative.contains(QChar::Null)) return {};
     for (const auto& part : relative.split('/')) if (part.isEmpty() || part == "." || part == "..") return {};
     for (const auto section : allStoreSections()) {
         const auto name = storeSectionName(section);
         if (relative == name || relative.startsWith(name + '/')) {
-            const auto root = sectionRoot(m_rootPath, section);
-            return root.isEmpty() ? QString() : root + relative.mid(name.size());
+            auto current = sectionRoot(m_rootPath, section);
+            if (current.isEmpty()) return {};
+            const auto parts = relative.mid(name.size() + 1).split('/', Qt::SkipEmptyParts);
+            for (qsizetype index = 0; index < parts.size(); ++index) {
+                current = iiFileProvider::Directory(current).filePath(parts[index]);
+                const QFileInfo info(current);
+                if (info.isSymLink() || info.isJunction()
+                    || (info.exists() && (info.canonicalFilePath() != current
+                        || (index != parts.size() - 1 && !info.isDir())
+                        || (!info.isDir() && !info.isFile())))) return {};
+            }
+            return isValid() ? current : QString();
         }
     }
     return {};
@@ -407,7 +430,7 @@ std::optional<StoreSection> SocietyDrive::sectionForPath(const QString& path) co
     if (!isValid()) {
         return std::nullopt;
     }
-    const QString relative = relativePath(QFileInfo(QDir(m_rootPath), path).canonicalFilePath());
+    const QString relative = relativePath(QFileInfo(iiFileProvider::Directory(m_rootPath), path).canonicalFilePath());
     const QString firstComponent = relative.section('/', 0, 0);
     for (const auto section : allStoreSections()) {
         if (firstComponent == storeSectionName(section)) {

@@ -10,8 +10,9 @@ public:
     explicit StubMount(QString path) : m_path(std::move(path)) {}
     QString path() const override { return m_path; }
     bool isRunning() const override { return true; }
+    QString filesystemType() const override { return {}; }
 };
-QString defaultMountPoint(const QString &id) { return QDir(qEnvironmentVariable("SOCIETY_MOUNT_STATE_DIRECTORY")).filePath(id); }
+QString defaultMountPoint(const QString &source, const QString &id) { return QDir(source).filePath(".society-runtime/mounts/" + id + "/Society"); }
 std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &, QString *) { return std::make_unique<StubMount>(view.rootPath()); }
 bool installMountAutostart(const QString &, QString *) { return true; }
 }

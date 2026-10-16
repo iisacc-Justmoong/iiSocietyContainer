@@ -19,8 +19,10 @@ enum SharedDriveLocationTests {
         let location = SharedDriveLocation(group: group)
         try reject { _ = try location.existingRoot() }
         let root = try location.prepareRoot()
-        try check(root.path == group.appendingPathComponent("Library/Application Support/Society").path,
+        try check(root.path == group.appendingPathComponent("Society.societycontainer").path,
                   "The source must be private app-group storage")
+        try check(Set(manager.contentsOfDirectory(atPath: group.path)) == ["Society.societycontainer"],
+                  "Preparing the shared source must create one package without outside scaffolding")
         try check(location.prepareRoot() == root, "Reopening the app must preserve the same source")
         try reject { try location.validate(root: group.appendingPathComponent("Documents")) }
         let process = Process()
@@ -63,12 +65,22 @@ enum SharedDriveLocationTests {
         try check(Set(reopened.children("root").map { $0.name }) == ["From Society.txt", "Models"],
                   "The iOS location must open directly in Files contents")
         try check(app.children("root").count == 9, "Society must retain all nine sections")
+        let previous = group.appendingPathComponent("Library/Application Support/Society", isDirectory: true)
+        try manager.createDirectory(at: previous.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let manifestBytes = try Data(contentsOf: root.appendingPathComponent(".society-drive.json"))
+        try manager.moveItem(at: root, to: previous)
+        try reject { _ = try location.existingRoot() }
+        try check(location.prepareRoot() == root, "The previous managed directory must move into one package")
+        try check(!manager.fileExists(atPath: previous.path), "Moving the original must not retain a second managed source")
+        try check(Data(contentsOf: root.appendingPathComponent(".society-drive.json")) == manifestBytes,
+                  "Packaging the previous managed source must preserve the manifest and UUID")
+        try check(FilesDriveStore(root: root, catalog: catalog).item(publicID).id == publicID,
+                  "Packaging a previous managed source must preserve user files and provider IDs")
         try manager.removeItem(at: root)
         try manager.createSymbolicLink(at: root, withDestinationURL: group)
         try reject { _ = try location.prepareRoot() }
         try manager.removeItem(at: root)
-        try manager.removeItem(at: group.appendingPathComponent("Library"))
-        try manager.createSymbolicLink(at: group.appendingPathComponent("Library"), withDestinationURL: base)
+        try manager.createSymbolicLink(at: root, withDestinationURL: base)
         try reject { _ = try location.prepareRoot() }
         print("Shared app source, restart, stable IDs, Files projection and redirect checks passed")
     }

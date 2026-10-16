@@ -1,3 +1,4 @@
+#include <iiFileProviderStorage.h>
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -15,6 +16,7 @@ typedef long NTSTATUS;
 #include <vector>
 #include <algorithm>
 #include <cstring>
+#include <cwchar>
 #include <iterator>
 
 namespace iiSocietyContainer {
@@ -37,6 +39,18 @@ public:
     ~DokanMount() override { if (instance) DokanCloseHandle(instance); }
     QString path() const override { return point + '\\'; }
     bool isRunning() const override { return instance && DokanIsFileSystemRunning(instance); }
+    QString filesystemType() const override
+    {
+        wchar_t label[256]{}, type[256]{};
+        DWORD serial = 0;
+        const auto root = (point + '\\').toStdWString();
+        if (!isRunning() || !GetVolumeInformationW(root.c_str(), label, 256, &serial, nullptr, nullptr, type, 256)) return {};
+        const auto digest = QCryptographicHash::hash(view.drive().identifier().toUtf8(), QCryptographicHash::Sha256);
+        DWORD expected = 0;
+        std::memcpy(&expected, digest.constData(), sizeof(expected));
+        return serial == expected && !std::wcscmp(label, L"Society") && !std::wcscmp(type, L"Society")
+            ? QStringLiteral("Society") : QString();
+    }
     static DokanMount &self(PDOKAN_FILE_INFO info) { return *reinterpret_cast<DokanMount *>(info->DokanOptions->GlobalContext); }
     static QString relative(LPCWSTR name)
     {
@@ -81,7 +95,7 @@ NTSTATUS DOKAN_CALLBACK createEntry(LPCWSTR name, PDOKAN_IO_SECURITY_CONTEXT, AC
     if (directory && (options & FILE_NON_DIRECTORY_FILE)) return STATUS_FILE_IS_A_DIRECTORY;
     if (directory) {
         if (!existed && (creation == CREATE_NEW || creation == OPEN_ALWAYS)) {
-            if (!CreateDirectoryW(diskPath.c_str(), nullptr)) return lastError();
+            if (!iiFileProvider::native::createDirectoryWindows(diskPath.c_str(), nullptr)) return lastError();
         } else if (existed && creation == CREATE_NEW) return STATUS_OBJECT_NAME_COLLISION;
         else if (creation == CREATE_ALWAYS || creation == TRUNCATE_EXISTING) return STATUS_ACCESS_DENIED;
         creation = OPEN_EXISTING;
@@ -91,7 +105,7 @@ NTSTATUS DOKAN_CALLBACK createEntry(LPCWSTR name, PDOKAN_IO_SECURITY_CONTEXT, AC
     // Reparse data and alternate streams are never served by this projection.
     flags |= FILE_FLAG_OPEN_REPARSE_POINT;
     auto handle = std::make_unique<FileHandle>();
-    handle->handle = CreateFileW(diskPath.c_str(), requested, sharing, nullptr, creation, flags, nullptr);
+    handle->handle = iiFileProvider::native::createFile(diskPath.c_str(), requested, sharing, nullptr, creation, flags, nullptr);
     if (handle->handle == INVALID_HANDLE_VALUE) return lastError();
     if (!regularHandle(handle->handle, source)) return STATUS_ACCESS_DENIED;
     info->Context = reinterpret_cast<ULONG64>(handle.release());
@@ -115,7 +129,7 @@ NTSTATUS DOKAN_CALLBACK readEntry(LPCWSTR name, LPVOID buffer, DWORD length, LPD
         const auto source = DokanMount::self(info).source(name);
         if (source.isEmpty()) return STATUS_OBJECT_NAME_NOT_FOUND;
         reopened = std::make_unique<FileHandle>();
-        reopened->handle = CreateFileW(native(source).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        reopened->handle = iiFileProvider::native::createFile(native(source).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
         if (reopened->handle == INVALID_HANDLE_VALUE) return lastError();
         if (!regularHandle(reopened->handle, source)) return STATUS_ACCESS_DENIED;
@@ -137,7 +151,7 @@ NTSTATUS DOKAN_CALLBACK writeEntry(LPCWSTR name, LPCVOID buffer, DWORD length, L
         const auto source = DokanMount::self(info).source(name);
         if (source.isEmpty()) return STATUS_OBJECT_NAME_NOT_FOUND;
         reopened = std::make_unique<FileHandle>();
-        reopened->handle = CreateFileW(native(source).c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        reopened->handle = iiFileProvider::native::createFile(native(source).c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
         if (reopened->handle == INVALID_HANDLE_VALUE) return lastError();
         if (!regularHandle(reopened->handle, source)) return STATUS_ACCESS_DENIED;
@@ -167,7 +181,7 @@ NTSTATUS DOKAN_CALLBACK information(LPCWSTR name, LPBY_HANDLE_FILE_INFORMATION r
     auto *file = context(info);
     FileHandle temporary;
     if (!file) {
-        temporary.handle = CreateFileW(native(source).c_str(), FILE_READ_ATTRIBUTES,
+        temporary.handle = iiFileProvider::native::createFile(native(source).c_str(), FILE_READ_ATTRIBUTES,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
         if (temporary.handle == INVALID_HANDLE_VALUE) return lastError();
@@ -275,7 +289,7 @@ NTSTATUS DOKAN_CALLBACK volumeInfo(LPWSTR label, DWORD labelSize, LPDWORD serial
     return STATUS_SUCCESS;
 }
 }
-QString defaultMountPoint(const QString &)
+QString defaultMountPoint(const QString &, const QString &)
 {
     const DWORD used = GetLogicalDrives();
     const QString letters = "STUVWXYZDEFGHIJKLMNOPQR";
@@ -306,7 +320,7 @@ std::unique_ptr<NativeMount> mountFiles(FilesView view, const QString &point, QS
     op.SetFileAttributes = setAttributes; op.SetFileTime = setTimes;
     op.GetDiskFreeSpace = diskSpace; op.GetVolumeInformation = volumeInfo;
     mount->options.Version = DOKAN_VERSION;
-    mount->options.Options = DOKAN_OPTION_CURRENT_SESSION;
+    mount->options.Options = DOKAN_OPTION_CURRENT_SESSION | DOKAN_OPTION_REMOVABLE;
     mount->options.GlobalContext = reinterpret_cast<ULONG64>(mount.get());
     mount->options.MountPoint = mount->nativePoint.c_str();
     const int status = DokanCreateFileSystem(&mount->options, &mount->operations, &mount->instance);

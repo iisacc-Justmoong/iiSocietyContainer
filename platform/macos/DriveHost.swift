@@ -26,10 +26,19 @@ enum DriveHost {
             if Thread.isMainThread { complete() } else { DispatchQueue.main.async(execute: complete) }
         }
         do {
-            guard let command = arguments.first, ["register", "list", "path", "refresh", "unregister"].contains(command),
-                  command == "list" || arguments.count == 2 else {
-                throw DriveStoreError.invalid("Usage: SocietyContainerDrive register <source-directory> | list | path <drive-id> | refresh <drive-id> | unregister <drive-id>")
+            guard let command = arguments.first, ["register", "list", "path", "refresh", "unregister", "mount", "unmount", "ready"].contains(command),
+                  command == "list" || command == "ready" || arguments.count == 2 else {
+                throw DriveStoreError.invalid("Usage: SocietyContainerDrive mount|unmount|register <source-directory> | list | path|refresh|unregister <drive-id>")
             }
+            if command == "ready" {
+                finish(["ready": true], nil)
+            } else if command == "mount" || command == "unmount" {
+                guard let catalogURL = Bundle.main.url(forResource: "Sections", withExtension: "json") else {
+                    throw DriveStoreError.invalid("The section catalog is missing.")
+                }
+                let catalog = try JSONDecoder().decode([DriveSection].self, from: Data(contentsOf: catalogURL))
+                DirectoryMount.perform(command, source: URL(fileURLWithPath: arguments[1], isDirectory: true), catalog: catalog, completion: finish)
+            } else {
             var newDomain: NSFileProviderDomain?
             var selectedID = arguments.count == 2 ? arguments[1] : ""
             if command == "register" {
@@ -118,6 +127,7 @@ enum DriveHost {
                         }
                     } else { report(domain) }
                 } else { finish(nil, DriveStoreError.invalid("This Society drive is not connected to Finder.")) }
+            }
             }
         } catch { finish(nil, error) }
         let deadline = Date().addingTimeInterval(30)

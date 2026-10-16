@@ -13,6 +13,7 @@
 #include <QtTest/QTest>
 
 #include <memory>
+#include <filesystem>
 
 using namespace iiSocietyContainer;
 
@@ -20,30 +21,87 @@ class SocietyDriveTests : public QObject
 {
     Q_OBJECT
 private slots:
-    void createsOrdinaryStorageTreeAndReusesIdentity()
+    void nativeAndQtUnicodeParentsPreserveThePackageBoundary()
     {
+        QTemporaryDir parent(QDir::current().filePath("unicode-package-XXXXXX")); QVERIFY(parent.isValid());
+        const auto qtParent = parent.filePath(QString::fromUtf8("Qt 한글 #100%"));
+        QVERIFY(QDir().mkdir(qtParent));
+        const auto nativeParent = parent.filePath(QString::fromUtf8("Native 한글 #100%"));
+#ifdef Q_OS_WIN
+        QVERIFY(std::filesystem::create_directory(std::filesystem::path(nativeParent.toStdWString())));
+#else
+        QVERIFY(std::filesystem::create_directory(std::filesystem::path(nativeParent.toStdString())));
+#endif
+        for (const auto &location : {qtParent, nativeParent}) {
+            QString error;
+            const auto drive = SocietyDrive::createAt(location, &error);
+            QVERIFY2(drive, qPrintable(error));
+            QCOMPARE(drive->rootPath(), location + "/Society.societycontainer");
+            const auto reopened = SocietyDrive::open(drive->rootPath(), &error);
+            QVERIFY2(reopened, qPrintable(error));
+            QCOMPARE(reopened->identifier(), drive->identifier());
+            const auto unicodeFile = drive->resolvePath(QString::fromUtf8("Files/사용자 한글 #100%.txt"));
+            QVERIFY(!unicodeFile.isEmpty());
+            QFile file(unicodeFile); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("user content"); file.close();
+            QCOMPARE(drive->resolvePath(QString::fromUtf8("Files/사용자 한글 #100%.txt")), unicodeFile);
+            const auto alias = location + QString::fromUtf8("-별칭.societycontainer");
+            QVERIFY(createTestSymbolicLink(drive->rootPath(), alias));
+            QVERIFY(!SocietyDrive::open(alias));
+            QVERIFY(!SocietyDrive::createAt(alias));
+        }
+    }
+    void bareFoldersImagesAndRedirectedPackagesAreRejectedWithoutWrites()
+    {
+        QTemporaryDir parent(QDir::current().filePath("package-boundary-XXXXXX")); QVERIFY(parent.isValid());
+        const auto drive = SocietyDrive::createAt(parent.path()); QVERIFY(drive);
+        const auto bare = parent.filePath("Society"); QVERIFY(QDir().mkdir(bare));
+        QFile userFile(bare + "/user.txt"); QVERIFY(userFile.open(QIODevice::WriteOnly));
+        QCOMPARE(userFile.write("keep"), qint64(4)); userFile.close();
+        QVERIFY(QFile::copy(drive->rootPath() + "/.society-drive.json", bare + "/.society-drive.json"));
+        QString error;
+        QVERIFY(!SocietyDrive::create(bare, &error)); QVERIFY(error.contains(".societycontainer"));
+        QVERIFY(!SocietyDrive::open(bare, &error)); QVERIFY(!SocietyDrive::createAt(bare, &error));
+        QCOMPARE(QDir(bare).entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot).size(), 2);
+        QVERIFY(userFile.open(QIODevice::ReadOnly)); QCOMPARE(userFile.readAll(), QByteArray("keep"));
+        const auto old = parent.filePath("Old.societycontainer"); QVERIFY(QDir().mkpath(old + "/bands"));
+        QFile marker(old + "/Info.plist"); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("legacy image"); marker.close();
+        QVERIFY(!SocietyDrive::create(old)); QVERIFY(!SocietyDrive::open(old));
+        QVERIFY(!QFileInfo::exists(old + "/.society-drive.json"));
+        const auto alias = parent.filePath("Alias.societycontainer");
+        QVERIFY(createTestSymbolicLink(drive->rootPath(), alias));
+        QVERIFY(!SocietyDrive::create(alias)); QVERIFY(!SocietyDrive::open(alias));
+        QVERIFY(drive->isValid());
+    }
+    void createsPackageStorageTreeAndReusesIdentity()
+    {
+        workspace = std::make_unique<QTemporaryDir>(QDir::current().filePath("drive-parent-XXXXXX"));
+        QVERIFY(workspace->isValid());
         QString error;
         const auto drive = SocietyDrive::createAt(workspace->path(), &error);
         QVERIFY2(drive, qPrintable(error));
-        QCOMPARE(drive->rootPath(), workspace->filePath("Society"));
-        QVERIFY(!QFileInfo::exists(workspace->filePath("Society.societycontainer")));
+        QCOMPARE(drive->rootPath(), workspace->filePath("Society.societycontainer"));
+        QVERIFY(!QFileInfo::exists(workspace->filePath("Society")));
         QVERIFY(!QFileInfo::exists(drive->rootPath() + "/bands"));
         for (const auto section : allStoreSections())
             QCOMPARE(drive->sectionPath(section), drive->rootPath() + '/' + storeSectionName(section));
+        QVERIFY(QDir(drive->sectionPath(StoreSection::Models)).isEmpty());
         QCOMPARE(SocietyDrive::createAt(workspace->path())->identifier(), drive->identifier());
         QCOMPARE(SocietyDrive::createAt(drive->rootPath())->identifier(), drive->identifier());
+        QVERIFY(QDir(drive->sectionPath(StoreSection::Models)).isEmpty());
         QVERIFY(!SocietyDrive::createAt(drive->sectionPath(StoreSection::Files), &error));
-        QVERIFY(!QFileInfo::exists(drive->sectionPath(StoreSection::Files) + "/Society"));
+        QVERIFY(!QFileInfo::exists(drive->sectionPath(StoreSection::Files) + "/Society.societycontainer"));
     }
     void refusesConflictingOrRedirectedStorageFolder()
     {
-        QFile conflict(workspace->filePath("Society"));
+        workspace = std::make_unique<QTemporaryDir>(QDir::current().filePath("drive-parent-XXXXXX"));
+        QVERIFY(workspace->isValid());
+        QFile conflict(workspace->filePath("Society.societycontainer"));
         QVERIFY(conflict.open(QIODevice::WriteOnly)); conflict.write("keep"); conflict.close();
         QVERIFY(!SocietyDrive::createAt(workspace->path()));
         QVERIFY(conflict.open(QIODevice::ReadOnly)); QCOMPARE(conflict.readAll(), QByteArray("keep")); conflict.close();
         QVERIFY(conflict.remove());
         QVERIFY(QDir().mkdir(workspace->filePath("outside")));
-        QVERIFY(QFile::link(workspace->filePath("outside"), workspace->filePath("Society")));
+        QVERIFY(QFile::link(workspace->filePath("outside"), workspace->filePath("Society.societycontainer")));
         QVERIFY(!SocietyDrive::createAt(workspace->path()));
         QVERIFY(!QFileInfo::exists(workspace->filePath("outside/.society-drive.json")));
     }
@@ -74,13 +132,21 @@ private slots:
         const auto host = QUuid::createUuid().toString(QUuid::WithoutBraces);
         const auto replica = SocietyDrive::adoptReplicaIdentity(workspace->path(), drive->identifier(), host);
         QVERIFY(replica); QVERIFY(!drive->tree()); QVERIFY(!replica->tree());
+        QVERIFY(drive->resolvePath("Files/new.txt").isEmpty());
+        QVERIFY(drive->relativePath(file.fileName()).isEmpty());
+        QCOMPARE(replica->resolvePath("Files/new/deep.txt"), workspace->filePath("Files/new/deep.txt"));
+        QVERIFY(createTestSymbolicLink(workspace->filePath("Models"), workspace->filePath("Files/redirect")));
+        QVERIFY(replica->resolvePath("Files/redirect/escape").isEmpty());
+        QVERIFY(removeTestSymbolicLink(workspace->filePath("Files/redirect")));
+        QVERIFY(replica->resolvePath("Files/projects/note.txt/child").isEmpty());
+        QVERIFY(replica->resolvePath("Files/alternate:stream").isEmpty());
         QVERIFY(SocietyDrive::completeReplica(workspace->path(), host));
         QVERIFY(replica->tree());
     }
 
     void init()
     {
-        workspace = std::make_unique<QTemporaryDir>(QDir::current().filePath("society-drive-XXXXXX"));
+        workspace = std::make_unique<QTemporaryDir>(QDir::current().filePath("society-drive-XXXXXX.societycontainer"));
         QVERIFY(workspace->isValid());
     }
 
@@ -310,9 +376,11 @@ private slots:
 
     void rejectsFinderReplicasAndTheirDescendants()
     {
+        workspace = std::make_unique<QTemporaryDir>(QDir::current().filePath("drive-parent-XXXXXX"));
+        QVERIFY(workspace->isValid());
 #ifdef Q_OS_MACOS
         const auto cloud = workspace->filePath("Library/CloudStorage");
-        const auto replica = QDir(cloud).filePath("SocietyContainer-SocietyContainer");
+        const auto replica = QDir(cloud).filePath("SocietyContainer-SocietyContainer.societycontainer");
         QVERIFY(QDir().mkpath(replica));
         // An existing misplaced manifest must be rejected as well as new creation.
         QVERIFY(SocietyDrive::create(replica));
@@ -331,7 +399,7 @@ private slots:
         const auto alias = workspace->filePath("replica-alias");
         QVERIFY(createTestSymbolicLink(replica, alias));
         QVERIFY(!SocietyDrive::open(alias, &error));
-        const auto sibling = workspace->filePath("Library/CloudStorage-backup");
+        const auto sibling = workspace->filePath("Library/CloudStorage-backup.societycontainer");
         QVERIFY(QDir().mkdir(sibling));
         QVERIFY(SocietyDrive::create(sibling, &error));
 #else

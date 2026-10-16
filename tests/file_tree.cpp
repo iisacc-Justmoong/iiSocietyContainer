@@ -22,7 +22,7 @@ int main(int argc, char** argv)
     fs::create_directory(fixture);
     struct Cleanup {
         fs::path path;
-        ~Cleanup() { std::error_code error; fs::remove_all(path, error); }
+        ~Cleanup() { iiFileProvider::native::Presentation::cancelPending(path); std::error_code error; fs::remove_all(path, error); }
     } cleanup{fixture};
     try {
         const auto root = fixture / "root";
@@ -33,6 +33,8 @@ int main(int argc, char** argv)
         { std::ofstream file(root / "projects" / unicode); file << "metadata only"; }
         { std::ofstream file(root / "z.txt"); file << "z"; }
         { std::ofstream file(root / ".hidden"); file << "hidden"; }
+        { std::ofstream file(root / ".iisacc-temporary.lock"); }
+        { std::ofstream file(root / "projects/.iisacc-temporary.lock"); }
         { std::ofstream file(outside / "keep.txt"); file << "keep"; }
         const FileTree tree(root);
         check(tree.isValid(), "valid tree root");
@@ -51,6 +53,12 @@ int main(int argc, char** argv)
         check(!snapshot.value->find(".hidden"), "hidden default");
         auto hidden = tree.children({}, true);
         check(bool(hidden) && hidden.value->size() == 3, "hidden opt-in");
+        const auto hiddenTree = tree.snapshot({}, {true, 64, 100});
+        check(bool(hiddenTree) && hiddenTree.value->find(".hidden")
+              && !hiddenTree.value->find(".iisacc-temporary.lock")
+              && !hiddenTree.value->find("projects/.iisacc-temporary.lock"), "lease metadata stays private with hidden-file opt-in");
+        check(!tree.entry(".iisacc-temporary.lock") && !tree.entry("projects/.iisacc-temporary.lock"),
+              "direct lease metadata lookup is protected");
         auto shallow = tree.snapshot({}, {false, 1, 100});
         check(bool(shallow) && !shallow.value->find("projects")->childrenLoaded, "depth cutoff stays explicit");
         check(!shallow.value->find(fs::path("projects") / unicode), "no fake descendants at cutoff");
@@ -86,11 +94,17 @@ int main(int argc, char** argv)
             check(bool(names) && names.value->find(typed.value->relativePath), "canonical Unicode path matches snapshot");
         }
         std::error_code linkError;
+        const auto rich = tree.presentation(fs::path("projects") / unicode);
+        check(bool(rich) && rich.value->details.size == 13 && rich.value->preview.kind == "text"
+              && !rich.value->preview.bytes.empty(), "native container exposes provider details and preview");
+        check(!tree.presentation("projects") && !tree.presentation("../root-other/keep.txt")
+              && !tree.presentation(".iisacc-temporary.lock"), "inspection rejects directories, escapes and provider controls");
         fs::create_directory_symlink(outside, root / "escape", linkError);
         if (!linkError) {
             fs::create_directory_symlink(root, root / "cycle");
             fs::create_symlink(root / "missing", root / "broken");
             check(!tree.entry("escape") && !tree.entry("escape/keep.txt"), "redirected ancestor rejected");
+            check(!tree.presentation("escape/keep.txt"), "inspection never follows a redirected ancestor");
             auto linked = tree.snapshot({}, {true, 64, 100});
             check(bool(linked) && !linked.value->find("escape") && !linked.value->find("cycle")
                   && !linked.value->find("broken"), "links are excluded and never followed");

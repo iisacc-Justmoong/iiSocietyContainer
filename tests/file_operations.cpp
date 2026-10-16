@@ -12,16 +12,31 @@ class FileOperationsTests : public QObject {
     Q_OBJECT
 private slots:
     void ordinaryDirectoryWithoutDriveTerminates() {
-        QTemporaryDir directory(QString(SOCIETY_TEST_DIRECTORY) + "/ordinary-root-XXXXXX");
+        QTemporaryDir directory(QString(SOCIETY_TEST_DIRECTORY) + "/ordinary-root-XXXXXX.societycontainer");
         QVERIFY(directory.isValid());
         QVERIFY(!FileOperations::containingDrive(directory.path()));
         QDir root(directory.path());
         while (!root.isRoot()) QVERIFY(root.cdUp());
         QVERIFY(!FileOperations::containingDrive(root.absolutePath()));
     }
+    void temporaryLeaseMetadataIsProtectedAndNotCopied() {
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/metadata-filter-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
+        const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); FileOperations operations(*drive);
+        QVERIFY(QDir().mkdir(temp.filePath("Files/folder")));
+        QFile sentinel(temp.filePath("Files/folder/.iisacc-temporary.lock")); QVERIFY(sentinel.open(QIODevice::WriteOnly)); sentinel.close();
+        QFile userLog(temp.filePath("Files/folder/user.log")); QVERIFY(userLog.open(QIODevice::WriteOnly)); userLog.write("user data"); userLog.close();
+        QVERIFY(!operations.editable(sentinel.fileName()));
+        QVERIFY(!operations.perform(FileOperations::Action::Trash, sentinel.fileName()));
+        QVERIFY(!operations.perform(FileOperations::Action::Rename, sentinel.fileName(), "renamed"));
+        const auto copied = operations.perform(FileOperations::Action::Duplicate, temp.filePath("Files/folder"));
+        QVERIFY2(copied, qPrintable(copied.error));
+        QVERIFY(!QFileInfo::exists(copied.path + "/.iisacc-temporary.lock"));
+        QVERIFY(QFileInfo::exists(copied.path + "/user.log"));
+        QCOMPARE(QFileInfo(sentinel.fileName()).size(), qint64(0));
+    }
     void createsDirectoriesAndMovesCompleteTrees() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/tree-manage-XXXXXX"); QVERIFY(temp.isValid());
-        QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/tree-outside-XXXXXX"); QVERIFY(outside.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/tree-manage-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
+        QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/tree-outside-XXXXXX.societycontainer"); QVERIFY(outside.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); FileOperations ops(*drive);
         const auto project = ops.createDirectory(temp.filePath("Files"), QString::fromUtf8("자료 Project"));
         QVERIFY2(project, qPrintable(project.error));
@@ -60,11 +75,12 @@ private slots:
     }
 
     void deletionBypassesContentAndReplicationWork() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/direct-delete-XXXXXX"); QVERIFY(temp.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/direct-delete-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive);
         StorageMap map(*drive); FileOperations ops(*drive);
         const auto source = temp.filePath("Models/Checkpoint/large.safetensors");
         constexpr qint64 bytes = 8LL * 1024 * 1024 * 1024;
+        QVERIFY(QDir().mkdir(temp.filePath("Models/Checkpoint")));
         QFile file(source); QVERIFY(file.open(QIODevice::WriteOnly)); QVERIFY(file.resize(bytes)); file.close();
         // A stale map must neither download nor prevent moving the actual file.
         const QJsonObject entry{{"path", "models/Checkpoint/large.safetensors"}, {"kind", "file"},
@@ -85,8 +101,8 @@ private slots:
         QCOMPARE(map.objects(), QJsonArray({entry, deleted})); // No graph/catalog mutation in the deletion path.
     }
     void removesPartialPackagesWithoutResolvingMissingChildren() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/partial-delete-XXXXXX"); QVERIFY(temp.isValid());
-        QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/delete-keep-XXXXXX"); QVERIFY(outside.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/partial-delete-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
+        QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/delete-keep-XXXXXX.societycontainer"); QVERIFY(outside.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); StorageMap map(*drive);
         QVERIFY(QDir().mkpath(temp.filePath("Models/partial/sub")));
         QFile keep(outside.filePath("keep.txt")); QVERIFY(keep.open(QIODevice::WriteOnly)); keep.write("keep"); keep.close();
@@ -102,7 +118,7 @@ private slots:
         QVERIFY(map.pendingRequests().isEmpty());
     }
     void handlesFilesPackagesAndCollisions() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/file-actions-XXXXXX"); QVERIFY(temp.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/file-actions-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive);
         FileOperations ops(*drive);
         const auto path = temp.filePath("Models/model.safetensors");
@@ -123,8 +139,8 @@ private slots:
         QVERIFY(QFileInfo::exists(restored.path + "/sub/weight.bin"));
     }
     void protectsLayoutAndRejectsEscapes() {
-        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/file-action-boundary-XXXXXX"); QVERIFY(temp.isValid());
-        QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/file-action-outside-XXXXXX"); QVERIFY(outside.isValid());
+        QTemporaryDir temp(QString(SOCIETY_TEST_DIRECTORY) + "/file-action-boundary-XXXXXX.societycontainer"); QVERIFY(temp.isValid());
+        QTemporaryDir outside(QString(SOCIETY_TEST_DIRECTORY) + "/file-action-outside-XXXXXX.societycontainer"); QVERIFY(outside.isValid());
         const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive); FileOperations ops(*drive);
         for (const auto &path : {temp.path(), temp.filePath("Models"), temp.filePath("Files")}) {
             QVERIFY(!ops.editable(path)); QVERIFY(!ops.perform(FileOperations::Action::Trash, path));

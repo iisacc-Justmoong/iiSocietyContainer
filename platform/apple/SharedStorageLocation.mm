@@ -14,7 +14,7 @@ QString iosSharedStorageRoot(QString *error)
             return {};
         }
         const auto path = QString::fromNSString([[container URLByAppendingPathComponent:
-            @"Library/Application Support/Society" isDirectory:YES] path]);
+            @"Society.societycontainer" isDirectory:YES] path]);
         const QFileInfo info(path);
         if (!info.isDir() || info.isSymLink() || info.canonicalFilePath() != path) {
             if (error) *error = QStringLiteral("Open Society to prepare the shared container on this device.");

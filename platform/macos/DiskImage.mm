@@ -1,3 +1,4 @@
+#include <iiFileProviderStorage.h>
 #include "DiskImage.h"
 #import <Foundation/Foundation.h>
 #include <algorithm>
@@ -255,7 +256,7 @@ DiskVolume prepareFiles(DiskVolume data) {
             if (copyfile(entry.path().c_str(), files.mountPath.c_str(), nullptr,
                          COPYFILE_ALL | COPYFILE_RECURSIVE | COPYFILE_CLONE | COPYFILE_NOFOLLOW) != 0)
                 throw std::runtime_error(std::string("Could not migrate Files; the originals remain intact: ") + std::strerror(errno));
-        fs::rename(source, backup);
+        iiFileProvider::native::renameFile(source, backup);
     }
     saveLayout(data.mountPath, files.mountPath);
     attach(image, false);
@@ -266,7 +267,7 @@ class ImageLock {
 public:
     explicit ImageLock(const fs::path &image) {
         const auto path = image.parent_path() / ".Society-volume.lock";
-        fd = open(path.c_str(), O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0600);
+        fd = iiFileProvider::native::openFile(path.c_str(), O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0600);
         if (fd < 0 || flock(fd, LOCK_EX | LOCK_NB)) {
             if (fd >= 0) close(fd);
             throw std::runtime_error("The disk location is not writable or another app is preparing it.");
@@ -305,8 +306,8 @@ std::expected<DiskVolume, std::string> DiskImage::create(const fs::path &locatio
              "-fs", "APFS", "-volname", "Society Data", legacy.string()});
         // hdiutil always appends its native extension. Rename the unmounted
         // package before publishing it; its APFS bytes and UUID stay unchanged.
-        fs::rename(legacy, image);
-        std::ofstream file(image / marker, std::ios::binary); file << signature; file.close();
+        iiFileProvider::native::renameFile(legacy, image);
+        iiFileProvider::native::OutputFile file(image / marker, std::ios::binary); file << signature; file.close();
         if (!file) throw std::runtime_error("Could not save the Society disk identity.");
         return mountImage(image);
     } catch (const std::exception &error) { return std::unexpected(error.what()); }
@@ -323,7 +324,14 @@ std::expected<DiskVolume, std::string> DiskImage::mount(const fs::path &image) {
 }
 std::optional<DiskVolume> DiskImage::mountedAt(const fs::path &root) {
     try {
-        for (const auto &volume : volumes()) if (volume.mountPath == resolvedPath(root)) return volume;
+        const auto resolved = resolvedPath(root);
+        struct statfs status{};
+        // Consumers repeatedly validate directory packages inside a volume.
+        // Only an actual mount root can match an image; avoid spawning hdiutil
+        // for ordinary directories while retaining image ownership validation.
+        if (statfs(resolved.c_str(), &status) || resolvedPath(status.f_mntonname) != resolved
+            || std::string(status.f_fstypename) != "apfs" || (status.f_flags & MNT_RDONLY)) return {};
+        for (const auto &volume : volumes()) if (volume.mountPath == resolved) return volume;
     } catch (const std::exception &) { }
     return {};
 }

@@ -5,6 +5,7 @@ Arguments: drive-tool mount-executable build-directory. Uses a new disposable dr
 disables login registration, and leaves every existing registration untouched.
 """
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -15,14 +16,17 @@ import time
 tool, mount, build = sys.argv[1:]
 with tempfile.TemporaryDirectory(prefix='native-files-', dir=build) as temporary:
     temporary = Path(temporary)
-    source = temporary / 'Society'
+    source = temporary / 'Society.societycontainer'
     source.mkdir()
     info = json.loads(subprocess.check_output([tool, 'create', str(source)], text=True))
     identifier = info['identifier']
+    manifest_hash = hashlib.sha256((source / '.society-drive.json').read_bytes()).hexdigest()
     (source / 'Models' / 'private.bin').write_bytes(b'private')
     (source / 'Files' / 'from-app.txt').write_text('from Society')
     env = os.environ.copy()
-    env.update(SOCIETY_MOUNT_STATE_DIRECTORY=str(temporary / 'state'), SOCIETY_MOUNT_AUTOSTART='0',
+    selected = temporary / 'selected-storage.json'
+    selected.write_text(json.dumps({'schemaVersion': 1, 'containerId': identifier, 'path': str(source)}))
+    env.update(SOCIETY_STORAGE_SETTINGS_PATH=str(selected), SOCIETY_MOUNT_AUTOSTART='0',
                XDG_DATA_HOME=str(temporary / 'data'), XDG_CONFIG_HOME=str(temporary / 'config'))
 
     def call(action, argument='', success=True):
@@ -32,11 +36,11 @@ with tempfile.TemporaryDirectory(prefix='native-files-', dir=build) as temporary
         return value
 
     def start():
-        server = subprocess.Popen([mount, 'serve'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        server = subprocess.Popen([mount, 'serve', str(source)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         for _ in range(100):
             if server.poll() is not None:
                 raise AssertionError(server.stderr.read().decode())
-            if (temporary / 'state/service.lock').exists():
+            if (source / '.society-runtime/mount-service/service.lock').exists():
                 time.sleep(0.15)
                 return server
             time.sleep(0.05)
@@ -45,9 +49,28 @@ with tempfile.TemporaryDirectory(prefix='native-files-', dir=build) as temporary
     server = start()
     registered = False
     try:
-        drive = Path(call('register', str(source))['systemPath'])
+        result = call('mount', str(source))
+        drive = Path(result['systemPath'])
         registered = True
+        assert result['isMounted'] and result['filesystemType'] == ('Society' if os.name == 'nt' else 'fuse.society')
+        if os.name == 'nt':
+            import ctypes
+            from ctypes import wintypes
+            kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+            kernel.GetVolumeInformationW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD),
+                wintypes.LPWSTR, wintypes.DWORD]
+            kernel.GetVolumeInformationW.restype = wintypes.BOOL
+            kernel.GetDriveTypeW.argtypes = [wintypes.LPCWSTR]
+            kernel.GetDriveTypeW.restype = wintypes.UINT
+            label, filesystem = ctypes.create_unicode_buffer(256), ctypes.create_unicode_buffer(256)
+            serial, component, flags = wintypes.DWORD(), wintypes.DWORD(), wintypes.DWORD()
+            assert kernel.GetVolumeInformationW(str(drive), label, 256, ctypes.byref(serial), ctypes.byref(component), ctypes.byref(flags), filesystem, 256)
+            assert label.value == 'Society' and filesystem.value == 'Society'
+            assert kernel.GetDriveTypeW(str(drive)) == 2, 'Explorer must recognize a removable drive'
         assert drive != source / 'Files', 'Test must use a real OS projection'
+        if os.name != 'nt':
+            assert drive == source / '.society-runtime/mounts' / identifier / 'Society', 'Linux drive backing directories belong to their container'
         assert (drive / 'from-app.txt').read_text() == 'from Society'
         assert {path.name for path in drive.iterdir()} == {'from-app.txt'}
         for name in ('Documents', 'Audios', '3D objects'):
@@ -86,6 +109,12 @@ with tempfile.TemporaryDirectory(prefix='native-files-', dir=build) as temporary
             assert 'private-link' not in {path.name for path in drive.iterdir()}
             (source / 'Files/private-link').unlink()
         assert (source / 'Models/private.bin').read_bytes() == b'private'
+        assert call('mount', str(source))['systemPath'] == str(drive)
+        assert hashlib.sha256((source / '.society-drive.json').read_bytes()).hexdigest() == manifest_hash
+        assert call('unmount', identifier)['isMounted'] is False
+        registered = False
+        drive = Path(call('mount', str(source))['systemPath'])
+        registered = True
         server.terminate(); server.wait(timeout=15)
         server = start()
         drive = Path(call('refresh', identifier)['systemPath'])

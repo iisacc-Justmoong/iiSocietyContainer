@@ -1,21 +1,70 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-if(NOT iiSocietyContainer_FIND_COMPONENTS STREQUAL "FileTree")
-    find_dependency(Qt6 6.8.3 EXACT COMPONENTS Core)
+find_dependency(iiFileProviderNative 0.7 CONFIG HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider")
+
+
+
+
+
+
+find_dependency(Threads)
+find_dependency(iiFileProviderTemporary CONFIG HINTS
+    "${CMAKE_CURRENT_LIST_DIR}/../../../../iiFileProvider"
+    "$ENV{HOME}/.local/SDK/iiFileProvider"
+    "$ENV{USERPROFILE}/.local/SDK/iiFileProvider")
+set(_iisociety_qt_free FALSE)
+if(iiSocietyContainer_FIND_COMPONENTS)
+    set(_iisociety_qt_free TRUE)
+    foreach(_iisociety_component IN LISTS iiSocietyContainer_FIND_COMPONENTS)
+        if(NOT _iisociety_component STREQUAL "FileTree" AND NOT _iisociety_component STREQUAL "Maintenance")
+            set(_iisociety_qt_free FALSE)
+        endif()
+    endforeach()
 endif()
+if(NOT _iisociety_qt_free)
+    if(NOT @IISOCIETYCONTAINER_BUILD_QT@)
+        set(iiSocietyContainer_FOUND FALSE)
+        set(iiSocietyContainer_NOT_FOUND_MESSAGE "This installation provides only FileTree and Maintenance; request those components")
+        return()
+    endif()
+    find_dependency(Qt6 6.8.3 EXACT COMPONENTS Core)
+    find_dependency(iiFileProvider 0.7.1 CONFIG HINTS
+        "${CMAKE_CURRENT_LIST_DIR}/../../../../iiFileProvider"
+        "$ENV{HOME}/.local/SDK/iiFileProvider"
+        "$ENV{USERPROFILE}/.local/SDK/iiFileProvider")
+endif()
+unset(_iisociety_component)
+set(_iisociety_native_only ${_iisociety_qt_free})
+unset(_iisociety_qt_free)
 set(iiSocietyContainer_FileTree_FOUND TRUE)
+set(iiSocietyContainer_Maintenance_FOUND TRUE)
+if("Sharing" IN_LIST iiSocietyContainer_FIND_COMPONENTS)
+    find_dependency(Qt6 6.8.3 EXACT COMPONENTS Gui Concurrent)
+    set(iiSocietyContainer_Sharing_FOUND @IISOCIETYCONTAINER_BUILD_GUI@)
+endif()
 if("Gui" IN_LIST iiSocietyContainer_FIND_COMPONENTS)
     find_dependency(Qt6 6.8.3 EXACT COMPONENTS Gui Concurrent Quick)
     set(iiSocietyContainer_Gui_FOUND @IISOCIETYCONTAINER_BUILD_GUI@)
 endif()
+include("${CMAKE_CURRENT_LIST_DIR}/QtApple.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/iiSocietyContainerTargets.cmake")
 if(@IISOCIETYCONTAINER_HAS_DESKTOP_MOUNT@)
     set_and_check(iiSocietyContainer_MOUNT_EXECUTABLE "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/iiSocietyContainerMount@CMAKE_EXECUTABLE_SUFFIX@")
+    if(WIN32 AND EXISTS "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/dokan2.dll")
+        set(iiSocietyContainer_MOUNT_RUNTIME "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/dokan2.dll")
+        if(EXISTS "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/LICENSE-Dokan.txt")
+            set(iiSocietyContainer_MOUNT_LICENSE "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/LICENSE-Dokan.txt")
+        endif()
+    endif()
 endif()
-if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(NOT _iisociety_native_only AND APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_and_check(iiSocietyContainer_NATIVE_APP "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/iiSocietyContainer/Society.app")
 endif()
-include("${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/iiSocietyContainer/platform/ios/iiSocietyContainerIOS.cmake")
-include("${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/iiSocietyContainer/platform/android/iiSocietyContainerAndroid.cmake")
+if(NOT _iisociety_native_only)
+    include("${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/iiSocietyContainer/platform/ios/iiSocietyContainerIOS.cmake")
+    include("${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/iiSocietyContainer/platform/android/iiSocietyContainerAndroid.cmake")
+endif()
 check_required_components(iiSocietyContainer)
+
+unset(_iisociety_native_only)

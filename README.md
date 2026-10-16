@@ -1,5 +1,25 @@
 # iiSocietyContainer
 
+Applications can retain a read-only `Container` object and logical file Aliases.
+`iiSocietyHelper` supplies their state, payload availability and previews; the
+mirror does not access or save files. See [Container Aliases](docs/ContainerAliases.md).
+
+Ordinary source drives now register identity-checked temporary-file and private
+log maintenance: one process worker scans immediately and every five minutes,
+deletes abandoned SDK temporaries without an age delay, and retains one newest
+log per SDK-private log directory. Shared cross-process leases preserve active
+writes and resumable transfers. Public `.tmp`/`.log` files and SQLite WAL files
+remain outside this policy. Recognized Finder `.DS_Store` metadata is removed
+only at the source and Models roots; ordinary namesakes, links, public Files
+metadata, and nested package metadata remain intact. The Qt-free `Maintenance` component and installed
+`iiSocietyContainerMaintenanceTool --once|--watch` are described in
+[StorageMaintenance.md](docs/StorageMaintenance.md). No maintenance operation
+restores or mounts a legacy image.
+
+On macOS 26 and later, signed directory storage can also expose `Files/` as a real FSKit filesystem named Society. The original `.societycontainer` directory package, UUID, and schema-1 shared settings stay authoritative. See [directory storage and Finder mounting](docs/DirectoryStorage.md) for developer provisioning, extension activation, native CLI commands, and explicit OS-mount validation.
+
+Windows exposes the same Files boundary as a Dokan 2 removable drive with an identity-checked native volume. Android exposes a verified DocumentsProvider root in system Files rather than a kernel volume. Native replies distinguish these connection types; reconnect preserves the original source and UUID. See [desktop mounting](platform/desktop/README.md) and [Android integration](platform/android/README.md).
+
 0.14.0 separates the original file and the host's repository list. `StorageMap` reads the logical key, version, size, hash, and local hold status of `.society-sync/catalog.json`, and atomically records a download request to fix a specific version at `.society-sync/requests/`. It does not create an empty original file for empty items. `available(keys)` must be true and the request status must be `ready` before using the file. It rejects path escapes, redirects, and lists from other containers.
 
 `StorageDirectoryModel` merges the actual directory and the host list in the worker thread to provide name, size, preview, and hold status. It selects only the immediate children of the current folder to validate the path, and reuses the parsing result for unchanged repository maps. `setFolder()` and `refresh()` do not wait for the GUI call and discard the late results of the previous folder. Empty folder URLs stop the lookup timer. `activate` requests the non-held file and sends `activated` after the verified download completes. `StorageModelCatalog` constructs the model card with name, path, format, size, and hold status without reading the original header or package if the host catalog exists. Catalog monitoring is limited to two directories, and local-only fallback monitoring is limited to a maximum of 64 items. `activatePath()` passes only the selected file or package as a version-fixed download request to the SDK and may send `objectReady` after completion. It maintains the structural judgment and import validation for local-only repositories. `SharedStorage::models()` also displays non-held models, and `resolveModel()` succeeds only when all required files are ready. The model reference of a package is fixed to the version of the entire configuration file. `shared_storage` tests check only-list models, request cancellation, opening after navigation and download completion without file creation.
@@ -14,7 +34,19 @@ macOS re-invokes `register` with the existing original, updating the display nam
 
 Version 0.14.0 libraries using C++23 and Qt 6.8.3 Core (desktop·Android dynamic, iOS static) are. `DiskImage` creates a separate APFS disk image at the archive location and mounts it. The existing directory-based API is a low-level compatibility API for the logical layout. `SocietyDrive` consists of a persistent drive ID and 9 areas. macOS · iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider provide the contents of `Files/` to the system drive root. Society and iisacc app use internal 9 areas, and other Android apps use the same signed URI and Helper file system API.
 
-`Models/` provides 23 model type folders. `ModelStore` is responsible for listing, auto-classification, manual type modification, and path interpretation, while `ModelClassifier` reads limited metadata. 0.11.1's `metadata()` queries the architecture, precision, and explicit media classification to be displayed on the consumer app's cards. 0.11.2 adds Anima checkpoint structure validation and Safetensors tensor dimension, data type, and byte range verification. Creation, legacy cleanup, judgment rules, move history, and CLI contracts are described in the [Models management document](docs/Models.md).
+`Models/` retains a 23-type logical taxonomy without precreating unused folders.
+New and reopened drives leave empty Models directories empty; `ensureLayout()`
+validates existing categories. A writer's `categoryPath(type)` prepares only the
+requested category, and model placement creates only its selected destination
+parents. Existing models, companions, folders, UUIDs, and the nine-section
+contract remain intact. `ModelStore` is responsible for listing,
+auto-classification, manual type modification, and path interpretation, while
+`ModelClassifier` reads limited metadata. 0.11.1's `metadata()` queries the
+architecture, precision, and explicit media classification to be displayed on
+the consumer app's cards. 0.11.2 adds Anima checkpoint structure validation and
+Safetensors tensor dimension, data type, and byte range verification. Creation,
+legacy cleanup, judgment rules, move history, and CLI contracts are described
+in the [Models management document](docs/Models.md).
 
 <a id="공개-api"></a>
 
@@ -104,24 +136,36 @@ Region definition and name list are handled by `src/Store/StoreSection.h` and `s
 #include <SocietyDrive.h>
 
 QString error;
-auto drive = iiSocietyContainer::SocietyDrive::create("/data/MyLibrary", &error);
+auto drive = iiSocietyContainer::SocietyDrive::create("/data/MyLibrary.societycontainer", &error);
 if (!drive) {
     qWarning("%s", qPrintable(error));
     return;
 }
 const QString id = drive->identifier();
 const QString files = drive->sectionPath(iiSocietyContainer::StoreSection::Files);
-auto reopened = iiSocietyContainer::SocietyDrive::open("/data/MyLibrary", &error);
+auto reopened = iiSocietyContainer::SocietyDrive::open("/data/MyLibrary.societycontainer", &error);
 // reopened->identifier() == id
 ```
 
-`create()` creates subdirectories matching the 9 section names exactly, along with `.society-drive.json`, inside an **already existing directory**. Existing valid section directories and their contents are preserved. A file, symbolic link, or junction with the same name, or an invalid existing manifest, returns an error without being overwritten. Initialization locking and atomic manifest saving are used. On failure, only empty directories created by this call are cleaned up. A valid existing drive is opened with the same ID. `open()` creates no files; it validates the manifest, version, ID, and complete section layout.
+`create()` creates subdirectories matching the 9 section names exactly, along with `.society-drive.json`, inside an **already existing canonical `.societycontainer` directory package**. Bare directories, redirected package roots and legacy sparsebundle/disk-image markers are rejected before writes. `createAt(parent)` creates `Society.societycontainer` beneath an existing ordinary parent, without allocating an image. Existing valid section directories and their contents are preserved. A file, symbolic link, or junction with the same name, or an invalid existing manifest, returns an error without being overwritten. Initialization locking and atomic manifest saving are used. On failure, only empty directories created by this call are cleaned up. A valid existing drive is opened with the same ID. `open()` validates the manifest, version, ID, and complete section layout; an up-to-date layout creates no extra state. Supported older section layouts may be upgraded while preserving user contents and identity. `SharedStorage::runtimePath()` resolves private application paths beneath the selected package `.society-runtime` without writes; `ensureRuntimeDirectory()` explicitly creates only the requested directories after identity and redirect checks.
 
 The manifest version is `schemaVersion: 1`, its type is `type: "SocietyDrive"`, and its display name is `Society`. The identifier is a UUID, and section entries contain `id`, `name`, and `path`. The persistent keys returned by `storeSectionKey()` are, in order, `asset-library`, `deleted`, `files`, `forked`, `generation-history`, `models`, `published`, and `thinking-space`. Display names and directory names are as listed in the table above. The native section catalog is generated from the `catalog` output of the C++ tool rather than defined redundantly.
 
 `sectionForPath()` returns regions based on normalized targets of paths that actually exist. Root itself, root items outside regions, missing items, and external paths are `std::nullopt`. Unclassified files of the existing root are preserved and do not arbitrarily move to any region. All regions including `Deleted` are the same general folder, and business rules such as trash, publish, or creation history are not yet assigned.
 
-On macOS 15 or later, the native adapter is built alongside the SDK. It is installed at `share/iiSocietyContainer/Society.app` and exposed through `iiSocietyContainer_NATIVE_APP` in the CMake package. The SDK's `iiSocietyContainerDriveTool create|open <path>` exposes the same API through a CLI. Finder registration, signing, file reflection behavior, and scope follow the [macOS adapter documentation](platform/macos/README.md). [Windows/Linux mounting](platform/desktop/README.md)and [Android document-provider and inter-app sharing](platform/android/README.md)are defined in separate platform documentation.
+The CLI's `iiSocietyContainerDriveTool create <existing-absolute-parent>` uses
+`createAt()` and creates `Society.societycontainer` directly beneath that parent.
+It requires no preliminary package directory or later rename. Selecting an
+existing package instead reuses its UUID, as does creating again under the same
+parent. `open <existing-package>` validates an existing package without creating
+one. Files already in the parent are preserved.
+
+```sh
+iiSocietyContainerDriveTool create /absolute/storage/location
+iiSocietyContainerDriveTool open /absolute/storage/location/Society.societycontainer
+```
+
+On macOS 15 or later, the native adapter is built alongside the SDK. It is installed at `share/iiSocietyContainer/Society.app` and exposed through `iiSocietyContainer_NATIVE_APP` in the CMake package. Finder registration, signing, file reflection behavior, and scope follow the [macOS adapter documentation](platform/macos/README.md). [Windows/Linux mounting](platform/desktop/README.md)and [Android document-provider and inter-app sharing](platform/android/README.md)are defined in separate platform documentation.
 
 Opening or saving `Example.txt` from the system drive corresponds to `Files/Example.txt` of the original. A separate `Files` folder stage is not indicated. The remaining 7 regions and container metadata are excluded from the system drive's list/search working set and file ID access, and are provided via Society app's region navigation. This is the exposure scope of File Provider and does not change the operating system permissions or encryption of the original directory.
 
@@ -129,7 +173,7 @@ Opening or saving `Example.txt` from the system drive corresponds to `Files/Exam
 
 ## native disk image
 
-Society desktop onboarding creates an ordinary `Society/` directory with `SocietyDrive::createAt(parent)`. The nine Storage sections are direct child directories, including `Files` and `Models`; the file manager opens the complete root. Shared settings preserve the directory path and container UUID without mounting a disk image. Existing sparsebundle images remain readable for recovery and migration. See [directory storage and migration](docs/DirectoryStorage.md) and the [legacy disk-image API](docs/DiskImage.md).
+Society desktop onboarding creates one `Society.societycontainer` directory package with `SocietyDrive::createAt(parent)`. The nine Storage sections are direct child directories, including `Files` and `Models`; the file manager opens the complete root. Shared settings preserve the package path and container UUID without mounting a disk image. Private runtime state stays inside the package. On macOS 27, public FSKit mounting lets the operating system create and manage the mount namespace under `/Volumes/`; the adapter creates no external backing data directory. macOS 26 and Linux use private mount directories inside the package. Bare directories and old sparsebundle images cannot be selected or restored as managed storage; the standalone disk-image API remains separate. See [directory storage and migration](docs/DirectoryStorage.md) and the [legacy disk-image API](docs/DiskImage.md).
 
 <a id="iisacc-공통-스토리지"></a>
 
@@ -137,13 +181,13 @@ Society desktop onboarding creates an ordinary `Society/` directory with `Societ
 
 `SharedStorage.h/.cpp` provides repository discovery independent of app name, model list and reference interpretation, and area internal directory creation. Society registers the selected source, and Dreamscapes and consumers open the same repository. App-specific model copies or Finder's `Files/` projection are not used.
 
-Generation queue, prompt, and execution status are stored in each app instance's memory and are not saved to Society or restored upon re-execution. Temporary materials requiring file paths from the generator are processed in the app-specific temporary directory outside Society and cleaned up when the task is finished. Only completed image files are saved immediately below `Generation History/`, and no app-specific or task-specific folders or automatic Asset Library registration are created. `SharedStorage` does not own the generation queue or temporary task lifecycle.
+Generation queue, prompt, and execution status are stored in each app instance's memory and are not saved to Society or restored upon re-execution. Temporary materials requiring file paths from the generator remain private to the application and are cleaned up when the task is finished. Completed images and self-contained `.iisc` canvases are saved immediately below `Generation History/`, without task subfolders or automatic Asset Library registration. `DashboardFiles` includes native canvases as file metadata; the consuming application owns canvas decoding and derived previews. `SharedStorage` does not own the generation queue or temporary task lifecycle.
 
 ```cpp
 #include <SharedStorage.h>
 using namespace iiSocietyContainer;
 QString error;
-SharedStorage::setDefaultContainer("/data/Society", &error); // Existing drive selected by Society
+SharedStorage::setDefaultContainer("/data/Society.societycontainer", &error); // Existing drive selected by Society
 auto storage = SharedStorage::open({}, &error);             // Another iisacc app
 if (storage) {
     const auto models = storage->models(&error);
@@ -162,7 +206,7 @@ The model list enumerates the Diffusers directory including `Models/` `.safetens
 
 A reference is `{containerId, path, format, fingerprint}`. `path` is a path relative to `Models/`, and `fingerprint` is a change-detection value based on each file's relative path, size, modification time, and first 64 KiB. It is neither a hash of all weights nor an immutable snapshot. References to another drive or to deleted, redirected, or modified models are rejected; full weight provenance is recorded by the actual generation engine. `ensureDirectory()` creates only relative paths beneath the specified section and rejects `..`, `.`, empty intermediate components, backslashes, colons, NUL, and redirection. General file-system access also supports hidden files and directories, while model discovery continues to exclude hidden entries. This is not an isolation mechanism that blocks concurrent file-system changes.
 
-iOS opens the `Library/Application Support/Society` of the same App Group as Society instead of Documents per app. The consuming app sets the bundle ID and then calls `iiSocietyContainer_configure_ios_client(Dreamscapes APP_GROUP group.com.iisacc.society DISPLAY_NAME Dreamscapes TEAM ...)`. This function configures the same `SocietyAppGroup` Info.plist key and App Group entitlement while maintaining the consuming app name and bundle ID, without adding a separate File Provider extension. Society must be opened first to initialize the original. All participating apps must be signed with a valid group entitlement from the same Apple team. [](https://developer.apple.com/documentation/xcode/configuring-app-groups)uses the shared container API.
+iOS opens `Library/Application Support/Society.societycontainer` in the same App Group as Society instead of Documents per app. The one-time same-group directory migration preserves the manifest UUID and does not restore past disk images. The consuming app sets the bundle ID and then calls `iiSocietyContainer_configure_ios_client(Dreamscapes APP_GROUP group.com.iisacc.society DISPLAY_NAME Dreamscapes TEAM ...)`. This function configures the same `SocietyAppGroup` Info.plist key and App Group entitlement while maintaining the consuming app name and bundle ID, without adding a separate File Provider extension. Society must be opened first to initialize the original. All participating apps must be signed with a valid group entitlement from the same Apple team. [](https://developer.apple.com/documentation/xcode/configuring-app-groups)uses the shared container API.
 
 Common storage tests and install consumers verify that the same UUID is found even if the app name differs, configured drive replacement detection, original model path parsing, package duplication exclusion, model change detection, and internal output directory boundaries. iOS Package inspection checks the actual generated plist and group entitlement match between Society and Dreamscapes, without substituting device execution.
 
@@ -178,7 +222,11 @@ Path lookup and normalization use `QFileInfo` and `QDir` from the existing Qt Co
 
 ## Build, test, install
 
-CMake, 3.24 or higher, C++20 compiler, Qt **6.8.3** Core development files are required. When building tests, Qt Test development files are also required. macOS searches for `/Volumes/Storage/Qt/6.8.3/macos` by default.
+CMake 3.24 or higher, a C++23 compiler, the installed `iiFileProviderTemporary`
+package, and Qt **6.8.3** Core development files are required for a full build.
+The `Maintenance` and `FileTree` installed components can be consumed without
+Qt. When building all tests, Qt Test development files are also required. macOS
+searches for `/Volumes/Storage/Qt/6.8.3/macos` by default.
 
 ```sh
 ./install.sh
@@ -285,9 +333,19 @@ Photos path and manifest migration contract follows [Photos.md](docs/Photos.md).
 
 ### Generation inventory reconciliation
 
+Generated images are published as PNG originals directly in `Generation History/`.
+`SharedStorage::publishGeneratedImage()` preserves bytes and atomically rejects
+collisions through iiFileProvider. Native `.iisc` wrapping belongs to editor use
+and persists the document in Society `Files/`;
+canvas documents do not duplicate images in the History gallery. See
+[Generation History publication](docs/GenerationHistory.md) for API boundaries
+and verification.
+
 `SharedStorage::models()` reconciles a local authority catalog with native Models files before returning generation models: Deleted moves disappear and new files/packages appear before background hashing finishes. Existing indexed version references remain compatible with remote generation. Discovery reads file metadata, not tensor payloads; hidden runtime directories and redirected paths are excluded. A replica with an empty catalog stays empty instead of exposing leftover local files. `resolveModel()` uses the same inventory. Regression coverage: `generationInventoryReconcilesAuthorityAndPreservesReplicas`.
 # File loading performance
 
 Application-local directory snapshots, SHA-256/preview caching and bounded parallel
 loading are documented in [FileLoading.md](FileLoading.md). GUI consumers register
 `iiSocietyContainer::PreviewProvider` under `society-preview` before loading QML.
+
+Directory and preview caches are written lazily beneath the source package’s `.society-runtime/cache/files/`. No selected package means no cache creation. Explicit cache overrides must stay within that package’s verified private runtime; external or redirected destinations are rejected before writing.

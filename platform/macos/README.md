@@ -1,9 +1,141 @@
-> The actual APFS disk of the new Society onboarding uses [DiskImage](../../docs/DiskImage.md).
-> This document describes the Files-specific projection adapter for the existing File Provider.
+> New Society storage is one schema-1 `.societycontainer` directory package.
+> FSKit mounts its existing `Files/` section without copying or preallocating data.
+> Legacy APFS disk images are not automatically opened or restored.
 
 # macOS Society
 
-Apple's [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)provides Society drive to Finder and file dialogs. Minimum macOS 15. Foundation, FileProvider, UniformTypeIdentifiers, CryptoKit, CoreServices are frameworks included in the operating system, adding no FUSE, external drivers, or paid cloud services. The Swift compiler uses Xcode Command Line Tools, and bundle creation uses Python 3. Apple framework usage conditions follow Apple SDK license.
+The native host accepts only `.societycontainer` sources with the Society UUID
+manifest and nine native section directories. Ordinary directories, nested
+containers, Finder replicas, and sources containing `Info.plist`, `bands`, or
+`.society-disk.plist` disk-image markers are rejected before registration.
+The FSKit resource probe also requires the package extension and refuses those
+legacy markers and redirected manifests.
+
+On macOS 27, the signed host uses Apple's public
+[`FSClient.mountSingleVolume`](https://developer.apple.com/documentation/fskit/fsclient/mountsinglevolume%28resource%3Abundleid%3Aoptions%3Acompletionhandler%3A%29)
+with the `com.apple.developer.fskit.mount` capability and a security-scoped
+resource URL. macOS creates and owns the mount point under `/Volumes/`.
+Society never creates or removes an external mount directory. Stored data,
+application state, logs and temporary files stay inside the selected package;
+the OS volume is a direct projection of `Files/` and does not copy that data.
+
+The macOS 26 command-line path prepares only an empty
+`<container>/.society-runtime/mounts/<uuid>/Society` backing directory. It rejects
+redirected ancestors, foreign mounted ancestors and nonempty directories.
+That older path requires an ownership-enabled host filesystem and can be
+limited by OS file-mount policy. macOS 27 does not fall back to it when its
+public API or provisioning fails.
+
+Reconnect examines actual `societyfs` mount records and the filesystem's volume
+UUID. A renamed source renews its security-scoped resource through public unmount and
+mount while retaining the same UUID; a different still-existing
+source inode with the same UUID, or duplicate mounted UUIDs, is rejected.
+Discovery creates no files. Unmount uses public Disk Arbitration and targets
+only the matching filesystem source and UUID. OS authorization errors leave the
+volume and its source intact and are reported to the caller.
+
+`DirectoryMountTests.swift` checks legacy package preparation, UUID discovery,
+rename reconnect and collision rejection. `tests/native_directory_mount.py`
+checks the actual device, OS-managed macOS 27 mount point, Files-only CRUD,
+rename reconnect and unchanged manifest UUID. It retains its backing fixture
+when unmount fails. The standard test suite does not register or activate an OS
+extension. File Provider materialization, extension registration, access grants
+and the `/Volumes` namespace remain under macOS control.
+
+`LocalDriveStore` protects `.society-write-*` copies with the same zero-byte
+`.iisacc-temporary.lock` shared lease used by the C++ SDK. The lease begins before
+copying and ends after publication or removal, so periodic maintenance skips
+active writes. A redirected or nonregular lease is rejected without replacing
+the destination. `LocalDriveStoreTests.swift` covers redirected-lease rejection.
+
+The public File Provider and FSKit views hide `.iisacc-temporary.lock` and reject
+direct item operations on this internal coordination metadata. An explicit
+FSKit deletion of an otherwise empty folder may remove its idle zero-byte
+sentinel while holding a nonblocking exclusive lease. An active writer returns
+`EBUSY`, and other folder contents remain subject to ordinary `ENOTEMPTY`.
+Background maintenance always preserves the sentinel. The real
+`tests/native_directory_mount.py` regression covers listing, direct write
+rejection, active-writer exclusion, and idle sentinel-only folder deletion.
+
+FSKit reads and writes own a descriptor with the requested access mode for
+the operation's lifetime. Reading a source-preloaded file before writing it,
+or closing its cached item during I/O, preserves the user inode and does not
+invalidate the operation descriptor. `native_io` exercises the read-only cache,
+write reopening, cached-close overlap and descriptor cleanup. Attribute reads
+and parent lookups likewise own their descriptor, including simultaneous
+attribute requests after a cached close. Attribute snapshot creation and field population are serialized per item to preserve FSKit attribute sequence ordering. Concurrent cache misses share the
+first published item for the same inode; reclaiming an older object does not
+remove a later cached object.
+
+Directory callbacks own independent `openat(".")` streams and close them on
+completion, error and early return. Cookies count raw directory entries across
+requests rather than reusing a `telldir` token from a different stream.
+If requested enumeration attributes cannot be obtained, the callback returns
+the actual error instead of packing missing attributes as a successful listing.
+`native_directory` covers repeated and interleaved complete listings,
+pagination and stream lifetime with 1,024 long filenames. The real mount
+regression also checks concurrent listing, repeated read/write of preloaded
+ordinary files, and read-only mutation rejection for metadata-name user data. Directory mutation
+between paginated requests remains outside the unchanged verifier policy.
+
+FSKit rejects new exact volume-root index names `.fseventsd` and
+`.Spotlight-V100`, and new `.DS_Store` entries in every folder, before creating
+source bytes.
+Creation reports `EEXIST` for an existing matching entry and `EPERM` for a
+missing matching entry. Renaming to a missing matching entry also reports
+`EPERM`. Existing matching entries and descendants of matching folders remain
+listed and available to lookup and reads. Mounted writes, removal, rename,
+attribute mutation and preallocation report `EPERM`; replacement of a reserved
+destination and creation inside a protected folder are also rejected. Users
+can edit and move this data through the authoritative source `Files/` path.
+Volume-management names in unprotected nested folders and other dotfiles
+remain ordinary names.
+The policy limits new Finder view, event-history and indexing metadata storage.
+`.Trashes`, `.TemporaryItems`, and `.DocumentRevisions-V100` remain ordinary
+names at the root as well, preserving user recovery, save transactions and
+document versions. `FSKitMetadataTests.swift` checks the native policy without
+activation, and the real mount regression checks the installed FSKit callbacks
+and existing user-file fidelity. The manifest UUID and file UID/GID attributes
+remain independent of these management names.
+
+The SDK's name policy does not override macOS System Policy. On the observed
+macOS 27 mount, the kernel denied the ordinary Python caller's
+`file-write-create` at the volume-root `.DocumentRevisions-V100`, while an
+ordinary APFS control directory allowed the same name and inner file writes.
+This policy does not change document-version service permissions. The real
+mount regression reports `EPERM` only for that new root `mkdir` as a separate
+OS limitation after verifying that no source entry remains. Other errors,
+including `.Trashes`/`.TemporaryItems` CRUD and writes inside a successfully
+created revision folder, still fail the test. The native unit test continues
+to require that `.DocumentRevisions-V100` is allowed by the SDK name policy.
+
+On the same observed macOS 27 mount, source-preloaded user files at root
+`.Spotlight-V100` and `.TemporaryItems/user.txt` remained listed or available
+to lookup, but the kernel denied the ordinary Python caller's `file-read-data`
+for those exact paths. The SDK adds no existing-item hiding or read-name
+restriction. The real regression reports only `EPERM` from these two exact
+existing root reads as separate OS limitations, asserting unchanged source
+bytes and device/inode and explicitly leaving projection writes unverified
+for those cases. New volume-root `.Trashes` and `.TemporaryItems` file creation,
+write, readback and deletion passed before the preloaded-file check; these
+remain strict checks with an explicit success record. Other ordinary existing
+user items and writes after a successful read of the unreserved
+`.TemporaryItems` path remain strict checks.
+Reserved root and nested metadata-name entries instead require mutation
+rejection and unchanged source bytes and device/inode. No recovery,
+save, document-version or indexing-service permissions or native entitlements
+are changed to bypass the observed OS protection.
+
+In an earlier real fixture with creation rejection alone, a preloaded root
+`.fseventsd` appeared in baseline and concurrent listings, then disappeared
+from the source itself. No successful-delete caller record was obtained, so
+this observation does not identify an OS service as the deleting actor.
+Callbacks that allowed existing reserved-name mutations could not guarantee
+source preservation. The read-only mounted protection now addresses that
+boundary without deleting or hiding existing user data or limiting ordinary
+user-document CRUD.
+
+Apple's [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)provides Society drive to Finder and file dialogs. Minimum macOS 15. Foundation, FileProvider, UniformTypeIdentifiers, CryptoKit, CoreServices are frameworks included in the operating system, adding no FUSE, external drivers, or paid cloud services. The Swift compiler uses the Apple SDK, bundle creation uses Python 3, and restricted FSKit capabilities use Xcode automatic provisioning with the configured developer team. Apple framework usage conditions follow Apple SDK license.
 
 <a id="빌드와-연결"></a>
 
@@ -24,12 +156,12 @@ cmake --install build
 Society The app's `Connect to Finder` registers installed adapters and connects the File Provider domain to the SDK drive ID. For the first connection, Finder's standard `Enable` behavior may be required. The path of the original folder and the path managed by the system are different. CLI connection is as follows.
 
 ```sh
-build/iiSocietyContainerDriveTool create "/path/to/existing/source"
+build/iiSocietyContainerDriveTool create "/path/to"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$PWD/build/native/Society.app"
 pluginkit -a "$PWD/build/native/Society.app/Contents/PlugIns/SocietyContainerProvider.appex"
 open -W -g -a "$PWD/build/native/Society.app" --args list
-"build/native/Society.app/Contents/MacOS/SocietyContainerDrive" register "/path/to/existing/source"
+"build/native/Society.app/Contents/MacOS/SocietyContainerDrive" register "/path/to/Society.societycontainer"
 "build/native/Society.app/Contents/MacOS/SocietyContainerDrive" list
 "build/native/Society.app/Contents/MacOS/SocietyContainerDrive" path "<drive-id>"
 "build/native/Society.app/Contents/MacOS/SocietyContainerDrive" refresh "<drive-id>"

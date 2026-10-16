@@ -1,5 +1,8 @@
+#include <iiFileProviderDevice.h>
+#include <iiFileProviderPresentation.h>
 #include "StorageDirectoryModel.h"
 #include "FileOperations.h"
+#include "SharedStorage.h"
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
@@ -14,7 +17,6 @@
 #include <thread>
 #include <QCryptographicHash>
 #include <QDataStream>
-#include <QSaveFile>
 #include <QStandardPaths>
 
 namespace iiSocietyContainer {
@@ -45,14 +47,18 @@ QString snapshotPath(const Options &o) {
     QByteArray key; QDataStream stream(&key, QIODevice::WriteOnly);
     stream << o.folder << o.dirs << o.files << o.hidden << o.dirsFirst << o.caseSensitive
            << o.sortCaseSensitive << o.reversed << int(o.sort) << o.filters;
-    return QDir(StorageDirectoryModel::cacheDirectory()).filePath(
+    const auto directory = StorageDirectoryModel::cacheDirectory(o.folder.toLocalFile());
+    if (directory.isEmpty()) return {};
+    return QDir(directory).filePath(
         "directories-v1/" + QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex()) + ".bin");
 }
 QList<QVariantMap> restoreSnapshot(const Options &o) {
     const QFileInfo folder(o.folder.toLocalFile());
     if (!folder.isDir() || folder.isSymLink()) return {};
     const auto drive = containingDrive(folder.absoluteFilePath());
-    QFile file(snapshotPath(o));
+    const auto path = snapshotPath(o);
+    if (path.isEmpty()) return {};
+    iiFileProvider::FileDevice file(path);
     if (file.size() > 16 * 1024 * 1024 || !file.open(QIODevice::ReadOnly)) return {};
     QDataStream stream(&file); stream.setVersion(QDataStream::Qt_6_8);
     quint32 version; QString binding; QList<QVariantMap> rows;
@@ -60,19 +66,27 @@ QList<QVariantMap> restoreSnapshot(const Options &o) {
     if (stream.status() != QDataStream::Ok || version != 1 || binding != (drive ? drive->identifier() : QString())) return {};
     for (const auto &row : rows)
         if (QFileInfo(row.value("filePath").toString()).absolutePath() != folder.absoluteFilePath()) return {};
+    rows.erase(std::remove_if(rows.begin(), rows.end(), [](const auto &row) {
+        return row.value("fileName").toString() == ".iisacc-temporary.lock";
+    }), rows.end());
     return rows;
 }
 void saveSnapshot(const Options &o, const Listing &listing) {
-    const auto path = snapshotPath(o); const auto directory = QFileInfo(path).absolutePath();
-    if (!QDir().mkpath(directory) || QFileInfo(directory).isSymLink()) return;
-    QFile::setPermissions(directory, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    const auto path = snapshotPath(o);
+    if (path.isEmpty() || !listing.drive) return;
+    const auto storage = SharedStorage::open(listing.drive->rootPath());
+    if (!storage) return;
+    const auto directory = QFileInfo(path).absolutePath();
+    const auto relative = QDir(storage->runtimePath()).relativeFilePath(directory);
+    if (storage->ensureRuntimeDirectory(relative) != directory) return;
+    iiFileProvider::FileDevice::setPermissions(directory, iiFileProvider::FileDevice::ReadOwner | iiFileProvider::FileDevice::WriteOwner | iiFileProvider::FileDevice::ExeOwner);
     QByteArray bytes; QDataStream stream(&bytes, QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_8);
     stream << quint32(1) << (listing.drive ? listing.drive->identifier() : QString()) << listing.rows;
     if (bytes.size() > 16 * 1024 * 1024) return;
-    QFile existing(path);
+    iiFileProvider::FileDevice existing(path);
     if (existing.open(QIODevice::ReadOnly) && existing.size() == bytes.size() && existing.readAll() == bytes) return;
-    existing.close(); QSaveFile file(path);
-    if (file.open(QIODevice::WriteOnly) && file.setPermissions(QFile::ReadOwner | QFile::WriteOwner)
+    existing.close(); iiFileProvider::SaveFile file(path);
+    if (file.open(QIODevice::WriteOnly) && file.setPermissions(iiFileProvider::FileDevice::ReadOwner | iiFileProvider::FileDevice::WriteOwner)
         && file.write(bytes) == bytes.size()) file.commit();
     // Directory snapshots are rebuildable. Keep the 128 most recently written.
     static std::mutex pruneMutex;
@@ -81,7 +95,7 @@ void saveSnapshot(const Options &o, const Listing &listing) {
     qint64 total = 0;
     for (int i = 0; i < entries.size(); ++i) {
         total += entries[i].size();
-        if (i >= 128 || total > 128ll * 1024 * 1024) QFile::remove(entries[i].absoluteFilePath());
+        if (i >= 128 || total > 128ll * 1024 * 1024) iiFileProvider::FileDevice::remove(entries[i].absoluteFilePath());
     }
 }
 Listing list(const Options &o, const QJsonArray &cached, const QString &cachedStamp,
@@ -98,6 +112,7 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
         while (!cancel->load()) {
             const auto i = next.fetch_add(1); if (i >= infos.size()) break;
             const auto info = infos[i]; const auto path = info.absoluteFilePath();
+            if (info.fileName() == ".iisacc-temporary.lock") continue;
             rows.append({{"fileName", info.fileName()}, {"filePath", path}, {"fileUrl", QUrl::fromLocalFile(path)},
                 {"fileSuffix", info.suffix()}, {"fileIsDir", info.isDir()}, {"fileSize", info.size()},
                 {"fileModified", info.lastModified()}, {"filePreviewUrl", QUrl::fromLocalFile(path)}, {"fileResident", true}});
@@ -113,9 +128,10 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
     for (const auto &row : entries) {
         paths.insert(row.value("filePath").toString(), row);
     }
+    QString relativeFolder;
     if (result.drive) {
         const auto root = result.drive->rootPath();
-        const auto relativeFolder = result.drive->relativePath(folder);
+        relativeFolder = result.drive->relativePath(folder);
         const QFileInfo catalog(QDir(root).filePath(".society-sync/catalog.json"));
         result.stamp = root + '\n' + result.drive->identifier() + '\n' + QString::number(catalog.size())
             + '\n' + QString::number(catalog.lastModified().toMSecsSinceEpoch())
@@ -160,11 +176,15 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
     for (const auto &row : paths) {
         if (cancel->load()) return {};
         const auto name = row.value("fileName").toString(); const bool directory = row.value("fileIsDir").toBool();
+        if (iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(name.toStdU16String()))) continue;
         if ((!o.hidden && name.startsWith('.')) || (directory ? !o.dirs : !o.files)) continue;
         bool match = filters.isEmpty() || directory;
         for (const auto &filter : filters) match |= filter.match(name).hasMatch();
         if (match) {
             auto entry = row;
+            const auto logical = relativeFolder.isEmpty() ? QString() : StorageMap::logicalPath(relativeFolder + '/' + name);
+            entry.insert("fileInformationKey", directory ? QString() : logical);
+            entry.insert("fileInformationProvider", directory || logical.isEmpty() ? QString() : QStringLiteral("iiFileProvider"));
             entry.insert("fileThumbnailUrl", StorageDirectoryModel::thumbnailUrl(row.value("filePreviewUrl").toUrl().toLocalFile()));
             result.rows.append(entry);
         }
@@ -200,7 +220,7 @@ StorageDirectoryModel::~StorageDirectoryModel() { if (m_cancel) m_cancel->store(
 int StorageDirectoryModel::rowCount(const QModelIndex &parent) const { return parent.isValid() ? 0 : m_rows.size(); }
 QHash<int, QByteArray> StorageDirectoryModel::roleNames() const {
     QHash<int, QByteArray> roles; int role = Qt::UserRole + 1;
-    for (const auto *name : {"fileName", "filePath", "fileUrl", "fileSuffix", "fileIsDir", "fileSize", "fileModified", "filePreviewUrl", "fileResident", "fileThumbnailUrl"}) roles.insert(role++, name);
+    for (const auto *name : {"fileName", "filePath", "fileUrl", "fileSuffix", "fileIsDir", "fileSize", "fileModified", "filePreviewUrl", "fileResident", "fileThumbnailUrl", "fileInformationKey", "fileInformationProvider"}) roles.insert(role++, name);
     return roles;
 }
 QVariant StorageDirectoryModel::data(const QModelIndex &index, int role) const { return get(index.row(), QString::fromLatin1(roleNames().value(role))); }
@@ -415,12 +435,27 @@ QUrl StorageDirectoryModel::thumbnailUrl(const QString &path) {
     const auto modified = std::filesystem::last_write_time(std::filesystem::u8path(path.toStdString()), error);
     if (error) return {};
     const auto encoded = path.toUtf8().toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
+    QString changeToken;
+    try { changeToken = QString::fromStdString(iiFileProvider::native::Presentation::cacheChangeToken(std::filesystem::path(path.toStdU16String()))); }
+    catch (...) { return {}; }
     return QUrl(QStringLiteral("image://society-preview/%1/%2-%3-%4").arg(QString::fromLatin1(encoded))
-        .arg(info.size()).arg(qint64(modified.time_since_epoch().count())).arg(info.metadataChangeTime().toMSecsSinceEpoch()));
+        .arg(info.size()).arg(qint64(modified.time_since_epoch().count())).arg(changeToken));
 }
 QString StorageDirectoryModel::cacheDirectory() {
+    const auto storage = SharedStorage::open({}, nullptr, true);
+    return storage ? cacheDirectory(storage->drive().sectionPath(StoreSection::Files)) : QString();
+}
+QString StorageDirectoryModel::cacheDirectory(const QString &sourcePath) {
+    const auto drive = containingDrive(sourcePath);
+    if (!drive) return {};
+    const auto storage = SharedStorage::open(drive->rootPath(), nullptr, true);
+    if (!storage) return {};
     const auto configured = qEnvironmentVariable("IISOCIETY_FILE_CACHE_DIRECTORY");
-    if (!configured.isEmpty() && QFileInfo(configured).isAbsolute()) return QDir::cleanPath(configured);
-    return QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation)).filePath("society");
+    if (!configured.isEmpty()) {
+        const auto runtime = storage->runtimePath();
+        const auto relative = QDir(runtime).relativeFilePath(configured);
+        return storage->runtimePath(relative) == configured ? configured : QString();
+    }
+    return storage->runtimePath("cache/files");
 }
 }

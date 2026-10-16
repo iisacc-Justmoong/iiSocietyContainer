@@ -67,7 +67,11 @@ function(iiSocietyContainer_add_ios_file_provider target)
         configure_file("${native}/${file}.in" "${generated}/${file}" @ONLY)
     endforeach()
 
-    set(common "${shared}/LocalDriveStore.swift" "${shared}/SharedDriveLocation.swift")
+    # This package supplies source compiled by the target Swift toolchain.
+    find_package(iiFileProviderSwift 0.6 CONFIG REQUIRED
+        HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider"
+        NO_CMAKE_FIND_ROOT_PATH)
+    set(common ${iiFileProviderSwift_SOURCE} "${shared}/LocalDriveStore.swift" "${shared}/SharedDriveLocation.swift")
     set(catalog "${shared}/Sections.json")
     set_source_files_properties("${catalog}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     # Keep Qt/LVRS C++ flags out of Swift compilation. The app calls this small

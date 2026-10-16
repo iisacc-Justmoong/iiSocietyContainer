@@ -32,7 +32,10 @@ public:
     static QList<ModelEntry> scanDirectory(const QString &modelsDirectory, QString *error = nullptr,
         const std::atomic_bool *cancelled = nullptr);
     QString rootPath() const;
+    /// Prepare only this requested category for model publication. Other
+    /// logical categories remain absent until explicitly used by a writer.
     QString categoryPath(ModelType type, QString *error = nullptr) const;
+    /// Validate existing taxonomy paths; never create unused type folders.
     bool ensureLayout(QString *error = nullptr) const;
     QList<ModelEntry> entries(QString *error = nullptr, const std::atomic_bool *cancelled = nullptr) const;
     /// Only existing entries inside Models may move. An explicit type supports manual correction.

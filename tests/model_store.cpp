@@ -86,7 +86,7 @@ class ModelStoreTests : public QObject {
 private slots:
     void exposesBoundedModelMetadataForCatalogs()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/catalog-metadata-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/catalog-metadata-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("model.safetensors");
         QVERIFY(write(path, weights({"tensor"}, {{"modelspec.architecture", "stable-diffusion-xl-v1-base"}})));
         auto metadata = ModelClassifier::metadata(path);
@@ -104,16 +104,23 @@ private slots:
         QVERIFY(ModelClassifier::metadata(fixture.filePath("linked.safetensors")).isEmpty());
     }
 
-    void createsAllTypesAndPreservesLegacyManifest()
+    void createsCategoriesOnlyOnDemandAndPreservesLegacyManifest()
     {
         const QStringList expected{"Checkpoint", "Embedding", "Hypernetwork", "Aesthetic Gradient", "LoRA", "LyCORIS", "DoRA",
             "Controlnet", "Upscaler", "Motion", "VAE", "Text Encoder", "UNet", "CLIP Vision", "Poses", "Wildcards",
             "Workflows", "ComfyUI Workflows", "Detection", "VLM", "CLIP", "LLM", "Other"};
         QCOMPARE(allModelTypes().size(), expected.size());
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/types-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/types-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QString error;
         const auto drive = SocietyDrive::create(fixture.path(), &error); QVERIFY2(drive, qPrintable(error));
         const auto store = ModelStore::open(fixture.path(), &error); QVERIFY2(store, qPrintable(error));
+        const auto modelsRoot = fixture.filePath("Models");
+        const auto manifest = read(fixture.filePath(".society-drive.json"));
+        QCOMPARE(QDir(modelsRoot).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 0);
+        QVERIFY(SocietyDrive::create(fixture.path()));
+        QVERIFY(store->ensureLayout(&error));
+        QVERIFY(store->ensureLayout(&error));
+        QCOMPARE(QDir(modelsRoot).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 0);
         for (qsizetype index = 0; index < expected.size(); ++index) {
             const auto type = allModelTypes()[index];
             QCOMPARE(modelTypeName(type), expected[index]);
@@ -122,19 +129,54 @@ private slots:
             QVERIFY(QFileInfo(store->categoryPath(type)).isDir());
             QVERIFY(QDir().rmdir(store->categoryPath(type))); // Simulate a pre-0.11 Models area.
         }
-        const auto manifest = read(fixture.filePath(".society-drive.json"));
         QVERIFY(SocietyDrive::open(fixture.path()));
         QVERIFY(QDir(fixture.filePath("Models")).isEmpty()); // Opening remains read-only.
         QVERIFY(store->ensureLayout(&error));
         QVERIFY(store->ensureLayout(&error));
         QCOMPARE(read(fixture.filePath(".society-drive.json")), manifest);
-        QCOMPARE(QDir(fixture.filePath("Models")).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 23);
+        QCOMPARE(QDir(modelsRoot).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 0);
+        const auto emptyReport = store->organize();
+        QVERIFY(emptyReport.errors.isEmpty()); QVERIFY(emptyReport.moved.isEmpty());
+        QCOMPARE(QDir(modelsRoot).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size(), 0);
         QVERIFY(!modelTypeFromName("../Checkpoint"));
+    }
+
+    void createsOnlyWrittenCategoriesAndKeepsExistingUserContent()
+    {
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/lazy-categories-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto identifier = drive->identifier();
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        const auto root = fixture.filePath("Models");
+        const auto bytes = weights({"layer.lora_A.weight", "layer.lora_B.weight"});
+        QVERIFY(write(root + "/style.safetensors", bytes));
+        QVERIFY(write(root + "/style.preview.png", "original preview"));
+        QString error;
+        QCOMPARE(store->place("style.safetensors", {}, &error), root + "/LoRA/style.safetensors");
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot), QStringList{"LoRA"});
+        QCOMPARE(read(root + "/LoRA/style.safetensors"), bytes);
+        QCOMPARE(read(root + "/LoRA/style.preview.png"), QByteArray("original preview"));
+        QCOMPARE(store->resolve("style.safetensors"), root + "/LoRA/style.safetensors");
+        const auto language = gguf("llama"); QVERIFY(write(root + "/language.gguf", language));
+        QCOMPARE(store->place("language.gguf", {}, &error), root + "/LLM/language.gguf");
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name), (QStringList{"LLM", "LoRA"}));
+        QCOMPARE(read(root + "/LLM/language.gguf"), language);
+        const auto checkpoint = store->categoryPath(ModelType::Checkpoint, &error);
+        QCOMPARE(checkpoint, root + "/Checkpoint"); QVERIFY(QFileInfo(checkpoint).isDir());
+        QVERIFY(write(checkpoint + "/user.safetensors", bytes));
+        QVERIFY(QDir().mkdir(root + "/VAE")); // Preserve an existing user-created empty category.
+        QVERIFY(store->ensureLayout(&error)); QVERIFY(SocietyDrive::create(fixture.path()));
+        QCOMPARE(QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name), (QStringList{"Checkpoint", "LLM", "LoRA", "VAE"}));
+        QCOMPARE(read(checkpoint + "/user.safetensors"), bytes);
+        QCOMPARE(SocietyDrive::open(fixture.path())->identifier(), identifier);
+        QCOMPARE(drive->sections().size(), 9);
     }
 
     void explicitMetadataCoversEveryType()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/metadata-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/metadata-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("arbitrary.safetensors");
         for (const auto type : allModelTypes()) {
             QVERIFY(write(path, weights({"tensor"}, {{"society.model_type", modelTypeName(type)}})));
@@ -150,7 +192,7 @@ private slots:
 
     void validatesLargeSparseSafetensorsWithoutReadingPayload()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/large-model-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/large-model-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("large.safetensors");
         const qint64 length = (qint64(1) << 32) + 123;
         const QJsonObject header{{"tensor", QJsonObject{{"dtype", "U8"}, {"shape", QJsonArray{length}},
@@ -172,7 +214,7 @@ private slots:
     void kreaCheckpoint()
     {
         QFETCH(QString, prefix);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/krea-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/krea-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto path = fixture.filePath("Models/Other/unrelated-name.safetensors");
         QJsonObject header{
@@ -210,7 +252,7 @@ private slots:
     void animaCheckpoint()
     {
         QFETCH(QString, prefix);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("unrelated-name.safetensors");
         auto header = animaTensors(prefix);
         if (prefix == "model.diffusion_model.net.") {
@@ -231,7 +273,7 @@ private slots:
 
     void animaRequiresConsistentBackboneAndAdapter()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-evidence-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-evidence-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("anima_checkpoint.safetensors");
         QVERIFY(write(path, weights({"net.blocks.0.mlp.layer1.weight", "net.llm_adapter.blocks.0.cross_attn.q_proj.weight"})));
         QCOMPARE(ModelClassifier::classify(path).type, ModelType::Other);
@@ -292,7 +334,7 @@ private slots:
     void validatesTensorDescriptorsAndPayload()
     {
         QFETCH(QByteArray, bytes);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/tensor-validation-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/tensor-validation-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("checkpoint.safetensors"); QVERIFY(write(path, bytes));
         const auto result = ModelClassifier::classify(path);
         QVERIFY2(!result.recognized, qPrintable(result.evidence));
@@ -305,7 +347,7 @@ private slots:
 
     void acceptsScalarEmptyAndPackedTensors()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/valid-tensors-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/valid-tensors-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("model.safetensors");
         const QJsonObject header{
             {"layer.lora_A.weight", QJsonObject{{"dtype", "F32"}, {"shape", QJsonArray{}}, {"data_offsets", QJsonArray{0, 4}}}},
@@ -321,7 +363,7 @@ private slots:
 
     void reorganizesPreviouslyUnknownAnimaAndPreservesReferences()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-organize-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-organize-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto source = fixture.filePath("Models/Other/renamed.safetensors");
         const auto bytes = tensorFile(animaTensors("net.")); QVERIFY(write(source, bytes));
@@ -363,7 +405,7 @@ private slots:
     void tensorSignatures()
     {
         QFETCH(QStringList, keys); QFETCH(int, type);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/tensors-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/tensors-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("unrelated name.safetensors");
         const auto bytes = weights(keys); QVERIFY(write(path, bytes));
         QCOMPARE(int(ModelClassifier::classify(path).type), type);
@@ -372,7 +414,7 @@ private slots:
 
     void packagesDocumentsAndGguf()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/formats-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/formats-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto pipeline = fixture.filePath("pipeline");
         QVERIFY(write(pipeline + "/model_index.json", "{\"_class_name\":\"StableDiffusionPipeline\"}"));
         QVERIFY(ModelClassifier::isPackage(pipeline));
@@ -412,7 +454,7 @@ private slots:
 
     void boundedInspectionDoesNotGuessFromNamesOrExecuteLegacyFiles()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/invalid-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/invalid-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QByteArray oversized(8, '\0'); qToLittleEndian(quint64(256 * 1024 * 1024), oversized.data());
         for (const auto &bytes : {QByteArray(), QByteArray("not a tensor file"), oversized,
                 QByteArray::fromHex("1000000000000000") + QByteArray("{}")} ) {
@@ -428,7 +470,7 @@ private slots:
 
     void organizesPackagesAndCompanionsWithoutReplacingFilesOrReferences()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/organize-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/organize-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto base = fixture.filePath("Models");
         const auto source = base + "/Collection/model.safetensors";
@@ -483,8 +525,8 @@ private slots:
 
     void pathReferencesTravelWithTheContainer()
     {
-        QTemporaryDir source(SOCIETY_TEST_DIRECTORY "/source-XXXXXX");
-        QTemporaryDir replica(SOCIETY_TEST_DIRECTORY "/replica-XXXXXX");
+        QTemporaryDir source(SOCIETY_TEST_DIRECTORY "/source-XXXXXX.societycontainer");
+        QTemporaryDir replica(SOCIETY_TEST_DIRECTORY "/replica-XXXXXX.societycontainer");
         QVERIFY(source.isValid()); QVERIFY(replica.isValid());
         QVERIFY(SocietyDrive::create(source.path()));
         QVERIFY(SocietyDrive::create(replica.path()));
@@ -504,7 +546,7 @@ private slots:
 
     void rejectsRedirectedCategoriesInvalidJournalsAndOutsideMoves()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/boundaries-XXXXXX"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/boundaries-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
         const auto path = fixture.filePath("Models/model.safetensors");
@@ -516,7 +558,7 @@ private slots:
         QVERIFY(store->place("LoRA", ModelType::Checkpoint, &error).isEmpty());
         QVERIFY(createTestSymbolicLink(fixture.filePath("Files/outside.safetensors"), fixture.filePath("Models/link.safetensors")));
         QVERIFY(store->place("link.safetensors", {}, &error).isEmpty());
-        QVERIFY(QDir().rmdir(fixture.filePath("Models/LoRA")));
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Models/LoRA")));
         QVERIFY(createTestSymbolicLink(fixture.filePath("Files"), fixture.filePath("Models/LoRA")));
         QVERIFY(!store->ensureLayout(&error));
         QVERIFY(!store->organize().errors.isEmpty());
@@ -532,7 +574,7 @@ private slots:
         const auto report = store->organize(&cancelled);
         QVERIFY(report.cancelled); QVERIFY(report.moved.isEmpty()); QCOMPARE(read(path), bytes);
 
-        QTemporaryDir conflict(SOCIETY_TEST_DIRECTORY "/type-conflict-XXXXXX"); QVERIFY(conflict.isValid());
+        QTemporaryDir conflict(SOCIETY_TEST_DIRECTORY "/type-conflict-XXXXXX.societycontainer"); QVERIFY(conflict.isValid());
         QVERIFY(write(conflict.filePath("Models/Checkpoint"), "do not replace"));
         QVERIFY(!SocietyDrive::create(conflict.path(), &error));
         QCOMPARE(read(conflict.filePath("Models/Checkpoint")), QByteArray("do not replace"));

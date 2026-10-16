@@ -1,18 +1,23 @@
+#include <iiFileProviderStorage.h>
+#include <iiFileProviderDevice.h>
+#include <iiFileProviderPresentation.h>
 #include "SharedStorage.h"
 #include "ModelStore.h"
 #include "StorageMap.h"
 #include "DiskImage.h"
+#include <File.h>
+#include <StagedFile.h>
+#include <FileCatalog.h>
+#include <iiFileProviderPresentation.h>
+#include "src/FileTreePaths.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
-#include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
-#include <QLockFile>
-#include <QSaveFile>
 #include <QStandardPaths>
 #include <algorithm>
+#include <filesystem>
 
 namespace iiSocietyContainer {
 #ifdef Q_OS_IOS
@@ -25,7 +30,7 @@ namespace {
 void fail(QString *error, const QString &message) { if (error) *error = message; }
 bool relative(const QString &path, bool allowHidden = false)
 {
-    if (path.isEmpty() || QDir::isAbsolutePath(path) || path.contains('\\')
+    if (path.isEmpty() || iiFileProvider::Directory::isAbsolutePath(path) || path.contains('\\')
         || path.contains(':') || path.contains(QChar::Null))
         return false;
     for (const auto &part : path.split('/'))
@@ -37,31 +42,32 @@ bool inventory(const QString &path, const QString &base, QCryptographicHash &has
     const QString &physicalRoot = {}, const QString &logicalRoot = {})
 {
     const QFileInfo info(path);
+    if (iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(info.fileName().toStdU16String()))) return true;
     if (info.isSymLink() || !info.isReadable() || info.canonicalFilePath() != path)
         return false;
     if (info.isDir()) {
-        for (const auto &entry : QDir(path).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name))
+        for (const auto &entry : iiFileProvider::Directory(path).entryInfoList(iiFileProvider::Directory::AllEntries | iiFileProvider::Directory::NoDotAndDotDot | iiFileProvider::Directory::Hidden, iiFileProvider::Directory::Name))
             if (!inventory(entry.absoluteFilePath(), base, hash, physicalRoot, logicalRoot))
                 return false;
         return true;
     }
     if (!info.isFile())
         return false;
-    const auto relative = logicalRoot.isEmpty() ? QDir(base).relativeFilePath(path)
-        : logicalRoot + (path == physicalRoot ? QString() : '/' + QDir(physicalRoot).relativeFilePath(path));
+    const auto relative = logicalRoot.isEmpty() ? iiFileProvider::Directory(base).relativeFilePath(path)
+        : logicalRoot + (path == physicalRoot ? QString() : '/' + iiFileProvider::Directory(physicalRoot).relativeFilePath(path));
     hash.addData(relative.toUtf8());
     hash.addData(QByteArray::number(info.size()));
     hash.addData(QByteArray::number(info.lastModified().toMSecsSinceEpoch()));
-    QFile file(path);
+    iiFileProvider::FileDevice file(path);
     if (!file.open(QIODevice::ReadOnly))
         return false;
     hash.addData(file.read(65536));
-    return file.error() == QFile::NoError;
+    return file.error() == iiFileProvider::FileDevice::NoError;
 }
 std::optional<StoredModel> inspect(const QString &path, const QString &base, const QString &previousId = {})
 {
     const QFileInfo info(path);
-    const bool package = info.isDir() && QFileInfo::exists(QDir(path).filePath("model_index.json"));
+    const bool package = info.isDir() && QFileInfo::exists(iiFileProvider::Directory(path).filePath("model_index.json"));
     const auto extension = info.suffix().toLower();
     if (!package && (!info.isFile() || (extension != "safetensor" && extension != "safetensors")))
         return {};
@@ -70,14 +76,14 @@ std::optional<StoredModel> inspect(const QString &path, const QString &base, con
         return {};
     QString format = package ? QStringLiteral("diffusers") : QStringLiteral("safetensors");
     if (package) {
-        QFile manifest(QDir(path).filePath("model_index.json"));
+        iiFileProvider::FileDevice manifest(iiFileProvider::Directory(path).filePath("model_index.json"));
         if (manifest.size() <= 1024 * 1024 && manifest.open(QIODevice::ReadOnly)) {
             const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
             if (object.value("schema") == "iild-unified-model-v1" && object.value("_class_name") == "IILDUnifiedCascade")
                 format = QStringLiteral("unified");
         }
     }
-    return StoredModel{previousId.isEmpty() ? QDir(base).relativeFilePath(path) : previousId, info.fileName(),
+    return StoredModel{previousId.isEmpty() ? iiFileProvider::Directory(base).relativeFilePath(path) : previousId, info.fileName(),
         format,
         QString::fromLatin1(fingerprint.result().toHex())};
 }
@@ -91,13 +97,19 @@ QString SharedStorage::settingsPath()
 {
     const auto override = qEnvironmentVariable("SOCIETY_STORAGE_SETTINGS_PATH");
     if (!override.isEmpty())
-        return QDir::isAbsolutePath(override) ? QDir::cleanPath(override) : QString();
-    return QDir(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation))
+        return iiFileProvider::Directory::isAbsolutePath(override) ? iiFileProvider::Directory::cleanPath(override) : QString();
+    return iiFileProvider::Directory(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation))
         .filePath("iisacc/Society/storage.json");
 }
 bool SharedStorage::setDefaultContainer(const QString &path, QString *error)
 {
     if (error) error->clear();
+#if !defined(Q_OS_IOS) && !defined(Q_OS_ANDROID)
+    if (DiskImage::mountedAt(path.toStdString())) {
+        fail(error, QStringLiteral("Legacy Society disk images cannot be selected. Choose a .societycontainer directory package."));
+        return false;
+    }
+#endif
     const auto drive = SocietyDrive::open(path, error);
     if (!drive)
         return false;
@@ -114,21 +126,17 @@ bool SharedStorage::setDefaultContainer(const QString &path, QString *error)
     return true;
 #else
     const auto settings = settingsPath();
-    if (settings.isEmpty() || !QDir().mkpath(QFileInfo(settings).absolutePath())) {
+    if (settings.isEmpty() || !iiFileProvider::Directory().mkpath(QFileInfo(settings).absolutePath())) {
         fail(error, QStringLiteral("The shared Society settings directory is unavailable."));
         return false;
     }
-    QLockFile lock(settings + ".lock");
+    iiFileProvider::LockFile lock(settings + ".lock");
     if (!lock.tryLock(1000)) {
         fail(error, QStringLiteral("Another app is updating the shared Society container."));
         return false;
     }
-    QSaveFile file(settings);
+    iiFileProvider::SaveFile file(settings);
     QJsonObject configuration{{"schemaVersion", 1}, {"containerId", drive->identifier()}, {"path", drive->rootPath()}};
-    if (const auto volume = DiskImage::mountedAt(drive->rootPath().toStdString())) {
-        configuration.insert("schemaVersion", 2);
-        configuration.insert("imagePath", QString::fromStdString(volume->imagePath.string()));
-    }
     const auto bytes = QJsonDocument(configuration).toJson();
     if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
         fail(error, file.errorString());
@@ -146,7 +154,6 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
     if (error) error->clear();
     QString selected = path;
     QString expectedId;
-    bool renamedImage = false;
     if (selected.isEmpty())
         selected = qEnvironmentVariable("SOCIETY_CONTAINER_PATH");
 #if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
@@ -165,35 +172,35 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
     }
 #endif
     if (selected.isEmpty()) {
-        QFile file(settingsPath());
+        iiFileProvider::FileDevice file(settingsPath());
         if (!file.open(QIODevice::ReadOnly) || file.size() > 65536) {
-            fail(error, QStringLiteral("Open a container in Society, or choose its source folder."));
+            fail(error, QStringLiteral("Open a .societycontainer package in Society, or choose its original package."));
             return {};
         }
         const auto settings = QJsonDocument::fromJson(file.readAll()).object();
         selected = settings.value("path").toString();
         expectedId = settings.value("containerId").toString();
         const int version = settings.value("schemaVersion").toInt();
-        if ((version != 1 && version != 2) || expectedId.isEmpty() || selected.isEmpty()) {
+        if (version == 2 || settings.contains("imagePath")) {
+            fail(error, QStringLiteral("Legacy Society disk images are not restored. Choose a .societycontainer directory package."));
+            return {};
+        }
+        if (version != 1 || expectedId.isEmpty() || selected.isEmpty()) {
             fail(error, QStringLiteral("The shared Society settings are invalid."));
             return {};
         }
-        if (version == 2) {
-            const auto image = settings.value("imagePath").toString();
-            if (!QDir::isAbsolutePath(image)) {
-                fail(error, QStringLiteral("The saved Society disk image path is invalid.")); return {};
-            }
-            const auto volume = DiskImage::mount(image.toStdString());
-            if (!volume) { fail(error, QString::fromStdString(volume.error())); return {}; }
-            renamedImage = QString::fromStdString(volume->imagePath.string()) != image;
-            selected = QString::fromStdString(volume->mountPath.string());
-        }
     }
+#if !defined(Q_OS_IOS) && !defined(Q_OS_ANDROID)
+    if (DiskImage::mountedAt(selected.toStdString())) {
+        fail(error, QStringLiteral("Legacy Society disk images are not restored. Choose a .societycontainer directory package."));
+        return {};
+    }
+#endif
     const auto drive = SocietyDrive::open(selected, error);
     if (!drive)
         return {};
     if (!expectedId.isEmpty() && drive->identifier() != expectedId) {
-        QFile manifest(QDir(drive->rootPath()).filePath(".society-drive.json"));
+        iiFileProvider::FileDevice manifest(iiFileProvider::Directory(drive->rootPath()).filePath(".society-drive.json"));
         QJsonObject identity;
         if (manifest.open(QIODevice::ReadOnly) && manifest.size() <= 65536) identity = QJsonDocument::fromJson(manifest.readAll()).object();
         if (identity.value("localIdentifier") != expectedId && identity.value("previousIdentifier") != expectedId) {
@@ -205,11 +212,84 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
         fail(error, QStringLiteral("The host drive's initial mirror is not ready."));
         return {};
     }
-    if (renamedImage && !setDefaultContainer(drive->rootPath(), error)) return {};
     return SharedStorage(*drive);
 }
 SharedStorage::SharedStorage(SocietyDrive drive) : m_drive(std::move(drive)) {}
 const SocietyDrive &SharedStorage::drive() const { return m_drive; }
+QJsonObject SharedStorage::fileInformation(StoreSection section, const QString &relativePath, QString *error) const
+{
+    const auto path = filePath(section, relativePath, error);
+    if (path.isEmpty() || relativePath.isEmpty()) {
+        if (!path.isEmpty()) fail(error, QStringLiteral("Select a regular Society file."));
+        return {};
+    }
+    for (const auto &part : relativePath.split('/')) {
+        if (iiFileProvider::native::Presentation::isControlFile(detail::nativePath(part))) {
+            fail(error, QStringLiteral("Provider control documents are private.")); return {};
+        }
+    }
+    const auto native = detail::nativePath(path);
+    const FileTree tree(detail::nativePath(m_drive.sectionPath(section)));
+    const auto record = tree.presentation(detail::nativePath(relativePath));
+    if (!record) { fail(error, QStringLiteral("The file information is unavailable or the file changed.")); return {}; }
+    QJsonObject result = QJsonDocument::fromJson(QByteArray::fromStdString(record.value->document)).object();
+    result.insert("format", "iiFileProvider.FileInformation");
+    result.insert("container", m_drive.identifier());
+    result.insert("path", storeSectionKey(section) + '/' + relativePath);
+    result.insert("embedded", record.value->embedded);
+    QJsonObject classification{{"status", "absent"}};
+    try {
+        const auto document = iiFileProvider::FileCatalog::classificationDocument(native);
+        if (!document.empty()) {
+            classification = QJsonDocument::fromJson(QByteArray::fromStdString(document)).object();
+            classification.insert("status", "ready");
+        }
+    } catch (...) { classification = {{"status", "invalid"}}; }
+    result.insert("classification", classification);
+    const auto after = iiFileProvider::native::Presentation::load(native);
+    if (filePath(section, relativePath) != path || !after || after->document != record.value->document
+        || QJsonDocument(result).toJson(QJsonDocument::Compact).size() > maximumFileInformationBytes) {
+        fail(error, QStringLiteral("The file changed during inspection or exceeds the information limit.")); return {};
+    }
+    if (error) error->clear();
+    return result;
+}
+QString SharedStorage::publishGeneratedImage(const QString &source, const QString &fileName, QString *error) const
+{
+    if (error) error->clear();
+    if (!relative(fileName) || fileName.contains('/')
+        || !fileName.endsWith(".png", Qt::CaseInsensitive)) {
+        fail(error, QStringLiteral("Use one visible PNG filename in Generation History.")); return {};
+    }
+    const auto destination = filePath(StoreSection::GenerationHistory, fileName, error);
+    if (destination.isEmpty()) return {};
+    const QFileInfo input(source);
+    if (!input.isAbsolute() || !input.isFile() || input.isSymLink()
+        || input.canonicalFilePath() != source) {
+        fail(error, QStringLiteral("Choose a readable original PNG without redirected paths.")); return {};
+    }
+    try {
+        if (iiFileProvider::File::readPrefix(source, 8) != QByteArray::fromHex("89504e470d0a1a0a")) {
+            fail(error, QStringLiteral("The generated image must contain PNG bytes.")); return {};
+        }
+        const auto runtime = ensureRuntimeDirectory("generation-history", error);
+        if (runtime.isEmpty()) return {};
+        // Stage privately so History observers can only see complete PNGs.
+        // StagedFile owns cleanup and the existing temporary-maintenance lease.
+        iiFileProvider::StagedFile staged(iiFileProvider::Directory(runtime).filePath("publication.png"));
+        iiFileProvider::native::copyFile(std::filesystem::path(source.toStdU16String()),
+            std::filesystem::path(staged.path().toStdU16String()), std::filesystem::copy_options::overwrite_existing);
+        if (filePath(StoreSection::GenerationHistory, fileName, error) != destination) return {};
+        const auto published = iiFileProvider::File::publish(std::filesystem::path(staged.path().toStdU16String()),
+            std::filesystem::path(destination.toStdU16String()), false);
+        if (!published.succeeded) {
+            fail(error, QString::fromStdString(published.message)); return {};
+        }
+        return destination;
+    } catch (const std::exception &exception) {
+        fail(error, QString::fromUtf8(exception.what())); return {};
+    }
+}
 QList<StoredModel> SharedStorage::models(QString *error) const
 {
     if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society mirror is not ready.")); return {}; }
@@ -218,7 +298,7 @@ QList<StoredModel> SharedStorage::models(QString *error) const
     StorageMap map(m_drive);
     QString catalogError;
     const auto objects = map.objects(&catalogError);
-    const bool catalogPresent = QFileInfo::exists(QDir(m_drive.rootPath()).filePath(".society-sync/catalog.json"));
+    const bool catalogPresent = QFileInfo::exists(iiFileProvider::Directory(m_drive.rootPath()).filePath(".society-sync/catalog.json"));
     if (!catalogError.isEmpty()) { fail(error, catalogError); return {}; }
     if (catalogPresent) {
         const bool authority = map.isLocalAuthority();
@@ -239,12 +319,12 @@ QList<StoredModel> SharedStorage::models(QString *error) const
             const auto base = m_drive.sectionPath(StoreSection::Models);
             if (base.isEmpty()) { fail(error, QStringLiteral("The Society Models area is unavailable.")); return {}; }
             const auto visit = [&](auto &&self, const QString &directory) -> void {
-                for (const auto &file : QDir(directory).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::Name)) {
+                for (const auto &file : iiFileProvider::Directory(directory).entryInfoList(iiFileProvider::Directory::AllEntries | iiFileProvider::Directory::NoDotAndDotDot, iiFileProvider::Directory::Name)) {
                     if (file.isSymLink() || file.isJunction() || file.fileName().startsWith('.')
                         || file.canonicalFilePath() != file.absoluteFilePath()) continue;
                     if (file.isDir()) { self(self, file.absoluteFilePath()); continue; }
                     if (!file.isFile()) continue;
-                    const auto key = "models/" + QDir(base).relativeFilePath(file.absoluteFilePath());
+                    const auto key = "models/" + iiFileProvider::Directory(base).relativeFilePath(file.absoluteFilePath());
                     auto entry = entries.value(key);
                     // Preserve synchronized references for existing files, including
                     // those sent by another device for host-side generation.
@@ -269,7 +349,7 @@ QList<StoredModel> SharedStorage::models(QString *error) const
             }
             QString format = package ? "diffusers" : "safetensors";
             if (package) {
-                QFile manifest(map.localPath(key + "/model_index.json"));
+                iiFileProvider::FileDevice manifest(map.localPath(key + "/model_index.json"));
                 if (manifest.size() <= 1024 * 1024 && manifest.open(QIODevice::ReadOnly)
                     && QJsonDocument::fromJson(manifest.readAll()).object().value("schema") == "iild-unified-model-v1") format = "unified";
             }
@@ -295,12 +375,12 @@ QList<StoredModel> SharedStorage::models(QString *error) const
         return result;
     }
     const auto visit = [&](auto &&self, const QString &directory) -> void {
-        for (const auto &entry : QDir(directory).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::Name)) {
+        for (const auto &entry : iiFileProvider::Directory(directory).entryInfoList(iiFileProvider::Directory::AllEntries | iiFileProvider::Directory::NoDotAndDotDot, iiFileProvider::Directory::Name)) {
             if (entry.isSymLink() || entry.fileName().startsWith('.'))
                 continue;
             if (auto model = inspect(entry.absoluteFilePath(), base))
                 result.append(*model);
-            else if (entry.isDir() && !QFileInfo::exists(QDir(entry.absoluteFilePath()).filePath("model_index.json")))
+            else if (entry.isDir() && !QFileInfo::exists(iiFileProvider::Directory(entry.absoluteFilePath()).filePath("model_index.json")))
                 self(self, entry.absoluteFilePath());
         }
     };
@@ -321,7 +401,7 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
         return {};
     }
     StorageMap map(m_drive);
-    if (QFileInfo::exists(QDir(m_drive.rootPath()).filePath(".society-sync/catalog.json"))) {
+    if (QFileInfo::exists(iiFileProvider::Directory(m_drive.rootPath()).filePath(".society-sync/catalog.json"))) {
         for (const auto &model : models(error)) {
             if (model.id != id) continue;
             if (model.reference(m_drive.identifier()) != reference) {
@@ -357,7 +437,7 @@ QString SharedStorage::filePath(StoreSection section, const QString &relativePat
         return current;
     const auto parts = relativePath.split('/');
     for (qsizetype index = 0; index < parts.size(); ++index) {
-        current = QDir(current).filePath(parts[index]);
+        current = iiFileProvider::Directory(current).filePath(parts[index]);
         const QFileInfo info(current);
         const bool last = index == parts.size() - 1;
         if (info.isSymLink() || info.isJunction()) {
@@ -384,10 +464,10 @@ QString SharedStorage::ensureDirectory(StoreSection section, const QString &rela
         return {};
     }
     for (const auto &part : relativePath.split('/')) {
-        current = QDir(current).filePath(part);
+        current = iiFileProvider::Directory(current).filePath(part);
         QFileInfo info(current);
         if (!info.exists() && !info.isSymLink() && !info.isJunction()) {
-            QDir().mkdir(current);
+            iiFileProvider::Directory().mkdir(current);
             info.refresh();
         }
         if (!info.isDir() || info.isSymLink() || info.isJunction() || info.canonicalFilePath() != current) {
@@ -395,6 +475,54 @@ QString SharedStorage::ensureDirectory(StoreSection section, const QString &rela
             return {};
         }
     }
+    return current;
+}
+
+QString SharedStorage::runtimePath(const QString &relativePath, QString *error) const
+{
+    if (error) error->clear();
+    if (!m_drive.isValid() || (!relativePath.isEmpty() && !relative(relativePath, true))) {
+        fail(error, QStringLiteral("Use a relative runtime path inside an available .societycontainer package."));
+        return {};
+    }
+    auto current = m_drive.rootPath();
+    QStringList parts{QStringLiteral(".society-runtime")};
+    if (!relativePath.isEmpty()) parts.append(relativePath.split('/'));
+    for (qsizetype index = 0; index < parts.size(); ++index) {
+        current = iiFileProvider::Directory(current).filePath(parts[index]);
+        const QFileInfo info(current);
+        const bool last = index == parts.size() - 1;
+        if (info.isSymLink() || info.isJunction()
+            || (info.exists() && (info.canonicalFilePath() != current
+                || ((!last || index == 0) && !info.isDir()) || (last && !info.isDir() && !info.isFile())))) {
+            fail(error, QStringLiteral("The Society runtime path is unavailable or redirected: %1").arg(parts[index]));
+            return {};
+        }
+    }
+    if (!m_drive.isValid()) { fail(error, QStringLiteral("The Society container identity changed.")); return {}; }
+    return current;
+}
+
+QString SharedStorage::ensureRuntimeDirectory(const QString &relativePath, QString *error) const
+{
+    const auto resolved = runtimePath(relativePath, error);
+    if (resolved.isEmpty()) return {};
+    auto current = m_drive.rootPath();
+    const auto parts = iiFileProvider::Directory(current).relativeFilePath(resolved).split('/');
+    for (const auto &part : parts) {
+        if (!m_drive.isValid()) { fail(error, QStringLiteral("The Society container identity changed.")); return {}; }
+        current = iiFileProvider::Directory(current).filePath(part);
+        QFileInfo info(current);
+        if (!info.exists() && !info.isSymLink() && !info.isJunction()) {
+            iiFileProvider::Directory().mkdir(current);
+            info.refresh();
+        }
+        if (!info.isDir() || info.isSymLink() || info.isJunction() || info.canonicalFilePath() != current) {
+            fail(error, QStringLiteral("The Society runtime directory is unavailable or redirected: %1").arg(part));
+            return {};
+        }
+    }
+    if (!m_drive.isValid()) { fail(error, QStringLiteral("The Society container identity changed.")); return {}; }
     return current;
 }
 }

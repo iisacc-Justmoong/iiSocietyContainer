@@ -1,5 +1,7 @@
 package com.iisacc.society.storage;
 
+import com.iisacc.iifileprovider.FileStorage;
+
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.pm.PackageManager;
@@ -96,7 +98,7 @@ public final class SocietyInternalProvider extends ContentProvider {
             synchronized (store) {
                 File file = resolve(uri, !mode.equals("r"));
                 if (file.isDirectory()) throw new IOException("Cannot open a Society area as a file");
-                return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode));
+                return FileStorage.openDescriptor(file, ParcelFileDescriptor.parseMode(mode));
             }
         } catch (IOException error) { throw new FileNotFoundException(error.getMessage()); }
     }

@@ -1,4 +1,5 @@
 #include "DashboardFiles.h"
+#include <iiFileProviderPresentation.h>
 #include <SocietyDrive.h>
 #include <QDateTime>
 #include <QDir>
@@ -46,7 +47,8 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
         while (!cancel->load() && iterator.hasNext()) {
             iterator.next();
             const auto file = iterator.fileInfo();
-            if (file.isSymLink() || file.fileName().startsWith('.')) continue;
+            if (file.isSymLink() || file.fileName().startsWith('.')
+                || iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(file.fileName().toStdU16String()))) continue;
             // Recheck SDK boundaries in case an entry changed during the walk.
             const auto canonical = file.canonicalFilePath();
             if (!canonical.startsWith(sectionRoot + '/')) continue;
@@ -54,6 +56,8 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
                 if (!history) result.watches.append(canonical);
                 continue;
             }
+            // History owns generated image originals. Editor canvas wrappers
+            // remain documents and must not duplicate an image in this gallery.
             if (!file.isFile() || (history && !isImage(file))) continue;
             result.watches.append(canonical);
             const auto suffix = file.suffix().toLower();

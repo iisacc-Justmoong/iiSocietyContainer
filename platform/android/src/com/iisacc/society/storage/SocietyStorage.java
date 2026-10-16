@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import org.json.JSONObject;
+import java.io.IOException;
 
 /** Qt bridge; the native app and DocumentsProvider open the same private source. */
 public final class SocietyStorage {
@@ -20,7 +21,19 @@ public final class SocietyStorage {
                 throw new IllegalArgumentException("The Society container identity changed");
             if (!action.equals("default") && !action.equals("register") && !action.equals("refresh") && !action.equals("path"))
                 throw new IllegalArgumentException("Unknown Society drive action");
-            if (!action.equals("default")) store.requireReady();
+            if (!action.equals("default")) {
+                store.requireReady();
+                // Confirm the installed provider's public root instead of
+                // treating an ordinary source path as a system connection.
+                try (Cursor roots = context.getContentResolver().query(
+                        DocumentsContract.buildRootsUri(SocietyDocumentsProvider.AUTHORITY),
+                        new String[]{DocumentsContract.Root.COLUMN_ROOT_ID, DocumentsContract.Root.COLUMN_DOCUMENT_ID},
+                        null, null, null)) {
+                    if (roots == null || roots.getCount() != 1 || !roots.moveToFirst()
+                            || !store.identifier().equals(roots.getString(0)) || !store.rootId().equals(roots.getString(1)))
+                        throw new IOException("The Society location is not available in system Files");
+                }
+            }
             Uri root = DocumentsContract.buildRootUri(SocietyDocumentsProvider.AUTHORITY, store.identifier());
             if (action.equals("path")) {
                 Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(root, DocumentsContract.Root.MIME_TYPE_ITEM)
@@ -29,7 +42,8 @@ public final class SocietyStorage {
             }
             context.getContentResolver().notifyChange(DocumentsContract.buildRootsUri(SocietyDocumentsProvider.AUTHORITY), null);
             return new JSONObject().put("identifier", store.identifier()).put("sourcePath", store.rootPath())
-                .put("systemPath", root.toString()).put("enabled", true).toString();
+                .put("systemPath", root.toString()).put("enabled", !action.equals("default"))
+                .put("connectionKind", "documentsProvider").put("isMounted", false).toString();
         } catch (Exception error) {
             try { return new JSONObject().put("error", error.getMessage() == null ? error.toString() : error.getMessage()).toString(); }
             catch (Exception impossible) { return "{\"error\":\"Society storage is unavailable\"}"; }
