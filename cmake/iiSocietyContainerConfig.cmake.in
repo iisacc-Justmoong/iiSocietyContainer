@@ -1,6 +1,7 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
+file(TO_CMAKE_PATH "$ENV{USERPROFILE}/.local/SDK/iiFileProvider" _iisociety_user_provider)
 find_dependency(iiFileProviderNative 0.7 CONFIG HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider")
 
 
@@ -12,7 +13,7 @@ find_dependency(Threads)
 find_dependency(iiFileProviderTemporary CONFIG HINTS
     "${CMAKE_CURRENT_LIST_DIR}/../../../../iiFileProvider"
     "$ENV{HOME}/.local/SDK/iiFileProvider"
-    "$ENV{USERPROFILE}/.local/SDK/iiFileProvider")
+    "${_iisociety_user_provider}")
 set(_iisociety_qt_free FALSE)
 if(iiSocietyContainer_FIND_COMPONENTS)
     set(_iisociety_qt_free TRUE)
@@ -32,7 +33,7 @@ if(NOT _iisociety_qt_free)
     find_dependency(iiFileProvider 0.7.1 CONFIG HINTS
         "${CMAKE_CURRENT_LIST_DIR}/../../../../iiFileProvider"
         "$ENV{HOME}/.local/SDK/iiFileProvider"
-        "$ENV{USERPROFILE}/.local/SDK/iiFileProvider")
+        "${_iisociety_user_provider}")
 endif()
 unset(_iisociety_component)
 set(_iisociety_native_only ${_iisociety_qt_free})
@@ -68,3 +69,4 @@ endif()
 check_required_components(iiSocietyContainer)
 
 unset(_iisociety_native_only)
+unset(_iisociety_user_provider)

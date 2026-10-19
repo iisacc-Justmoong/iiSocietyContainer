@@ -331,6 +331,9 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_test(NAME iiSocietyContainer.maintenance COMMAND iiSocietyContainerMaintenanceTests "${CMAKE_CURRENT_BINARY_DIR}")
     set_tests_properties(iiSocietyContainer.maintenance PROPERTIES TIMEOUT 30)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME iiSocietyContainer.installed_package COMMAND "${Python3_EXECUTABLE}" -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/installed_package.py" "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_COMMAND}")
+    set_tests_properties(iiSocietyContainer.installed_package PROPERTIES TIMEOUT 180)
     add_test(NAME iiSocietyContainer.maintenance_cli COMMAND "${Python3_EXECUTABLE}" -B
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/maintenance_cli.py" $<TARGET_FILE:iiSocietyContainerMaintenanceTool>
         "${CMAKE_CURRENT_BINARY_DIR}")

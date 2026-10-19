@@ -135,7 +135,11 @@ private slots:
         QVERIFY(storage->publishGeneratedImage(link, "link.png", &error).isEmpty());
         const QDir history(fixture.filePath("Generation History"));
         QVERIFY(iiFileProvider::native::Presentation::waitForIdle(std::chrono::seconds(15)));
-        QCOMPARE(history.entryList(QDir::AllEntries | QDir::NoDotAndDotDot), QStringList{"한글 #%-0001.PNG"});
+        auto published = history.entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+        published.removeIf([](const QString& name) {
+            return iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(name.toStdU16String()));
+        });
+        QCOMPARE(published, QStringList{"한글 #%-0001.PNG"});
         QVERIFY(iiFileProvider::native::Presentation::load(std::filesystem::path(path.toStdU16String())));
         iiFileProvider::native::Presentation::cancelPending(std::filesystem::path(fixture.path().toStdU16String()));
         QVERIFY(iiFileProvider::File::remove(path));
