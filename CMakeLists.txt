@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(iiSocietyContainer VERSION 0.16.1 LANGUAGES CXX)
+project(iiSocietyContainer VERSION 0.16.2 LANGUAGES CXX)
 # File creation is owned by iiFileProvider.
 find_package(iiFileProviderNative 0.7 CONFIG REQUIRED HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider")
 

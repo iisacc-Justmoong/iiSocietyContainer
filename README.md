@@ -1,5 +1,10 @@
 # iiSocietyContainer
 
+Package release: **0.16.2** (2026-10-19). This patch packages the current
+source snapshot; build, test and installation evidence is recorded in the SDK
+patch-release report. Earlier versioned feature notes remain historical.
+
+
 Applications can retain a read-only `Container` object and logical file Aliases.
 `iiSocietyHelper` supplies their state, payload availability and previews; the
 mirror does not access or save files. See [Container Aliases](docs/ContainerAliases.md).
