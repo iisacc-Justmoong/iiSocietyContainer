@@ -297,9 +297,9 @@ Actual Finder connection tests are performed on explicitly registered verificati
 
 ## License
 
-SPDX-License-Identifier: AGPL-3.0-only
+SPDX-License-Identifier: MIT
 
-Self-written code and documents of iiSocietyContainer are distributed exclusively under the GNU Affero General Public License v3.0. The full terms follow [LICENSE](LICENSE).
+Self-written code and documents of iiSocietyContainer are distributed under the MIT License. The full terms follow [LICENSE](LICENSE).
 
 External libraries including Qt and third-party code with separate notices maintain their own licenses. This project's license declaration does not replace the corresponding third-party license.
 
