@@ -314,7 +314,7 @@ iOS 16 and above use the same App Group original for Society app and built-in Fi
 `SocietyDrive::adoptReplicaIdentity(root, expectedId, hostId)` atomically adopts
 an authenticated host's UUID under the drive lock. The existing nine section
 paths remain unchanged; stale drive objects become invalid and must be reopened.
-iiSocietySync owns host selection, private recovery of a former independent
+iiSocietyHelper Sync owns host selection, private recovery of a former independent
 container, and initial mirroring before uploads. A device's replica journal and
 credentials remain local. This API alone does not copy or merge files.
 
@@ -356,3 +356,8 @@ loading are documented in [FileLoading.md](FileLoading.md). GUI consumers regist
 `iiSocietyContainer::PreviewProvider` under `society-preview` before loading QML.
 
 Directory and preview caches are written lazily beneath the source package’s `.society-runtime/cache/files/`. No selected package means no cache creation. Explicit cache overrides must stay within that package’s verified private runtime; external or redirected destinations are rejected before writing.
+
+The QML-facing Container builds a private Alias index on snapshot publication.
+Repeated key lookup reads accepted metadata directly without rescanning every
+row, touching files or changing revision/notification state. Its exported object
+layout is preserved; see [Container Aliases](docs/ContainerAliases.md).

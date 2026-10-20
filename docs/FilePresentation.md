@@ -48,7 +48,7 @@ and `Client::inspectHostFile` for asynchronous direct host access. A remote or
 nonresident original can be inspected through that authenticated host interface
 without materializing its payload. The host serves 256-KiB chunks, pins the
 source version and whole information-document hash, and refuses mixed revisions.
-See [the host protocol](../../iiSocietySync/README.md).
+See [the host protocol](../../iiSocietyHelper/docs/Sync/README.md).
 
 ## Intake and persistence
 

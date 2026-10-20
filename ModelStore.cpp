@@ -9,7 +9,7 @@
 
 namespace iiSocietyContainer {
 namespace {
-// This is container data, so it must not use iiSocietySync's local-only .society- prefix.
+// This is container data, so it must not use iiSocietyHelper::Sync's local-only .society- prefix.
 constexpr auto journalName = ".model-paths.json";
 void fail(QString *error, const QString &message) { if (error) *error = message; }
 bool safeRelative(const QString &path)

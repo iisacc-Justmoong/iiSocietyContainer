@@ -1,9 +1,24 @@
 #include "Container.h"
 #include <QDateTime>
 #include <QSet>
+#include <QHash>
 #include <algorithm>
 
 namespace iiSocietyContainer {
+namespace {
+// Keep the exported Container layout unchanged: existing native consumers
+// construct this QML adapter by value. The QObject owns this private index.
+class AliasLookup final : public QObject {
+public:
+    explicit AliasLookup(QObject *owner) : QObject(owner) {}
+    QHash<QString, qsizetype> positions;
+};
+AliasLookup *lookup(const Container *owner) {
+    for (auto *child : owner->children())
+        if (auto *index = dynamic_cast<AliasLookup *>(child)) return index;
+    return nullptr;
+}
+}
 void Container::synchronize(QString id, QString root, QVariantList aliases,
                            bool available, QString error) {
     QVariantList accepted;
@@ -23,7 +38,14 @@ void Container::synchronize(QString id, QString root, QVariantList aliases,
         return at == bt ? left.value("key").toString() < right.value("key").toString() : at > bt;
     });
     if (m_id == id && m_root == root && m_aliases == accepted && m_available == available && m_error == error) return;
+    auto *index = lookup(this);
+    if (!index) index = new AliasLookup(this);
+    QHash<QString, qsizetype> positions;
+    positions.reserve(accepted.size());
+    for (qsizetype i = 0; i < accepted.size(); ++i)
+        positions.insert(accepted[i].toMap().value("key").toString(), i);
     m_id = std::move(id); m_root = std::move(root); m_aliases = std::move(accepted);
+    index->positions = std::move(positions);
     m_available = available; m_error = std::move(error); ++m_revision;
     emit stateChanged();
 }
@@ -32,6 +54,10 @@ void Container::setQuery(const QString &query) {
     m_query = query; emit stateChanged();
 }
 QVariantMap Container::alias(const QString &key) const {
+    if (const auto *index = lookup(this)) {
+        const auto position = index->positions.constFind(key);
+        return position == index->positions.cend() ? QVariantMap{} : m_aliases[*position].toMap();
+    }
     for (const auto &value : m_aliases) if (value.toMap().value("key").toString() == key) return value.toMap();
     return {};
 }
