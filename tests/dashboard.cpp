@@ -18,6 +18,20 @@ using namespace iiSocietyContainer;
 class DashboardTests : public QObject {
     Q_OBJECT
 private slots:
+    void documentsExposeRevisionedPreviewsWithoutBecomingImages()
+    {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/document-dashboard-XXXXXX.societycontainer");
+        QVERIFY(SocietyDrive::create(root.path()));
+        QFile canvas(root.filePath("Files/study.iisc"));
+        QVERIFY(canvas.open(QIODevice::WriteOnly)); canvas.write("native document"); canvas.close();
+        DashboardFiles model; model.setContainerPath(root.path());
+        QTRY_VERIFY(!model.loading());
+        QCOMPARE(model.recentFiles().size(), 1);
+        const auto row = model.recentFiles().first().toMap();
+        QVERIFY(row.value("description").toString().contains("Canvas"));
+        QCOMPARE(row.value("thumbnailSource").toUrl().host(), "society-preview");
+        QVERIFY(row.value("previewSource").toUrl().isEmpty()); // Original-image contract is unchanged.
+    }
     void editorCanvasesDoNotDuplicateGeneratedImagesInHistory() {
         QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/native-history-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(root.path()));

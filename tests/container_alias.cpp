@@ -10,6 +10,27 @@ using namespace iiSocietyContainer;
 class ContainerAliasTests : public QObject {
     Q_OBJECT
 private slots:
+    void repeatedSnapshotsKeepRevisionAndChangedInputsAreStillValidated() {
+        Container container; QVariantList rows;
+        for (int i=0; i<2000; ++i) rows.append(QVariantMap{{"containerId","perf"},
+            {"key",QString("files/%1").arg(i,5,10,QChar('0'))}, {"modified","2026-10-21T00:00:00Z"}});
+        QElapsedTimer timer; timer.start();
+        container.synchronize("perf","/not-a-real-drive",rows,true);
+        const auto first=timer.nsecsElapsed(); const auto revision=container.revision();
+        QSignalSpy changed(&container,&Container::stateChanged);
+        timer.restart();
+        for (int i=0;i<5;++i) container.synchronize("perf","/not-a-real-drive",rows,true);
+        qInfo("PERF snapshot 2000 first_us=%lld repeated_mean_us=%lld",first/1000,timer.nsecsElapsed()/5000);
+        QCOMPARE(changed.size(),0); QCOMPARE(container.revision(),revision);
+        std::reverse(rows.begin(),rows.end());
+        container.synchronize("perf","/not-a-real-drive",rows,true);
+        QCOMPARE(changed.size(),0); QCOMPARE(container.revision(),revision);
+        auto modified=rows[0].toMap(); modified["key"]="files/../escape"; rows[0]=modified;
+        container.synchronize("perf","/not-a-real-drive",rows,true);
+        QCOMPARE(container.aliases().size(),1999); QCOMPARE(changed.size(),1);
+        container.synchronize("other","/other",rows,true);
+        QVERIFY(container.aliases().isEmpty());
+    }
     void stateIsAnAliasSnapshotAndDoesNotProbeOrCreateStorage() {
         Container container;
         QSignalSpy changed(&container, &Container::stateChanged);

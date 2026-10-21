@@ -12,6 +12,9 @@ class AliasLookup final : public QObject {
 public:
     explicit AliasLookup(QObject *owner) : QObject(owner) {}
     QHash<QString, qsizetype> positions;
+    QString id, root, error;
+    QVariantList input;
+    bool available = false, initialized = false;
 };
 AliasLookup *lookup(const Container *owner) {
     for (auto *child : owner->children())
@@ -21,7 +24,15 @@ AliasLookup *lookup(const Container *owner) {
 }
 void Container::synchronize(QString id, QString root, QVariantList aliases,
                            bool available, QString error) {
-    QVariantList accepted;
+    auto *index = lookup(this);
+    if (!index) index = new AliasLookup(this);
+    if (index->initialized && index->id == id && index->root == root
+        && index->available == available && index->error == error && index->input == aliases) return;
+    index->initialized = true; index->id = id; index->root = root;
+    index->available = available; index->error = error; index->input = aliases;
+    struct Candidate { QVariant value; QString key; QDateTime modified; };
+    QList<Candidate> candidates;
+    candidates.reserve(aliases.size());
     QSet<QString> keys;
     if (available && !id.isEmpty()) for (const auto &value : aliases) {
         const auto entry = value.toMap();
@@ -30,16 +41,14 @@ void Container::synchronize(QString id, QString root, QVariantList aliases,
             || key.startsWith('/') || key.contains('\\') || key.contains(QChar::Null)) continue;
         const auto parts = key.split('/');
         if (parts.contains("..") || parts.contains(".") || parts.contains(QString{})) continue;
-        keys.insert(key); accepted.append(entry);
+        keys.insert(key); candidates.append({entry, key, entry.value("modified").toDateTime()});
     }
-    std::sort(accepted.begin(), accepted.end(), [](const QVariant &a, const QVariant &b) {
-        const auto left = a.toMap(), right = b.toMap();
-        const auto at = left.value("modified").toDateTime(), bt = right.value("modified").toDateTime();
-        return at == bt ? left.value("key").toString() < right.value("key").toString() : at > bt;
+    std::sort(candidates.begin(), candidates.end(), [](const Candidate &a, const Candidate &b) {
+        return a.modified == b.modified ? a.key < b.key : a.modified > b.modified;
     });
+    QVariantList accepted; accepted.reserve(candidates.size());
+    for (const auto &candidate : candidates) accepted.append(candidate.value);
     if (m_id == id && m_root == root && m_aliases == accepted && m_available == available && m_error == error) return;
-    auto *index = lookup(this);
-    if (!index) index = new AliasLookup(this);
     QHash<QString, qsizetype> positions;
     positions.reserve(accepted.size());
     for (qsizetype i = 0; i < accepted.size(); ++i)

@@ -69,7 +69,7 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
             auto preview = isImage(file) ? QUrl::fromLocalFile(canonical) : QUrl();
             if (!preview.isEmpty()) preview.setQuery(QStringLiteral("v=%1-%2")
                 .arg(file.lastModified().toMSecsSinceEpoch()).arg(file.size()));
-            const auto thumbnail = isImage(file) ? StorageDirectoryModel::thumbnailUrl(canonical) : QUrl();
+            const auto thumbnail = StorageDirectoryModel::thumbnailUrl(canonical);
             result.files.append(QVariantMap{
                 {"path", canonical}, {"folderPath", file.absolutePath()},
                 {"name", file.fileName()}, {"description", iiSocietyContainer::storeSectionName(section) + " · " + kind},

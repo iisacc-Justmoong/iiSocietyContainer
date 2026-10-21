@@ -5,6 +5,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <future>
+#include <atomic>
 #include <memory>
 #include <vector>
 #include <StorageDirectoryModel.h>
@@ -12,10 +13,89 @@
 #include <SharedStorage.h>
 #include <QSignalSpy>
 #include <QElapsedTimer>
+#include <QBuffer>
+#include <QScopeGuard>
+#include <iiFileProviderPresentation.h>
 using namespace iiSocietyContainer;
 class PreviewCacheTests : public QObject {
     Q_OBJECT
 private slots:
+    void nativeInformationCardDoesNotHideAnExistingLargeImageDecoder()
+    {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/large-image-XXXXXX.societycontainer");
+        QVERIFY(SocietyDrive::create(root.path()));
+        const auto source = root.filePath("Files/large.png");
+        QImage image(80, 40, QImage::Format_RGB32); image.fill(Qt::blue); QVERIFY(image.save(source));
+        // PNG decoders accept padding after IEND. Exceed the native provider's
+        // 32 MiB budget without allocating a large test raster.
+        QFile file(source); QVERIFY(file.open(QIODevice::ReadWrite));
+        QVERIFY(file.resize(33ll * 1024 * 1024)); file.close();
+        PreviewCache cache;
+        const auto first = cache.load(source, PreviewCache::HashPolicy::PreviewOnly);
+        QVERIFY(!first.image.isNull());
+        QCOMPARE(first.image.pixelColor(10, 10), QColor(Qt::blue));
+        QVERIFY(first.contentHash.isEmpty());
+        const auto next = cache.load(source, PreviewCache::HashPolicy::PreviewOnly);
+        QVERIFY(next.cacheHit); QCOMPARE(next.image, first.image);
+    }
+    void ordinaryFolderImagesHaveReadOnlyPreviewsWithoutACache()
+    {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/external-image-XXXXXX");
+        const auto source = root.filePath("image.png");
+        QImage image(80, 40, QImage::Format_RGB32); image.fill(Qt::cyan); QVERIFY(image.save(source));
+        QFile file(source); QVERIFY(file.open(QIODevice::ReadOnly)); const auto original = file.readAll(); file.close();
+        PreviewCache cache;
+        const auto preview = cache.load(source, PreviewCache::HashPolicy::PreviewOnly);
+        QVERIFY(!preview.image.isNull()); QVERIFY(preview.contentHash.isEmpty());
+        QVERIFY(preview.previewPath.isEmpty()); QVERIFY(!preview.cacheHit);
+        QCOMPARE(preview.image.pixelColor(10, 10), QColor(Qt::cyan));
+        QVERIFY(cache.load(source).image.isNull());
+        QCOMPARE(QDir(root.path()).entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot), QStringList{"image.png"});
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), original);
+    }
+    void previewOnlyUsesProviderMediaWithoutHashingTheOriginal() {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/preview-only-XXXXXX.societycontainer");
+        QVERIFY(SocietyDrive::create(root.path()));
+        const auto source = root.filePath("Files/study.iisc");
+        { QFile file(source); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("document fixture");
+          QVERIFY(file.resize(16ll * 1024 * 1024)); }
+        QImage image(120, 80, QImage::Format_RGB32); image.fill(Qt::yellow);
+        QByteArray png; QBuffer buffer(&png); QVERIFY(buffer.open(QIODevice::WriteOnly));
+        QVERIFY(image.save(&buffer, "PNG"));
+        std::atomic_int renders = 0;
+        using iiFileProvider::native::Presentation;
+        Presentation::setRenderer(".iisc", [&](const auto &, auto &) -> std::optional<iiFileProvider::native::FilePreview> {
+            ++renders;
+            return iiFileProvider::native::FilePreview{"image/png", "image", png.toStdString(), 120, 80};
+        });
+        const auto cleanup = qScopeGuard([] { Presentation::setRenderer(".iisc", {}); });
+        const auto url = StorageDirectoryModel::thumbnailUrl(source); QVERIFY(!url.isEmpty());
+        PreviewCache cache(root.filePath(".society-runtime/cache/preview-only"));
+        QElapsedTimer timer; timer.start();
+        const auto first = cache.load(source, PreviewCache::HashPolicy::PreviewOnly);
+        const auto firstMs = timer.nsecsElapsed() / 1e6;
+        QVERIFY(!first.image.isNull()); QVERIFY(first.contentHash.isEmpty()); QVERIFY(!first.cacheHit);
+        QCOMPARE(first.image.pixelColor(10, 10), QColor(Qt::yellow));
+        const auto rendered = renders.load();
+        timer.restart();
+        const auto second = cache.load(source, PreviewCache::HashPolicy::PreviewOnly);
+        const auto persistedMs = timer.nsecsElapsed() / 1e6;
+        QVERIFY(second.cacheHit); QCOMPARE(renders.load(), rendered);
+        QCOMPARE(second.image, first.image);
+        timer.restart(); const auto verified = cache.load(source);
+        const auto verifiedMs = timer.nsecsElapsed() / 1e6;
+        QVERIFY(!verified.contentHash.isEmpty());
+        QFile original(source); QVERIFY(original.open(QIODevice::ReadOnly));
+        QCryptographicHash expected(QCryptographicHash::Sha256); QVERIFY(expected.addData(&original)); original.close();
+        QCOMPARE(verified.contentHash, expected.result().toHex());
+        qInfo("16 MiB native preview first %.3f ms, persisted %.3f ms, explicit whole-source hash %.3f ms",
+              firstMs, persistedMs, verifiedMs);
+        QCOMPARE(renders.load(), rendered);
+        QFile changed(source); QVERIFY(changed.open(QIODevice::WriteOnly)); changed.write("changed document"); changed.close();
+        const auto next = cache.load(source, PreviewCache::HashPolicy::PreviewOnly);
+        QVERIFY(!next.image.isNull()); QVERIFY(!next.cacheHit);
+        QVERIFY(renders.load() > rendered);
+    }
     void embeddingPreservesTheThumbnailRequestKey() {
         QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/preview-key-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
@@ -108,6 +188,11 @@ private slots:
         auto two = std::async(std::launch::async, [&] { return store.load(source); });
         const auto a = one.get(), b = two.get(); QVERIFY(!a.image.isNull()); QCOMPARE(a.contentHash, b.contentHash);
         QCOMPARE(int(a.cacheHit) + int(b.cacheHit), 1);
+        QImage replacement(128, 96, QImage::Format_RGB32); replacement.fill(Qt::blue);
+        QVERIFY(replacement.save(a.previewPath)); // Valid PNG, wrong digest.
+        const auto repaired = store.load(source);
+        QVERIFY(!repaired.cacheHit);
+        QCOMPARE(repaired.image.pixelColor(10, 10), QColor(Qt::green));
         QFile corrupt(a.previewPath); QVERIFY(corrupt.open(QIODevice::WriteOnly)); corrupt.write("broken"); corrupt.close();
         QVERIFY(!store.load(source).image.isNull());
         QVERIFY(store.workerCount() >= 1);

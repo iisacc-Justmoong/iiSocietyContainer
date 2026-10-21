@@ -217,6 +217,9 @@ private slots:
         QTRY_COMPARE(restored.status(), StorageDirectoryModel::Ready);
         QCOMPARE(cached.size(), 1); QCOMPARE(restored.rowCount(), 1);
         QCOMPARE(restored.get(0, "fileName").toString(), "new.txt");
+        QCOMPARE(restored.entry(0).value("filePath"), restored.get(0, "filePath"));
+        QVERIFY(restored.entry(-1).isEmpty());
+        QVERIFY(restored.entry(restored.rowCount()).isEmpty());
         write(QDir(files).filePath("watched.txt"), "observed");
         QTRY_COMPARE_WITH_TIMEOUT(restored.rowCount(), 2, 3000); // No explicit refresh or ten-second fallback.
     }

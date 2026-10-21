@@ -174,17 +174,40 @@ FileTree::ChildrenResult FileTree::readChildren(const std::filesystem::path& rel
         if (error) return failed<std::vector<Entry>>(error);
         if (!std::filesystem::is_regular_file(status) && !std::filesystem::is_directory(status)) continue;
         const auto key = parent.value->relativePath == "." ? name : parent.value->relativePath / name;
-        auto child = entry(key);
-        // Symlinks and reparse-point redirects are intentionally excluded.
-        if (!child) {
-            if (child.error == invalidPath() || child.error == std::errc::too_many_symbolic_link_levels) continue;
-            return failed<std::vector<Entry>>(child.error);
+        if (!validRelative(key)) continue;
+#ifdef _WIN32
+        const auto attributes = GetFileAttributesW(iterator->path().c_str());
+        if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) continue;
+#endif
+        // The iterator supplies native filename spelling beneath the validated
+        // parent. Do not reopen/recanonicalize every ancestor for every child.
+        Entry child;
+        child.path = iterator->path();
+        child.relativePath = key;
+        child.parentPath = parent.value->relativePath;
+        child.kind = std::filesystem::is_directory(status) ? Kind::Directory : Kind::File;
+        child.permissions = status.permissions();
+        if (child.kind == Kind::File) {
+            child.size = iterator->file_size(error);
+            if (error) return failed<std::vector<Entry>>(error);
         }
+        child.lastModified = iterator->last_write_time(error);
+        if (error) return failed<std::vector<Entry>>(error);
+        const auto after = std::filesystem::symlink_status(child.path, error);
+        if (error) return failed<std::vector<Entry>>(error);
+        if (std::filesystem::is_symlink(after)) continue;
+        if (after.type() != status.type())
+            return failed<std::vector<Entry>>(std::make_error_code(std::errc::state_not_recoverable));
         if (result.size() == limit)
             return failed<std::vector<Entry>>(std::make_error_code(std::errc::value_too_large));
-        result.push_back(std::move(*child.value));
+        result.push_back(std::move(child));
     }
     if (error) return failed<std::vector<Entry>>(error);
+    const auto checkedParent = entry(relative);
+    if (!checkedParent || checkedParent.value->kind != Kind::Directory
+        || checkedParent.value->path != parent.value->path)
+        return failed<std::vector<Entry>>(checkedParent.error ? checkedParent.error
+            : std::make_error_code(std::errc::state_not_recoverable));
     std::sort(result.begin(), result.end(), [](const Entry& a, const Entry& b) {
         if (a.kind != b.kind) return a.kind == Kind::Directory;
         return a.path.filename().native() < b.path.filename().native();

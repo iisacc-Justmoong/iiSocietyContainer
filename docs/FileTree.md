@@ -1,5 +1,10 @@
 # 컨테이너 파일 트리
 
+파일 목록은 부모 경계 검증 후 네이티브 디렉터리 이터레이터의 경로·유형·크기·수정
+시각을 직접 수집한다. 항목마다 루트부터 다시 조회하지 않으며, 열거 후에는 부모
+경계를 다시 검사한다. 링크·리디렉션 거부, Unicode 원문 경로, 깊이·항목 예산은
+유지한다. 이 경로는 파일 내용이나 해시를 읽지 않는 Qt 비의존 C++23 구현이다.
+
 ## Provider-backed inspection
 
 `FileTree::presentation(relativePath)` returns iiFileProvider's typed file details

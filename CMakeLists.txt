@@ -459,7 +459,7 @@ install(FILES iiSocietyContainer.h iiSocietyContainerExport.h Container.h FileTr
     FileDirectory.h ModelType.h ModelClassifier.h ModelStore.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
-install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
+install(FILES README.md FileLoading.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
 install(FILES tools/migrate_directory.py DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/tools)
 install(FILES docs/Models.md docs/Files.md docs/FileActions.md docs/FileTree.md docs/DirectoryStorage.md docs/GenerationHistory.md docs/ContainerAliases.md docs/StorageMaintenance.md docs/DiskImage.md docs/NativeBuild.md docs/FilePresentation.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
 install(DIRECTORY platform/apple platform/ios platform/android DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform

@@ -39,6 +39,8 @@ public:
     Status status() const { return m_status; }
     bool downloading() const { return m_downloading; }
     Q_INVOKABLE QVariant get(int index, const QString &role) const;
+    // One GUI bridge crossing for a complete metadata-only row.
+    Q_INVOKABLE QVariantMap entry(int index) const;
     Q_INVOKABLE bool isFolder(int index) const;
     Q_INVOKABLE void activate(int index);
     // For a model package, materialize its catalogued files before opening it.

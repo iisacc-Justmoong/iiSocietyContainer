@@ -60,7 +60,9 @@ QList<QVariantMap> restoreSnapshot(const Options &o) {
     if (path.isEmpty()) return {};
     iiFileProvider::FileDevice file(path);
     if (file.size() > 16 * 1024 * 1024 || !file.open(QIODevice::ReadOnly)) return {};
-    QDataStream stream(&file); stream.setVersion(QDataStream::Qt_6_8);
+    // Decode the bounded snapshot in memory; avoid a provider call per field.
+    const auto bytes = file.readAll();
+    QDataStream stream(bytes); stream.setVersion(QDataStream::Qt_6_8);
     quint32 version; QString binding; QList<QVariantMap> rows;
     stream >> version >> binding >> rows;
     if (stream.status() != QDataStream::Ok || version != 1 || binding != (drive ? drive->identifier() : QString())) return {};
@@ -219,12 +221,16 @@ StorageDirectoryModel::StorageDirectoryModel(QObject *parent) : QAbstractListMod
 StorageDirectoryModel::~StorageDirectoryModel() { if (m_cancel) m_cancel->store(true); }
 int StorageDirectoryModel::rowCount(const QModelIndex &parent) const { return parent.isValid() ? 0 : m_rows.size(); }
 QHash<int, QByteArray> StorageDirectoryModel::roleNames() const {
-    QHash<int, QByteArray> roles; int role = Qt::UserRole + 1;
-    for (const auto *name : {"fileName", "filePath", "fileUrl", "fileSuffix", "fileIsDir", "fileSize", "fileModified", "filePreviewUrl", "fileResident", "fileThumbnailUrl", "fileInformationKey", "fileInformationProvider"}) roles.insert(role++, name);
+    static const auto roles = [] {
+        QHash<int, QByteArray> roles; int role = Qt::UserRole + 1;
+        for (const auto *name : {"fileName", "filePath", "fileUrl", "fileSuffix", "fileIsDir", "fileSize", "fileModified", "filePreviewUrl", "fileResident", "fileThumbnailUrl", "fileInformationKey", "fileInformationProvider"}) roles.insert(role++, name);
+        return roles;
+    }();
     return roles;
 }
 QVariant StorageDirectoryModel::data(const QModelIndex &index, int role) const { return get(index.row(), QString::fromLatin1(roleNames().value(role))); }
 QVariant StorageDirectoryModel::get(int index, const QString &role) const { return index >= 0 && index < m_rows.size() ? m_rows[index].value(role) : QVariant(); }
+QVariantMap StorageDirectoryModel::entry(int index) const { return index >= 0 && index < m_rows.size() ? m_rows[index] : QVariantMap(); }
 bool StorageDirectoryModel::isFolder(int index) const { return get(index, "fileIsDir").toBool(); }
 void StorageDirectoryModel::setFolder(const QUrl &folder) {
     if (m_folder == folder) return;
@@ -427,9 +433,9 @@ void StorageDirectoryModel::addWatches(QStringList paths, quint64 revision) {
     if (!paths.isEmpty()) QTimer::singleShot(16, this, [this, paths, revision] { addWatches(paths, revision); });
 }
 QUrl StorageDirectoryModel::thumbnailUrl(const QString &path) {
-    static const QStringList extensions{"png", "jpg", "jpeg", "webp", "bmp", "gif", "tif", "tiff", "avif", "heic", "heif", "svg"};
     const QFileInfo info(path);
-    if (path.isEmpty() || !info.isAbsolute() || !extensions.contains(info.suffix().toLower())
+    if (path.isEmpty() || !info.isAbsolute()
+        || iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(info.fileName().toStdU16String()))
         || !info.isFile() || info.isSymLink() || info.canonicalFilePath() != QDir::cleanPath(path)) return {};
     std::error_code error;
     const auto modified = std::filesystem::last_write_time(std::filesystem::u8path(path.toStdString()), error);
