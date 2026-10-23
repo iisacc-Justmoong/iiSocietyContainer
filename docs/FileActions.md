@@ -2,6 +2,8 @@
 
 # 파일 작업
 
+관리 저장소를 사용하는 현재 버전에서 `Remove`는 `Deleted`의 실제 파일을 제거하고 편집본에 tombstone을 기록한다. 보관된 RAW 원본과 이력은 남으므로 이를 모든 저장 데이터의 영구 소거로 표현하지 않는다. Society의 확인 화면은 이 보관 규칙을 안내한다. 아래의 기존 "영구 제거" 설명은 공개 파일 경로의 unlink를 뜻한다. 관리되지 않은 과거 파일은 삭제 순간에 소급하여 원본을 보관하지 않는다.
+
 0.15.0의 `FileOperations::createDirectory(parent, name)`와 `Action::Move`는 디렉터리 생성 및 파일·디렉터리 이동을 추가한다. 기존 이름을 덮어쓰지 않고, 섹션 루트를 보호하며, 이동은 같은 파일 시스템의 대체 없는 rename으로 수행한다. 경로·충돌·준비 상태와 트리 재조회 예시는 [컨테이너 파일 트리](FileTree.md)의 디렉터리 관리 계약을 따른다.
 
 `FileOperations`는 차단형 드라이브 바인딩 파일 시스템 API입니다. 워커 스레드에서 호출하십시오. `FileActions`는 옵션인 `iiSocietyContainer::Gui` 타깃에서 비동기 Qt GUI 어댑터입니다. 소비자는 `Gui` CMake 구성 요소를 요청합니다; Core 전용 소비자는 기존 Core 링크 의존성을 유지합니다. `IISOCIETYCONTAINER_BUILD_GUI=OFF`는 클립보드 및 공유 지원을 생략합니다.

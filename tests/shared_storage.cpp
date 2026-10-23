@@ -145,7 +145,9 @@ private slots:
         QVERIFY(iiFileProvider::File::remove(path));
         const auto lease = history.filePath(".iisacc-temporary.lock");
         if (QFileInfo::exists(lease)) { QCOMPARE(QFileInfo(lease).size(), 0); QVERIFY(QFile::remove(lease)); }
-        QVERIFY(QDir().rmdir(history.path()));
+        // A published file now owns a durable classification index. Preserve
+        // that fixture state while replacing the public section with a link.
+        QVERIFY(QDir().rename(history.path(), fixture.filePath(".retained-history")));
         QVERIFY(createTestSymbolicLink(fixture.filePath("Files"), history.path()));
         QVERIFY(storage->publishGeneratedImage(source, "escape.png", &error).isEmpty());
         QVERIFY(!QFileInfo::exists(fixture.filePath("Files/escape.png")));

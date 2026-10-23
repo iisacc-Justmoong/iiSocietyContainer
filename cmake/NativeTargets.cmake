@@ -1,5 +1,10 @@
 # Shared native targets: no directory-wide Qt or file-adapter linkage.
-add_library(iiSocietyContainerFileTree ${_library_type} FileTree.h FileTree.cpp DirectoryStorage.h DirectoryStorage.cpp iiSocietyContainerExport.h)
+find_package(iiFileProviderObjects CONFIG REQUIRED)
+if(NOT iiFileProviderObjects_DOCUMENT_API_VERSION EQUAL 1)
+    message(FATAL_ERROR "Rebuild and install iiFileProvider Objects with atomic document/RAW and ontology support")
+endif()
+find_package(iiFileProviderCatalog 0.7.3 CONFIG REQUIRED)
+add_library(iiSocietyContainerFileTree ${_library_type} FileTree.h FileTree.cpp DirectoryStorage.h DirectoryStorage.cpp FileRepository.h FileRepository.cpp iiSocietyContainerExport.h)
 add_library(iiSocietyContainer::FileTree ALIAS iiSocietyContainerFileTree)
 target_compile_features(iiSocietyContainerFileTree PUBLIC cxx_std_23)
 target_compile_definitions(iiSocietyContainerFileTree PRIVATE IISOCIETYCONTAINER_FILETREE_BUILD)
@@ -17,7 +22,7 @@ target_compile_definitions(iiSocietyContainerMaintenance PRIVATE IISOCIETYCONTAI
 target_include_directories(iiSocietyContainerMaintenance PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(iiSocietyContainerFileTree PUBLIC iiFileProvider::Native)
+target_link_libraries(iiSocietyContainerFileTree PUBLIC iiFileProvider::Native iiFileProvider::Objects iiFileProvider::Catalog)
 target_link_libraries(iiSocietyContainerMaintenance PRIVATE iiFileProvider::Native iiFileProvider::Temporary Threads::Threads)
 set_target_properties(iiSocietyContainerMaintenance PROPERTIES EXPORT_NAME Maintenance
     CXX_EXTENSIONS OFF VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR}

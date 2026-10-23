@@ -70,7 +70,7 @@ void FileActions::execute() {
     connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher] {
         const auto result = watcher->result(); watcher->deleteLater(); finish(result.path, result.error);
     });
-    m_status = m_operation == Trash ? tr("Moving to Deleted…") : m_operation == Remove ? tr("Deleting permanently…")
+    m_status = m_operation == Trash ? tr("Moving to Deleted…") : m_operation == Remove ? tr("Removing from Deleted…")
         : m_operation == Duplicate || m_operation == Paste ? tr("Copying…") : tr("Updating the selected item…"); emit changed();
     watcher->setFuture(QtConcurrent::run(&m_worker, [source, argument, operation, sources] {
         const auto drive = FileOperations::containingDrive(operation == Paste ? argument : source);

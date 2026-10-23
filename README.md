@@ -1,5 +1,10 @@
 # iiSocietyContainer
 
+Native `FileRepository` and the `SharedStorage` adapter connect actual files to
+iiFileProvider RAW originals, mutable revisions, work sessions, classification
+search and ontology directories. Public files retain their native paths. See
+[managed storage and search](docs/ManagedFiles.md) for intake, cursors and recovery.
+
 [Windows 빌드 및 실행](docs/WindowsBuildAndRun.md)
 
 Package release: **0.16.2** (2026-10-19). This patch packages the current

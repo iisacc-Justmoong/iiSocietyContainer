@@ -1,6 +1,9 @@
 #include "DashboardFiles.h"
 #include <iiFileProviderPresentation.h>
 #include <SocietyDrive.h>
+#include <SharedStorage.h>
+#include <QJsonArray>
+#include <QRegularExpression>
 #include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
@@ -12,6 +15,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <algorithm>
 #include <future>
+#include <utility>
 #include <StorageDirectoryModel.h>
 
 namespace iiSocietyContainer {
@@ -19,6 +23,62 @@ namespace {
 constexpr qsizetype dashboardListLimit = 20;
 constexpr qsizetype recentPublishedLimit = 4;
 struct Snapshot { QVariantList files; QStringList watches; QString error; };
+struct Search { QSet<QString> paths; QString error; };
+Search searchIndex(const QString &root, const QString &text, std::stop_token stop)
+{
+    Search result;
+    const auto storage = SharedStorage::open(root, &result.error); if (!storage) return result;
+    // Standalone consumers can search before a daemon has ever indexed the
+    // drive. Bootstrap on this I/O worker; subsequent requests use indexes only.
+    if (!std::filesystem::exists(FileRepository::packagePath(std::filesystem::path(root.toStdU16String()), storage->drive().identifier().toStdString()))
+        && !storage->reconcileFiles(&result.error, stop)) return result;
+    QJsonObject request; QStringList words, keywords, collections; QJsonArray conditions;
+    const auto tokens = text.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    for (const auto &token : tokens) {
+        const auto colon = token.indexOf(':'); const auto kind = token.left(colon).toLower(), value = token.mid(colon + 1);
+        if (colon <= 0) { words.append(token); continue; }
+        if (kind == "class") request.insert("classKey", value);
+        else if (kind == "in") request.insert("directory", value);
+        else if (kind == "keyword") keywords.append(value);
+        else if (kind == "collection") collections.append(value);
+        else if (kind == "color") request.insert("color", value.toLower());
+        else if (kind == "rating") {
+            bool ok = false; const int rating = value.toInt(&ok);
+            if (!ok || rating < 0 || rating > 5) { result.error = "Use rating:0 through rating:5."; return result; }
+            request.insert("minimumRating", rating);
+        } else { words.append(token); }
+    }
+    const bool semantic = request.contains("classKey") || request.contains("directory");
+    if (request.contains("directory") && (request.contains("classKey") || !words.isEmpty() || !keywords.isEmpty()
+        || !collections.isEmpty() || request.contains("color") || request.contains("minimumRating"))) {
+        result.error = "Use in: with a saved semantic directory by itself."; return result;
+    }
+    if (semantic) {
+        if (!words.isEmpty()) { result.error = "Use class: or in: with keyword:, color: and rating: filters."; return result; }
+        for (const auto &keyword : keywords) conditions.append(QJsonObject{{"property","society:keyword"},{"equals",QJsonObject{{"kind","text"},{"value",keyword}}}});
+        for (const auto &collection : collections) conditions.append(QJsonObject{{"property","society:collection"},{"equals",QJsonObject{{"kind","text"},{"value",collection}}}});
+        if (request.contains("color")) { conditions.append(QJsonObject{{"property","society:color"},{"equals",QJsonObject{{"kind","text"},{"value",request.take("color")}}}}); }
+        if (request.contains("minimumRating")) { conditions.append(QJsonObject{{"property","society:rating"},{"equals",QJsonObject{{"kind","integer"},{"value",QString::number(request.take("minimumRating").toInt())}}}}); }
+        if (!conditions.isEmpty()) request.insert("conditions", conditions);
+    } else {
+        if (!words.isEmpty()) request.insert("text", words.join(' '));
+        if (!keywords.isEmpty()) request.insert("keywords", QJsonArray::fromStringList(keywords));
+        if (!collections.isEmpty()) request.insert("collections", QJsonArray::fromStringList(collections));
+    }
+    for (const auto section : {StoreSection::Files, StoreSection::Published, StoreSection::GenerationHistory}) {
+        if (!semantic) request.insert("section", storeSectionKey(section));
+        request.remove("cursor"); request.insert("limit", 1024);
+        for (int pages = 0; pages < 256; ++pages) {
+            if (stop.stop_requested()) return {};
+            const auto page = storage->searchFiles(request, &result.error); if (!result.error.isEmpty()) return result;
+            for (const auto &value : page.value("files").toArray()) result.paths.insert(value.toObject().value("path").toString().normalized(QString::NormalizationForm_C));
+            const auto cursor = page.value("next").toObject(); if (cursor.isEmpty()) break;
+            request.insert("cursor", cursor);
+        }
+        if (semantic) break;
+    }
+    return result;
+}
 
 bool isImage(const QFileInfo &file)
 {
@@ -108,6 +168,8 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
 
 DashboardFiles::DashboardFiles(QObject *parent) : QObject(parent)
 {
+    m_searchDebounce.setSingleShot(true); m_searchDebounce.setInterval(120);
+    connect(&m_searchDebounce, &QTimer::timeout, this, &DashboardFiles::search);
     m_debounce.setSingleShot(true); m_debounce.setInterval(150);
     connect(&m_watches, &QFileSystemWatcher::directoryChanged, &m_debounce, qOverload<>(&QTimer::start));
     connect(&m_watches, &QFileSystemWatcher::fileChanged, &m_debounce, qOverload<>(&QTimer::start));
@@ -115,7 +177,7 @@ DashboardFiles::DashboardFiles(QObject *parent) : QObject(parent)
     m_fallback.setInterval(10000);
     connect(&m_fallback, &QTimer::timeout, this, &DashboardFiles::refresh);
 }
-DashboardFiles::~DashboardFiles() { if (m_cancel) m_cancel->store(true); }
+DashboardFiles::~DashboardFiles() { if (m_cancel) m_cancel->store(true); m_searchStop.request_stop(); if (m_searchWatcher) m_searchWatcher->waitForFinished(); }
 
 void DashboardFiles::setContainerPath(const QString &path)
 {
@@ -126,6 +188,8 @@ void DashboardFiles::setContainerPath(const QString &path)
     const auto watches = m_watches.files() + m_watches.directories();
     if (!watches.isEmpty()) m_watches.removePaths(watches);
     m_path = path;
+    m_searchStop.request_stop();
+    ++m_searchRevision; m_completedQuery.clear(); m_matches.clear();
     if (path.isEmpty()) m_fallback.stop(); else m_fallback.start();
     m_files.clear(); m_error.clear();
     emit containerPathChanged(); emit filesChanged();
@@ -136,6 +200,8 @@ void DashboardFiles::setQuery(const QString &query)
 {
     if (m_query == query) return;
     m_query = query;
+    m_searchStop.request_stop();
+    ++m_searchRevision; m_searchDebounce.start();
     emit queryChanged(); emit filesChanged();
 }
 
@@ -146,8 +212,16 @@ QVariantList DashboardFiles::filtered(StoreSection section, qsizetype limit) con
     for (const auto &entry : m_files) {
         auto file = entry.toMap();
         if (file.value("section").toString() != key) continue;
-        if (!m_query.trimmed().isEmpty() && !file.value("name").toString().contains(m_query.trimmed(), Qt::CaseInsensitive)
-            && !file.value("metadata2").toString().contains(m_query.trimmed(), Qt::CaseInsensitive)) continue;
+        if (!m_query.trimmed().isEmpty()) {
+            if (m_completedQuery == m_query) {
+                const auto root = storeSectionName(section) + '/';
+                const auto native = file.value("path").toString();
+                const auto relative = QDir(m_path).relativeFilePath(native);
+                const auto logical = key + '/' + relative.mid(root.size());
+                if (!m_matches.contains(logical.normalized(QString::NormalizationForm_C))) continue;
+            } else if (!file.value("name").toString().contains(m_query.trimmed(), Qt::CaseInsensitive)
+                && !file.value("metadata2").toString().contains(m_query.trimmed(), Qt::CaseInsensitive)) continue;
+        }
         file.insert("dateText", file.value("modified").toDateTime().toLocalTime().date().toString(Qt::ISODate));
         result.append(file);
         if (result.size() == limit) break;
@@ -158,6 +232,23 @@ QVariantList DashboardFiles::filtered(StoreSection section, qsizetype limit) con
 QVariantList DashboardFiles::recentFiles() const { return filtered(StoreSection::Files, dashboardListLimit); }
 QVariantList DashboardFiles::recentPublished() const { return filtered(StoreSection::Published, recentPublishedLimit); }
 QVariantList DashboardFiles::generationHistory() const { return filtered(StoreSection::GenerationHistory, dashboardListLimit); }
+void DashboardFiles::search()
+{
+    if (m_searching) { m_searchPending = true; return; }
+    if (m_query.trimmed().isEmpty() || m_path.isEmpty()) { m_completedQuery.clear(); m_matches.clear(); emit filesChanged(); return; }
+    m_searching = true; emit searchChanged(); const auto revision = m_searchRevision;
+    m_searchStop = std::stop_source{}; const auto stop = m_searchStop.get_token();
+    const auto path = m_path, query = m_query;
+    auto *watcher = new QFutureWatcher<Search>(this);
+    m_searchWatcher = watcher;
+    connect(watcher, &QFutureWatcher<Search>::finished, this, [this, watcher, revision, query] {
+        const auto result = watcher->result(); m_searchWatcher = nullptr; watcher->deleteLater(); m_searching = false; emit searchChanged();
+        if (revision == m_searchRevision) { m_matches = result.paths; m_completedQuery = query; m_error = result.error; emit filesChanged(); }
+        const bool again = std::exchange(m_searchPending, false) || revision != m_searchRevision;
+        if (again) m_searchDebounce.start();
+    });
+    watcher->setFuture(QtConcurrent::run([path, query, stop] { try { return searchIndex(path, query, stop); } catch (const std::exception &e) { return Search{{},QString::fromUtf8(e.what())}; } }));
+}
 
 void DashboardFiles::refresh()
 {
@@ -207,6 +298,7 @@ void DashboardFiles::refresh()
         m_files = result.files; m_error = result.error; m_loading = false;
         if (changed) emit filesChanged();
         emit loadingChanged();
+        if (!m_query.trimmed().isEmpty()) m_searchDebounce.start();
         if (m_refreshPending) { m_refreshPending = false; m_debounce.start(); }
     });
     watcher->setFuture(QtConcurrent::run(scan, m_path, m_cancel));

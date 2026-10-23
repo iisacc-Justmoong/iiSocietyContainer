@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 project(SocietyNativeStorageConsumer LANGUAGES CXX)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_DISABLE_FIND_PACKAGE_Qt6 TRUE)
 find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS FileTree Maintenance)
 if(TARGET Qt6::Core OR TARGET Qt6::Gui OR TARGET Qt6::Quick)
@@ -12,3 +13,6 @@ add_test(NAME NativeStorage.InstalledFileTree COMMAND native_file_tree "${CMAKE_
 add_executable(native_maintenance ../maintenance.cpp)
 target_link_libraries(native_maintenance PRIVATE iiSocietyContainer::Maintenance iiFileProvider::Temporary)
 add_test(NAME NativeStorage.InstalledMaintenance COMMAND native_maintenance "${CMAKE_CURRENT_BINARY_DIR}")
+add_executable(native_file_repository ../file_repository.cpp)
+target_link_libraries(native_file_repository PRIVATE iiSocietyContainer::FileTree)
+add_test(NAME NativeStorage.InstalledRepository COMMAND native_file_repository "${CMAKE_CURRENT_BINARY_DIR}")

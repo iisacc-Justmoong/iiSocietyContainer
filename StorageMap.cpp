@@ -21,7 +21,7 @@ StorageMap::StorageMap(const SocietyDrive &drive) : m_drive(drive) {}
 QString StorageMap::physicalPath(const QString &key) {
     if (!key.contains('/') || key.size() > 3500 || key.contains('\\') || key.contains(':') || key.contains(QChar::Null)) return {};
     for (const auto &part : key.split('/'))
-        if (part.isEmpty() || part == "." || part == ".." || part.startsWith(".society-") || part.startsWith(".iiserverhost-")) return {};
+        if (part.isEmpty() || part == "." || part == ".." || part.startsWith(".society-") || part.startsWith(".iiwebserver-")) return {};
     for (const auto section : allStoreSections())
         if (key.section('/', 0, 0) == storeSectionKey(section)) return storeSectionName(section) + '/' + key.section('/', 1);
     return {};

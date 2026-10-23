@@ -246,6 +246,9 @@ QJsonObject SharedStorage::fileInformation(StoreSection section, const QString &
         }
     } catch (...) { classification = {{"status", "invalid"}}; }
     result.insert("classification", classification);
+    QString trackingError;
+    const auto tracking = fileTracking(section, relativePath, &trackingError);
+    result.insert("managed", tracking.isEmpty() ? QJsonObject{{"status", "unavailable"}} : tracking);
     const auto after = iiFileProvider::native::Presentation::load(native);
     if (filePath(section, relativePath) != path || !after || after->document != record.value->document
         || QJsonDocument(result).toJson(QJsonDocument::Compact).size() > maximumFileInformationBytes) {
@@ -285,6 +288,8 @@ QString SharedStorage::publishGeneratedImage(const QString &source, const QStrin
         if (!published.succeeded) {
             fail(error, QString::fromStdString(published.message)); return {};
         }
+        FileRepositoryContext context; context.description = "Publish generated image";
+        if (!recordFile(StoreSection::GenerationHistory, fileName, error, std::move(context))) return {};
         return destination;
     } catch (const std::exception &exception) {
         fail(error, QString::fromUtf8(exception.what())); return {};
@@ -446,11 +451,18 @@ QString SharedStorage::filePath(StoreSection section, const QString &relativePat
         }
         if (last && !info.exists())
             return current;
-        if (info.canonicalFilePath() != current || (!last && !info.isDir())
+        const auto canonical = info.canonicalFilePath();
+#ifdef Q_OS_DARWIN
+        const bool same = canonical.normalized(QString::NormalizationForm_C) == current.normalized(QString::NormalizationForm_C);
+#else
+        const bool same = canonical == current;
+#endif
+        if (!same || (!last && !info.isDir())
             || (last && !info.isDir() && !info.isFile())) {
             fail(error, QStringLiteral("The Society path is unavailable: %1").arg(parts[index]));
             return {};
         }
+        current = canonical;
     }
     return current;
 }

@@ -51,6 +51,7 @@ add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyCo
         FileOperations.h FileOperations.cpp
         PhotosLayout.h PhotosLayout.cpp
         SharedStorage.h SharedStorage.cpp StorageMap.h StorageMap.cpp StorageDirectoryModel.h StorageDirectoryModel.cpp
+        ManagedStorage.cpp
         StorageModelCatalog.h StorageModelCatalog.cpp
         ModelType.h ModelType.cpp ModelClassifier.h ModelClassifier.cpp ModelStore.h ModelStore.cpp
         ModelLayout.h ModelLayout.cpp
@@ -413,6 +414,12 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     set_target_properties(iiSocietyContainerDriveTests PROPERTIES AUTOMOC ON CXX_EXTENSIONS OFF)
     add_test(NAME iiSocietyContainer.drive COMMAND iiSocietyContainerDriveTests)
     add_executable(iiSocietyContainerSharedStorageTests tests/shared_storage.cpp)
+    add_executable(iiSocietyContainerRepositoryTests tests/file_repository.cpp)
+    add_executable(iiSocietyContainerManagedStorageTests tests/managed_storage.cpp)
+    target_link_libraries(iiSocietyContainerManagedStorageTests PRIVATE iiSocietyContainer::iiSocietyContainer)
+    add_test(NAME iiSocietyContainer.managed_storage COMMAND iiSocietyContainerManagedStorageTests)
+    target_link_libraries(iiSocietyContainerRepositoryTests PRIVATE iiSocietyContainer::FileTree)
+    add_test(NAME iiSocietyContainer.file_repository COMMAND iiSocietyContainerRepositoryTests "${CMAKE_CURRENT_BINARY_DIR}")
     add_executable(iiSocietyContainerLoadingBenchmark tests/loading_benchmark.cpp)
     target_link_libraries(iiSocietyContainerLoadingBenchmark PRIVATE iiSocietyContainer::iiSocietyContainer)
     target_link_libraries(iiSocietyContainerSharedStorageTests PRIVATE iiSocietyContainer::iiSocietyContainer iiFileProvider::Native Qt6::Test)
@@ -455,13 +462,13 @@ endif()
 if(TARGET iiSocietyContainerMaintenanceTool)
     install(TARGETS iiSocietyContainerMaintenanceTool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-install(FILES iiSocietyContainer.h iiSocietyContainerExport.h Container.h FileTree.h DirectoryStorage.h StorageMaintenance.h SocietyDrive.h DiskImage.h SharedStorage.h FilesView.h FileOperations.h
+install(FILES iiSocietyContainer.h iiSocietyContainerExport.h Container.h FileTree.h DirectoryStorage.h StorageMaintenance.h FileRepository.h SocietyDrive.h DiskImage.h SharedStorage.h FilesView.h FileOperations.h
     FileDirectory.h ModelType.h ModelClassifier.h ModelStore.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
 install(FILES README.md FileLoading.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
 install(FILES tools/migrate_directory.py DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/tools)
-install(FILES docs/Models.md docs/Files.md docs/FileActions.md docs/FileTree.md docs/DirectoryStorage.md docs/GenerationHistory.md docs/ContainerAliases.md docs/StorageMaintenance.md docs/DiskImage.md docs/NativeBuild.md docs/FilePresentation.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
+install(FILES docs/ManagedFiles.md docs/Models.md docs/Files.md docs/FileActions.md docs/FileTree.md docs/DirectoryStorage.md docs/GenerationHistory.md docs/ContainerAliases.md docs/StorageMaintenance.md docs/DiskImage.md docs/NativeBuild.md docs/FilePresentation.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
 install(DIRECTORY platform/apple platform/ios platform/android DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform
     PATTERN "*Tests.swift" EXCLUDE PATTERN "._*" EXCLUDE PATTERN ".DS_Store" EXCLUDE)
 install(FILES platform/macos/README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform/macos)

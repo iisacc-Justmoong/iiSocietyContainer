@@ -2,6 +2,8 @@
 #include <iiSocietyContainer/DashboardFiles.h>
 #include <iiSocietyContainer/SocietyApplication.h>
 #include <SocietyDrive.h>
+#include <SharedStorage.h>
+#include <File.h>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -18,6 +20,23 @@ using namespace iiSocietyContainer;
 class DashboardTests : public QObject {
     Q_OBJECT
 private slots:
+    void providerMetadataAndOntologyAreTheActualSearchSource() {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/managed-dashboard-XXXXXX.societycontainer");
+        QVERIFY(SocietyDrive::create(root.path())); const auto storage = SharedStorage::open(root.path()); QVERIFY(storage);
+        iiFileProvider::File::create(root.filePath("Files/opaque.txt"), "original bytes");
+        auto repository = storage->fileRepository(); iiFileProvider::FileMetadata metadata;
+        metadata.title = "Launch campaign"; metadata.keywords = {"approved"}; metadata.rating = 5;
+        const auto file = repository->observe("files/opaque.txt", metadata);
+        using namespace iiFileProvider;
+        repository->ontology().apply({OntologyClass{"ProjectAsset","Project","",{FileRepository::fileClass}},OntologyTypeAssignment{OntologyResource::file(file.key),"ProjectAsset"},OntologyDirectory{"Projects/Launch","Launch",{"ProjectAsset"}}},repository->ontology().revision(),repository->sessionKey());
+        DashboardFiles model; model.setContainerPath(root.path()); QTRY_VERIFY(!model.loading());
+        model.setQuery("campaign"); QTRY_COMPARE_WITH_TIMEOUT(model.recentFiles().size(),1,30000);
+        QCOMPARE(model.recentFiles().front().toMap().value("name").toString(),"opaque.txt");
+        model.setQuery("keyword:approved rating:5"); QTRY_COMPARE_WITH_TIMEOUT(model.recentFiles().size(),1,30000);
+        model.setQuery("class:ProjectAsset keyword:approved"); QTRY_COMPARE_WITH_TIMEOUT(model.recentFiles().size(),1,30000);
+        model.setQuery("in:Projects/Launch"); QTRY_COMPARE_WITH_TIMEOUT(model.recentFiles().size(),1,30000);
+        QVERIFY2(model.errorString().isEmpty(),qPrintable(model.errorString()));
+    }
     void documentsExposeRevisionedPreviewsWithoutBecomingImages()
     {
         QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/document-dashboard-XXXXXX.societycontainer");

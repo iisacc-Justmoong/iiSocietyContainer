@@ -4,10 +4,13 @@
 #include <QVariantList>
 #include <QFileSystemWatcher>
 #include <QTimer>
+#include <QSet>
 #include "FileActions.h"
 #include <src/Store/StoreSection.h>
 #include <atomic>
 #include <memory>
+#include <stop_token>
+class QFutureWatcherBase;
 
 // A read-only snapshot of a drive. Scanning never runs on the GUI thread.
 namespace iiSocietyContainer {
@@ -20,6 +23,7 @@ class IISOCIETY_GUI_EXPORT DashboardFiles : public QObject
     Q_PROPERTY(QVariantList recentPublished READ recentPublished NOTIFY filesChanged)
     Q_PROPERTY(QVariantList generationHistory READ generationHistory NOTIFY filesChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
+    Q_PROPERTY(bool searching READ searching NOTIFY searchChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY filesChanged)
 public:
     explicit DashboardFiles(QObject *parent = nullptr);
@@ -32,6 +36,7 @@ public:
     QVariantList recentPublished() const;
     QVariantList generationHistory() const;
     bool loading() const { return m_loading; }
+    bool searching() const { return m_searching; }
     QString errorString() const { return m_error; }
     Q_INVOKABLE void refresh();
 signals:
@@ -39,9 +44,11 @@ signals:
     void queryChanged();
     void filesChanged();
     void loadingChanged();
+    void searchChanged();
 private:
     QVariantList filtered(StoreSection section, qsizetype limit) const;
     void addWatches(QStringList paths, quint64 revision);
+    void search();
     QString m_path, m_query, m_error;
     QVariantList m_files;
     bool m_loading = false, m_refreshPending = false;
@@ -49,6 +56,13 @@ private:
     std::shared_ptr<std::atomic_bool> m_cancel;
     QFileSystemWatcher m_watches;
     QTimer m_debounce, m_fallback;
+    QTimer m_searchDebounce;
+    QSet<QString> m_matches;
+    QString m_completedQuery;
+    bool m_searching = false, m_searchPending = false;
+    quint64 m_searchRevision = 0;
+    QFutureWatcherBase *m_searchWatcher = nullptr;
+    std::stop_source m_searchStop;
 };
 
 } // namespace iiSocietyContainer

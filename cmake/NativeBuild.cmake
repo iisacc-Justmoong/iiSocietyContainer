@@ -2,7 +2,7 @@
 set(IISOCIETYCONTAINER_BUILD_GUI OFF)
 set(IISOCIETYCONTAINER_HAS_DESKTOP_MOUNT OFF)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
-    foreach(name IN ITEMS directory_storage file_tree maintenance)
+    foreach(name IN ITEMS directory_storage file_tree maintenance file_repository)
         add_executable(iiSocietyContainerNative_${name} "tests/${name}.cpp")
         target_link_libraries(iiSocietyContainerNative_${name} PRIVATE
             iiSocietyContainer::FileTree iiSocietyContainer::Maintenance iiFileProvider::Temporary Threads::Threads)
@@ -13,10 +13,10 @@ endif()
 install(TARGETS iiSocietyContainerFileTree iiSocietyContainerMaintenance EXPORT iiSocietyContainerTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES FileTree.h DirectoryStorage.h StorageMaintenance.h iiSocietyContainerExport.h
+install(FILES FileTree.h DirectoryStorage.h StorageMaintenance.h FileRepository.h iiSocietyContainerExport.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
-install(FILES docs/FileTree.md docs/DirectoryStorage.md docs/StorageMaintenance.md docs/NativeBuild.md
+install(FILES docs/ManagedFiles.md docs/FileTree.md docs/DirectoryStorage.md docs/StorageMaintenance.md docs/NativeBuild.md
     DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
 install(FILES platform/ios/iiSocietyContainerIOS.cmake
     DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform/ios)

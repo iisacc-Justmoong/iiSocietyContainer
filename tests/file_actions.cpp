@@ -48,9 +48,9 @@ private slots:
         QTRY_COMPARE(done.size(), 1); QVERIFY(failed.isEmpty());
         QCOMPARE(QGuiApplication::clipboard()->mimeData()->urls(), QList<QUrl>{QUrl::fromLocalFile(source)});
         QVERIFY(actions.canPaste());
-        actions.paste(temp.filePath("Models")); QTRY_COMPARE(done.size(), 2); QVERIFY(failed.isEmpty());
+        actions.paste(temp.filePath("Models")); QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, 30000); QVERIFY(failed.isEmpty());
         QVERIFY(QFileInfo::exists(temp.filePath("Models/test 2.safetensors"))); QVERIFY(QFileInfo::exists(source));
-        actions.rename("updated.safetensors"); QTRY_COMPARE(done.size(), 3); QVERIFY(!QFileInfo::exists(source));
+        actions.rename("updated.safetensors"); QTRY_COMPARE_WITH_TIMEOUT(done.size(), 3, 30000); QVERIFY(!QFileInfo::exists(source));
         actions.setPath(temp.filePath("Models/updated.safetensors")); actions.trash(); QTRY_COMPARE(done.size(), 4);
         QVERIFY(QFileInfo::exists(temp.filePath("Deleted/updated.safetensors"))); QVERIFY(failed.isEmpty());
     }

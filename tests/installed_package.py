@@ -27,8 +27,11 @@ config = [cmake, '-S', source, '-B', consumer, '-G', cache['CMAKE_GENERATOR'],
 for name in ['CMAKE_TOOLCHAIN_FILE', 'VCPKG_TARGET_TRIPLET', 'CMAKE_PROJECT_INCLUDE']:
     if cache.get(name):
         config.append('-D' + name + '=' + cache[name])
+for name, value in cache.items():
+    if name.startswith('iiFileProvider') and name.endswith('_DIR') and value:
+        config.append('-D' + name + '=' + value)
 run(config)
 run([cmake, '--build', consumer, '--config', cache.get('CMAKE_BUILD_TYPE', 'Release'), '--parallel', '2'])
 env['PATH'] = str(stage / 'bin') + os.pathsep + env['PATH']
 run([str(Path(cmake).with_name('ctest.exe' if os.name == 'nt' else 'ctest')), '--test-dir', consumer, '-C', cache.get('CMAKE_BUILD_TYPE', 'Release'), '--output-on-failure', '--no-tests=error'])
-print('Staged FileTree/Maintenance consumers execute without importing Qt.')
+print('Staged FileTree, Maintenance and managed Repository consumers execute without importing Qt.')

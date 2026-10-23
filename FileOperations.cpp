@@ -2,6 +2,7 @@
 #include <iiFileProviderDevice.h>
 #include "FileOperations.h"
 #include "StorageMap.h"
+#include "SharedStorage.h"
 #include "DiskImage.h"
 #include "src/FileTreePaths.h"
 #include <QFileInfo>
@@ -35,7 +36,7 @@ bool confined(const SocietyDrive &drive, const QString &path, bool section = fal
     bool first = true;
     for (const auto &part : relative.split('/')) {
         if (part.isEmpty() || part == "." || part == ".." || part.contains('\\') || part.contains(':')
-            || part.contains(QChar::Null) || part.startsWith(".society-") || part.startsWith(".iiserverhost-")
+            || part.contains(QChar::Null) || part.startsWith(".society-") || part.startsWith(".iiwebserver-")
             || part == ".iisacc-temporary.lock") return false;
         if (first) { first = false; continue; }
         current += '/' + part; const QFileInfo info(current);
@@ -160,6 +161,7 @@ FileOperations::Result FileOperations::createDirectory(const QString &parent, co
 }
 FileOperations::Result FileOperations::perform(Action action, const QString &source, const QString &argument) const {
     auto failed = [](const QString &error) { return Result{{}, error}; };
+    try {
     if (action == Action::Move && !m_drive.isReady()) return failed("The Society drive is not ready.");
     const bool importing = action == Action::Copy;
     const QFileInfo sourceInfo(source);
@@ -169,11 +171,34 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
     if (!QFileInfo::exists(source)) return failed(deleting
         ? "This item is not stored on this device. Delete it on the Society host."
         : "Download this item from the Society host before changing it.");
+    QString storageError;
+    const auto storage = SharedStorage::open(m_drive.rootPath(), &storageError);
+    if (!storage) return failed(storageError);
+    FileRepositoryContext context; context.description = deleting ? "Delete Society file" : importing ? "Import Society file" : "Move or copy Society file";
+    std::unique_ptr<FileRepository> repository;
+    if (!deleting || std::filesystem::exists(FileRepository::packagePath(detail::nativePath(m_drive.rootPath()), m_drive.identifier().toStdString()) / "objects.sqlite3"))
+        repository = storage->fileRepository(std::move(context));
+    const auto sourceSection = m_drive.sectionForPath(source);
+    const auto logicalSource = !importing && sourceSection ? storage->managedFilePath(*sourceSection,
+        iiFileProvider::Directory(m_drive.sectionPath(*sourceSection)).relativeFilePath(source)) : std::string{};
+    if (!importing && !deleting) repository->captureTree(logicalSource);
+    const auto complete = [&](const QString &destination, bool moved) -> Result {
+        if (!repository) return {destination, {}};
+        const auto section = m_drive.sectionForPath(destination); if (!section) return failed("The destination left this drive.");
+        const auto logical = storage->managedFilePath(*section, iiFileProvider::Directory(m_drive.sectionPath(*section)).relativeFilePath(destination));
+        if (moved) repository->relocated(logicalSource, logical, !deleting);
+        else if (!importing && sourceInfo.isFile()) {
+            const auto original = repository->lookup(logicalSource);
+            repository->observe(logical, original ? std::optional<iiFileProvider::FileMetadata>(repository->original(original->key).metadata.annotations) : std::nullopt);
+        } else repository->captureTree(logical);
+        return {destination, {}};
+    };
     // Deletion has no dependency on catalog residency, downloads, hashes, model
     // packages, or the replication lock. The indexer observes changes afterwards.
     if (action == Action::Remove) {
         if (!source.startsWith(m_drive.sectionPath(StoreSection::Deleted) + '/')) return failed("Only items in Deleted can be permanently removed.");
-        return removeTree(source) ? Result{source, {}} : failed("Could not permanently delete this item.");
+        if (!removeTree(source)) return failed("Could not permanently delete this item.");
+        if (repository) repository->removed(logicalSource); return {source, {}};
     }
     if (action == Action::Trash) {
         const auto folder = m_drive.sectionPath(StoreSection::Deleted);
@@ -181,7 +206,7 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
         if (source.startsWith(folder + '/')) return failed("This item is already in Deleted.");
         const auto destination = uniquePath(folder, sourceInfo.fileName(), false);
         if (destination.isEmpty() || !editable(destination)) return failed("The Deleted destination is unavailable.");
-        if (moveWithoutCopy(source, destination)) return {destination, {}};
+        if (moveWithoutCopy(source, destination)) return complete(destination, true);
 #ifdef Q_OS_MACOS
         // Native Files and private Deleted have separate volumes. Keep a local
         // recovery name until the verified private copy has been published.
@@ -198,7 +223,7 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
                 return failed("Could not publish the item in Deleted. Its original remains in the source volume.");
             }
             removeTree(recovery);
-            return {destination, {}};
+            return complete(destination, true);
         }
 #endif
         return failed("Could not move this item to Deleted. Check access and that both folders are on the same filesystem.");
@@ -243,6 +268,7 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
     } else if (!iiFileProvider::Directory().rename(copy ? staged : source, destination)) {
         return failed("Could not move this item. Check access and try again.");
     }
-    staged.clear(); return {destination, {}};
+    staged.clear(); return complete(destination, !copy);
+    } catch (const std::exception &error) { return failed(QString::fromUtf8(error.what())); }
 }
 }

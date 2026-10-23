@@ -30,7 +30,10 @@ private slots:
         QVERIFY(!operations.perform(FileOperations::Action::Rename, sentinel.fileName(), "renamed"));
         const auto copied = operations.perform(FileOperations::Action::Duplicate, temp.filePath("Files/folder"));
         QVERIFY2(copied, qPrintable(copied.error));
-        QVERIFY(!QFileInfo::exists(copied.path + "/.iisacc-temporary.lock"));
+        // The source lease is excluded by copyTree. Publishing the new file's
+        // classification can independently create a fresh zero-byte lease.
+        const QFileInfo copiedLease(copied.path + "/.iisacc-temporary.lock");
+        if (copiedLease.exists()) { QVERIFY(copiedLease.isFile()); QVERIFY(!copiedLease.isSymLink()); QCOMPARE(copiedLease.size(), qint64(0)); }
         QVERIFY(QFileInfo::exists(copied.path + "/user.log"));
         QCOMPARE(QFileInfo(sentinel.fileName()).size(), qint64(0));
     }

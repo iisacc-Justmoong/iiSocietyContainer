@@ -10,6 +10,14 @@ find_dependency(iiFileProviderNative 0.7 CONFIG HINTS "$ENV{IIFILEPROVIDER_PREFI
 
 
 find_dependency(Threads)
+find_dependency(iiFileProviderObjects CONFIG)
+if(NOT iiFileProviderObjects_DOCUMENT_API_VERSION EQUAL 1)
+    set(iiSocietyContainer_FOUND FALSE)
+    set(iiSocietyContainer_NOT_FOUND_MESSAGE "iiFileProvider Objects needs the atomic document/RAW API; rebuild the coherent provider package")
+    return()
+endif()
+set(iiSocietyContainer_HAS_MANAGED_FILES TRUE)
+find_dependency(iiFileProviderCatalog 0.7.3 CONFIG)
 find_dependency(iiFileProviderTemporary CONFIG HINTS
     "${CMAKE_CURRENT_LIST_DIR}/../../../../iiFileProvider"
     "$ENV{HOME}/.local/SDK/iiFileProvider"
