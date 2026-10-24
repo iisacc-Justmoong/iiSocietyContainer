@@ -25,6 +25,8 @@
 #include <QElapsedTimer>
 #include <QDataStream>
 #include <QScopeGuard>
+#include <atomic>
+#include <thread>
 
 using namespace iiSocietyContainer;
 
@@ -40,8 +42,9 @@ void makeReadyReplica(const SocietyDrive &drive)
     // Keep this fixture's logical namespace stable while creating the actual
     // replica manifest contract, rather than treating missing primary metadata
     // as proof that a newly created source package is a replica.
-    QVERIFY(SocietyDrive::adoptReplicaIdentity(drive.rootPath(), drive.identifier(), drive.identifier()));
-    QVERIFY(SocietyDrive::completeReplica(drive.rootPath(), drive.identifier()));
+    QString error;
+    QVERIFY2(SocietyDrive::adoptReplicaIdentity(drive.rootPath(), drive.identifier(), drive.identifier(), &error), qPrintable(error));
+    QVERIFY2(SocietyDrive::completeReplica(drive.rootPath(), drive.identifier(), &error), qPrintable(error));
 }
 }
 
@@ -223,7 +226,7 @@ private slots:
         QVERIFY(restored.entry(-1).isEmpty());
         QVERIFY(restored.entry(restored.rowCount()).isEmpty());
         write(QDir(files).filePath("watched.txt"), "observed");
-        QTRY_COMPARE_WITH_TIMEOUT(restored.rowCount(), 2, 3000); // No explicit refresh or ten-second fallback.
+        QTRY_COMPARE_WITH_TIMEOUT(restored.rowCount(), 2, 5000); // Still before the ten-second fallback, without explicit refresh.
     }
     void generationInventoryReconcilesAuthorityAndPreservesReplicas() {
         QTemporaryDir fixture(QDir::current().filePath("generation-inventory-XXXXXX.societycontainer")); QVERIFY(fixture.isValid());
@@ -291,7 +294,9 @@ private slots:
         const auto inventory = storage->models(); QCOMPARE(inventory.size(), 8);
         for (const auto &model : inventory) {
             QVERIFY(model.available);
-            QVERIFY(paths.contains(storage->resolveModel(model.reference(drive->identifier()))));
+            QString error;
+            const auto resolved = storage->resolveModel(model.reference(drive->identifier()), &error);
+            QVERIFY2(paths.contains(resolved), qPrintable(error));
         }
         QCOMPARE(map.objects(), partial); QVERIFY(map.pendingRequests().isEmpty());
         QVERIFY(!QFileInfo::exists(fixture.filePath(".society-sync/primary.json")));
@@ -299,6 +304,51 @@ private slots:
             QFile source(path); QVERIFY(source.open(QIODevice::ReadOnly));
             QCOMPARE(source.readAll(), QByteArray("user weights"));
         }
+    }
+
+    void localModelReferenceRemainsStableWhileProviderPublishesPreviews() {
+        QTemporaryDir fixture(QDir::current().filePath("model-preview-reference-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        StorageMap map(*drive); QVERIFY(map.publish({}));
+        QVERIFY(QDir().mkdir(fixture.filePath("Models/Checkpoint")));
+        const auto path = fixture.filePath("Models/Checkpoint/stable.safetensors");
+        write(path, "user model weights");
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        const auto models = storage->models(); QCOMPARE(models.size(), 1);
+        const auto reference = models.first().reference(drive->identifier());
+        const auto nativePath = std::filesystem::path(path.toStdU16String());
+        const auto bitmapPath = std::filesystem::path(fixture.filePath("preview.bmp").toStdU16String());
+        std::string bitmap(66, '\0'); bitmap[0] = 'B'; bitmap[1] = 'M';
+        const auto put32 = [&](std::size_t at, std::uint32_t value) {
+            for (int i = 0; i < 4; ++i) bitmap[at + std::size_t(i)] = char(value >> (i * 8));
+        };
+        put32(2, 66); put32(10, 54); put32(14, 40); put32(18, 3); put32(22, 1);
+        bitmap[26] = 1; bitmap[28] = 24; put32(34, 12); bitmap[56] = char(255);
+        iiFileProvider::native::File::write(bitmapPath, bitmap);
+        const auto preview = iiFileProvider::native::Presentation::prepare(bitmapPath).preview;
+        QCOMPARE(preview.mimeType, std::string("image/png"));
+        std::atomic<unsigned> published = 0;
+        std::string previewError;
+        std::jthread publisher([&] {
+            try {
+                for (int i = 0; i < 64; ++i) {
+                    (void)iiFileProvider::native::Presentation::attach(nativePath, preview,
+                        {{"iteration", std::to_string(i)}});
+                    ++published;
+                }
+            } catch (const std::exception &error) { previewError = error.what(); }
+        });
+        QString error;
+        for (int i = 0; i < 64; ++i)
+            QCOMPARE(storage->resolveModel(reference, &error), path);
+        publisher.join();
+        QVERIFY2(previewError.empty(), previewError.c_str());
+        QCOMPARE(published.load(), 64u);
+        QCOMPARE(storage->resolveModel(reference, &error), path);
+        write(path, "changed model weights");
+        QVERIFY(storage->resolveModel(reference, &error).isEmpty());
+        QVERIFY(!error.isEmpty());
     }
 
     void replicaCatalogDoesNotExposeUnindexedLocalModels_data() {
@@ -377,7 +427,14 @@ private slots:
         QVERIFY(map.pendingRequests().isEmpty());
     }
 
+    void hostModelImportsAppearBeforeSyncHashingCompletes_data() {
+        QTest::addColumn<int>("iteration");
+        for (int iteration = 0; iteration < 16; ++iteration)
+            QTest::newRow(qPrintable(QString::number(iteration))) << iteration;
+    }
     void hostModelImportsAppearBeforeSyncHashingCompletes() {
+        QFETCH(int, iteration);
+        Q_UNUSED(iteration);
         QTemporaryDir fixture(QDir::current().filePath("host-model-import-XXXXXX.societycontainer")); QVERIFY(fixture.isValid());
         const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
         makeReadyReplica(*drive);

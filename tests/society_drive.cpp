@@ -1,5 +1,7 @@
 #include "SymbolicLink.h"
 #include <SocietyDrive.h>
+#include <StorageMaintenance.h>
+#include <iiFileProviderNative.h>
 
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -14,6 +16,8 @@
 
 #include <memory>
 #include <filesystem>
+#include <atomic>
+#include <thread>
 
 using namespace iiSocietyContainer;
 
@@ -21,6 +25,35 @@ class SocietyDriveTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void replicaIdentityUpdatesWhileMaintenanceReadsTheManifest()
+    {
+        QTemporaryDir fixture(QDir::current().filePath("replica-maintenance-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        QString error;
+        const auto drive = SocietyDrive::create(fixture.path(), &error);
+        QVERIFY2(drive, qPrintable(error));
+        const auto root = std::filesystem::path(fixture.path().toStdU16String());
+        const auto identifier = drive->identifier().toStdString();
+        std::atomic<unsigned> reads = 0;
+        std::jthread maintenance([&](std::stop_token stop) {
+            while (!stop.stop_requested()) {
+                (void)StorageMaintenance::runOnce(root, identifier);
+                ++reads;
+            }
+        });
+        while (reads.load() == 0) std::this_thread::yield();
+        for (int i = 0; i < 64; ++i) {
+            // Keep a real provider snapshot open across replacement, matching
+            // maintenance and presentation readers rather than only racing it.
+            iiFileProvider::native::ReadFile snapshot(root / ".society-drive.json");
+            QVERIFY2(SocietyDrive::adoptReplicaIdentity(fixture.path(), drive->identifier(), drive->identifier(), &error), qPrintable(error));
+            QVERIFY2(SocietyDrive::completeReplica(fixture.path(), drive->identifier(), &error), qPrintable(error));
+        }
+        maintenance.request_stop();
+        maintenance.join();
+        QVERIFY(reads.load() > 0);
+        QVERIFY(drive->isReady());
+    }
     void nativeAndQtUnicodeParentsPreserveThePackageBoundary()
     {
         QTemporaryDir parent(QDir::current().filePath("unicode-package-XXXXXX")); QVERIFY(parent.isValid());

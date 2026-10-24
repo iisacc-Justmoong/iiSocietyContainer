@@ -14,6 +14,7 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QFileInfo>
+#include <mutex>
 #include <QJsonDocument>
 #include <QStandardPaths>
 #include <algorithm>
@@ -55,9 +56,14 @@ bool inventory(const QString &path, const QString &base, QCryptographicHash &has
         return false;
     const auto relative = logicalRoot.isEmpty() ? iiFileProvider::Directory(base).relativeFilePath(path)
         : logicalRoot + (path == physicalRoot ? QString() : '/' + iiFileProvider::Directory(physicalRoot).relativeFilePath(path));
+    iiFileProvider::native::SourceAccess access(std::filesystem::path(path.toStdU16String()));
+    std::lock_guard sourceLock(access);
+    // Re-read after taking the provider boundary: NTFS preview streams briefly
+    // share and then restore the data fork's modification time.
+    const QFileInfo current(path);
     hash.addData(relative.toUtf8());
-    hash.addData(QByteArray::number(info.size()));
-    hash.addData(QByteArray::number(info.lastModified().toMSecsSinceEpoch()));
+    hash.addData(QByteArray::number(current.size()));
+    hash.addData(QByteArray::number(current.lastModified().toMSecsSinceEpoch()));
     iiFileProvider::FileDevice file(path);
     if (!file.open(QIODevice::ReadOnly))
         return false;
@@ -333,9 +339,13 @@ QList<StoredModel> SharedStorage::models(QString *error) const
                     auto entry = entries.value(key);
                     // Preserve synchronized references for existing files, including
                     // those sent by another device for host-side generation.
-                    if (entry.isEmpty() || entry.value("size").toString().toLongLong() != file.size())
-                        entry["version"] = "local:" + QString::number(file.size()) + ':'
-                            + QString::number(file.lastModified().toMSecsSinceEpoch());
+                    if (entry.isEmpty() || entry.value("size").toString().toLongLong() != file.size()) {
+                        iiFileProvider::native::SourceAccess access(std::filesystem::path(file.absoluteFilePath().toStdU16String()));
+                        std::lock_guard sourceLock(access);
+                        const QFileInfo current(file.absoluteFilePath());
+                        entry["version"] = "local:" + QString::number(current.size()) + ':'
+                            + QString::number(current.lastModified().toMSecsSinceEpoch());
+                    }
                     entry["path"] = key; entry["kind"] = "file";
                     entry["size"] = QString::number(file.size()); entry["resident"] = true;
                     entries.insert(key, entry);

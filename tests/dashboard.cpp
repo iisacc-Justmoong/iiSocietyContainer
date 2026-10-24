@@ -51,6 +51,21 @@ private slots:
         QCOMPARE(row.value("thumbnailSource").toUrl().host(), "society-preview");
         QVERIFY(row.value("previewSource").toUrl().isEmpty()); // Original-image contract is unchanged.
     }
+    void providerControlDirectoryContentsNeverBecomeRecentFiles() {
+        QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/control-dashboard-XXXXXX.societycontainer");
+        QVERIFY(SocietyDrive::create(root.path()));
+        const auto control = root.filePath("Files/.iisacc-file-provider");
+        QVERIFY(QDir().mkpath(control));
+        for (const auto &name : {"catalog.sqlite3", "catalog.sqlite3-wal", "catalog.sqlite3-shm"}) {
+            QFile file(control + '/' + name); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("internal");
+        }
+        QFile visible(root.filePath("Files/document.txt"));
+        QVERIFY(visible.open(QIODevice::WriteOnly)); visible.write("visible"); visible.close();
+        DashboardFiles model; model.setContainerPath(root.path());
+        QTRY_VERIFY(!model.loading());
+        QCOMPARE(model.recentFiles().size(), 1);
+        QCOMPARE(model.recentFiles().first().toMap()["name"].toString(), "document.txt");
+    }
     void editorCanvasesDoNotDuplicateGeneratedImagesInHistory() {
         QTemporaryDir root(SOCIETY_TEST_DIRECTORY "/native-history-XXXXXX.societycontainer");
         QVERIFY(SocietyDrive::create(root.path()));

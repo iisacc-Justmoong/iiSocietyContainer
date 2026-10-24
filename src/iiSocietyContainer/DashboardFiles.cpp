@@ -107,6 +107,11 @@ Snapshot scan(const QString &path, const std::shared_ptr<std::atomic_bool> &canc
         while (!cancel->load() && iterator.hasNext()) {
             iterator.next();
             const auto file = iterator.fileInfo();
+            const auto components = QDir(sectionRoot).relativeFilePath(file.filePath()).split('/');
+            if (std::any_of(components.begin(), components.end(), [](const auto &part) {
+                return part.startsWith('.') || iiFileProvider::native::Presentation::isControlFile(
+                    std::filesystem::path(part.toStdU16String()));
+            })) continue;
             if (file.isSymLink() || file.fileName().startsWith('.')
                 || iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(file.fileName().toStdU16String()))) continue;
             // Recheck SDK boundaries in case an entry changed during the walk.

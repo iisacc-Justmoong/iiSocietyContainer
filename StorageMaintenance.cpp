@@ -1,5 +1,6 @@
 #include <iiFileProviderStorage.h>
 #include <iiFileProviderPresentation.h>
+#include <iiFileProviderNative.h>
 #include "StorageMaintenance.h"
 #include <TemporaryLease.h>
 #include <algorithm>
@@ -202,10 +203,15 @@ bool validRoot(const fs::path& root, std::string_view expected, const std::optio
     if (!direct(manifest, false)) return false;
     std::error_code ec; const auto size = fs::file_size(manifest, ec);
     if (ec || size == 0 || size > 16384) return false;
-    std::ifstream stream(manifest, std::ios::binary);
-    std::string text(static_cast<std::size_t>(size), '\0');
-    if (!stream.read(text.data(), static_cast<std::streamsize>(size)) || stream.peek() != std::char_traits<char>::eof()) return false;
-    return Manifest(text).matches(expected);
+    // The provider's Windows reader permits atomic replacement while this
+    // maintenance snapshot is open. A CRT ifstream denies delete sharing.
+    try {
+        iiFileProvider::native::ReadFile stream(manifest);
+        if (stream.size() == 0 || stream.size() > 16384) return false;
+        const auto text = stream.read(static_cast<std::int64_t>(stream.size()));
+        if (text.size() != stream.size()) return false;
+        return Manifest(text).matches(expected);
+    } catch (const iiFileProvider::native::FileError &) { return false; }
 }
 
 std::vector<fs::directory_entry> entries(const fs::path& directory, Report& report) {

@@ -1,4 +1,5 @@
 #include <iiFileProviderDevice.h>
+#include <iiFileProviderNative.h>
 #include "SocietyDrive.h"
 #include "src/FileTreePaths.h"
 #include "ModelLayout.h"
@@ -29,6 +30,18 @@ void setError(QString* error, const QString& message)
 {
     if (error) {
         *error = message;
+    }
+}
+
+bool replaceManifest(const QString &path, const QByteArray &bytes, QString *error)
+{
+    try {
+        iiFileProvider::native::File::write(detail::nativePath(path),
+            std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
+        return true;
+    } catch (const std::exception &failure) {
+        setError(error, QString::fromUtf8(failure.what()));
+        return false;
     }
 }
 
@@ -276,10 +289,7 @@ std::optional<SocietyDrive> SocietyDrive::open(const QString& directoryPath, QSt
             data.insert("filesLayoutVersion", 1);
         }
         const auto bytes = QJsonDocument(data).toJson();
-        iiFileProvider::SaveFile output(manifest.filePath());
-        if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
-            setError(error, QStringLiteral("Could not save the upgraded Society manifest: %1").arg(output.errorString())); return {};
-        }
+        if (!replaceManifest(manifest.filePath(), bytes, error)) return {};
     }
     return SocietyDrive(root.path(), identifier);
 }
@@ -322,10 +332,7 @@ std::optional<SocietyDrive> SocietyDrive::adoptReplicaIdentity(
         manifest.insert("previousIdentifier", checked->identifier());
     manifest.insert("replicaReady", false);
     const auto bytes = QJsonDocument(manifest).toJson();
-    iiFileProvider::SaveFile output(input.fileName());
-    if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
-        setError(error, output.errorString()); return std::nullopt;
-    }
+    if (!replaceManifest(input.fileName(), bytes, error)) return std::nullopt;
     return open(root.path(), error);
 }
 
@@ -351,10 +358,8 @@ bool SocietyDrive::completeReplica(const QString& directoryPath, const QString& 
         manifest.insert("filesLayoutVersion", 1);
     }
     manifest.insert("replicaReady", true);
-    const auto bytes = QJsonDocument(manifest).toJson(); iiFileProvider::SaveFile output(input.fileName());
-    if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
-        setError(error, output.errorString()); return false;
-    }
+    const auto bytes = QJsonDocument(manifest).toJson();
+    if (!replaceManifest(input.fileName(), bytes, error)) return false;
     setError(error, {}); return true;
 }
 
