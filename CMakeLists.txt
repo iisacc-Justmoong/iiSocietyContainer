@@ -472,6 +472,7 @@ install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/s
 install(FILES README.md FileLoading.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
 install(FILES tools/migrate_directory.py DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/tools)
 install(FILES docs/ManagedFiles.md docs/Models.md docs/Files.md docs/FileActions.md docs/FileTree.md docs/DirectoryStorage.md docs/GenerationHistory.md docs/ContainerAliases.md docs/StorageMaintenance.md docs/DiskImage.md docs/NativeBuild.md docs/FilePresentation.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
+install(FILES docs/APPLE_TEST_LIFETIME.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs COMPONENT Documentation)
 install(DIRECTORY platform/apple platform/ios platform/android DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform
     PATTERN "*Tests.swift" EXCLUDE PATTERN "._*" EXCLUDE PATTERN ".DS_Store" EXCLUDE)
 install(FILES platform/macos/README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform/macos)

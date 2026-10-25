@@ -15,7 +15,10 @@ enum SharedDriveLocationTests {
         let base = URL(fileURLWithPath: CommandLine.arguments[1])
         let group = base.appendingPathComponent("app-group-test-" + UUID().uuidString)
         try manager.createDirectory(at: group, withIntermediateDirectories: false)
-        defer { try? manager.removeItem(at: group) }
+        defer {
+            _ = IisaccFileProvider.waitForPresentations()
+            try? manager.removeItem(at: group)
+        }
         let location = SharedDriveLocation(group: group)
         try reject { _ = try location.existingRoot() }
         let root = try location.prepareRoot()
@@ -65,6 +68,8 @@ enum SharedDriveLocationTests {
         try check(Set(reopened.children("root").map { $0.name }) == ["From Society.txt", "Models"],
                   "The iOS location must open directly in Files contents")
         try check(app.children("root").count == 9, "Society must retain all nine sections")
+        try check(IisaccFileProvider.waitForPresentations(),
+                  "File previews must finish before relocating the shared-source fixture")
         let previous = group.appendingPathComponent("Library/Application Support/Society", isDirectory: true)
         try manager.createDirectory(at: previous.deletingLastPathComponent(), withIntermediateDirectories: true)
         let manifestBytes = try Data(contentsOf: root.appendingPathComponent(".society-drive.json"))
@@ -76,6 +81,8 @@ enum SharedDriveLocationTests {
                   "Packaging the previous managed source must preserve the manifest and UUID")
         try check(FilesDriveStore(root: root, catalog: catalog).item(publicID).id == publicID,
                   "Packaging a previous managed source must preserve user files and provider IDs")
+        try check(IisaccFileProvider.waitForPresentations(),
+                  "File previews must finish before replacing the shared-source fixture")
         try manager.removeItem(at: root)
         try manager.createSymbolicLink(at: root, withDestinationURL: group)
         try reject { _ = try location.prepareRoot() }
