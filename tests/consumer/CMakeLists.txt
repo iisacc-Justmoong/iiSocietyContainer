@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.24)
 project(iiSocietyContainerConsumer LANGUAGES CXX)
 
-find_package(iiSocietyContainer 0.15.0 CONFIG REQUIRED)
+option(IISOCIETYCONTAINER_TEST_GUI "Verify the installed GUI component headers" OFF)
+if(IISOCIETYCONTAINER_TEST_GUI)
+    find_package(iiSocietyContainer 0.15.0 CONFIG REQUIRED COMPONENTS Gui)
+else()
+    find_package(iiSocietyContainer 0.15.0 CONFIG REQUIRED)
+endif()
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     get_filename_component(society_native_bundle_name "${iiSocietyContainer_NATIVE_APP}" NAME)
     if(NOT society_native_bundle_name STREQUAL "Society.app")
@@ -66,3 +71,9 @@ target_link_libraries(iiSocietyContainerOperationsConsumer PRIVATE iiSocietyCont
 target_compile_definitions(iiSocietyContainerOperationsConsumer PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
 set_target_properties(iiSocietyContainerOperationsConsumer PROPERTIES AUTOMOC ON CXX_EXTENSIONS OFF)
 add_test(NAME iiSocietyContainer.installed_file_operations COMMAND iiSocietyContainerOperationsConsumer)
+
+if(IISOCIETYCONTAINER_TEST_GUI)
+    add_executable(iiSocietyContainerGuiHeaders gui_headers.cpp)
+    target_link_libraries(iiSocietyContainerGuiHeaders PRIVATE iiSocietyContainer::Gui)
+    add_test(NAME iiSocietyContainer.installed_gui_headers COMMAND iiSocietyContainerGuiHeaders)
+endif()

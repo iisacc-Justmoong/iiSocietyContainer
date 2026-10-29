@@ -10,11 +10,11 @@
   },
   "source": {
     "path": "docs/FILE_PROVIDER.md",
-    "sha256": "5063124f78057a5131cf48a0c7c5c9eca14366014c31adc6c02d21946832aab8",
-    "bytes": 1584,
-    "line_count": 37,
+    "sha256": "6ccf2c9deef4b323f8ab596a19330c61c4ca715bc4eb988af965557ef6120049",
+    "bytes": 1868,
+    "line_count": 41,
     "encoding": "utf-8",
-    "language": "en"
+    "language": "ko"
   },
   "document": {
     "title": "File creation ownership in iiSocietyContainer",
@@ -42,50 +42,64 @@
       "id": "b000003",
       "kind": "paragraph",
       "start_line": 3,
-      "end_line": 3,
-      "raw": "Drive/model directories, previews and mount-backed creation use provider factories. FUSE, Dokan and FSKit retain their existing descriptor confinement and flags. Native Swift sources and the Android storage bridge are supplied by iiFileProvider.\n"
+      "end_line": 5,
+      "raw": "파일 동작·프리뷰 캐시·애플리케이션 통합의 헤더와 구현은 `src/Gui/`에 둔다.\n설치 소비자 테스트는 세 GUI 공개 헤더를 기존 `<iiSocietyContainer/...>` 경로로 컴파일한다.\n기존 `iiSocietyContainer/` 공개 include와 설치 경로는 유지한다.\n"
     },
     {
       "id": "b000004",
       "kind": "blank",
-      "start_line": 4,
-      "end_line": 4,
+      "start_line": 6,
+      "end_line": 6,
       "raw": "\n"
     },
     {
       "id": "b000005",
       "kind": "paragraph",
-      "start_line": 5,
-      "end_line": 8,
-      "raw": "The common [ownership contract](../../iiFileProvider/docs/FILE_OWNERSHIP.md) defines stream, staging, control-file and\ninstalled-package rules. Source regression tests remain with this module; the\nworkspace creation audit also checks these boundaries. Build/deployment and target\nruntime validation are separate evidence.\n"
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "Drive/model directories, previews and mount-backed creation use provider factories. FUSE, Dokan and FSKit retain their existing descriptor confinement and flags. Native Swift sources and the Android storage bridge are supplied by iiFileProvider.\n"
     },
     {
       "id": "b000006",
       "kind": "blank",
-      "start_line": 9,
-      "end_line": 9,
+      "start_line": 8,
+      "end_line": 8,
       "raw": "\n"
     },
     {
       "id": "b000007",
       "kind": "paragraph",
-      "start_line": 10,
-      "end_line": 10,
-      "raw": "Changed boundaries:\n"
+      "start_line": 9,
+      "end_line": 12,
+      "raw": "The common [ownership contract](../../iiFileProvider/docs/FILE_OWNERSHIP.md) defines stream, staging, control-file and\ninstalled-package rules. Source regression tests remain with this module; the\nworkspace creation audit also checks these boundaries. Build/deployment and target\nruntime validation are separate evidence.\n"
     },
     {
       "id": "b000008",
       "kind": "blank",
-      "start_line": 11,
-      "end_line": 12,
-      "raw": "\n\n"
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
     },
     {
       "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "Changed boundaries:\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 16,
+      "raw": "\n\n"
+    },
+    {
+      "id": "b000011",
       "kind": "list",
-      "start_line": 13,
-      "end_line": 37,
-      "raw": "- `DirectoryStorage.cpp`\n- `FileOperations.cpp`\n- `ModelLayout.cpp`\n- `ModelStore.cpp`\n- `PhotosLayout.cpp`\n- `SharedStorage.cpp`\n- `SocietyDrive.cpp`\n- `StorageDirectoryModel.cpp`\n- `StorageMaintenance.cpp`\n- `StorageMap.cpp`\n- `platform/android/src/com/iisacc/society/storage/DriveStore.java`\n- `platform/android/src/com/iisacc/society/storage/SocietyDocumentsProvider.java`\n- `platform/android/src/com/iisacc/society/storage/SocietyInternalProvider.java`\n- `platform/apple/LocalDriveStore.swift`\n- `platform/apple/SharedDriveLocation.swift`\n- `platform/desktop/MountDaemon.cpp`\n- `platform/ios/live-activity/TaskActivityBridge.swift`\n- `platform/linux/FuseMount.cpp`\n- `platform/macos/DirectoryMount.swift`\n- `platform/macos/DiskImage.mm`\n- `platform/macos/FSKit/SocietyFSVolume+FSVolumeOperations.swift`\n- `platform/macos/build_native.py`\n- `platform/windows/DokanMount.cpp`\n- `src/iiSocietyContainer/PreviewCache.cpp`\n- `tools/drive.cpp`\n",
+      "start_line": 17,
+      "end_line": 41,
+      "raw": "- `DirectoryStorage.cpp`\n- `FileOperations.cpp`\n- `ModelLayout.cpp`\n- `ModelStore.cpp`\n- `PhotosLayout.cpp`\n- `SharedStorage.cpp`\n- `SocietyDrive.cpp`\n- `StorageDirectoryModel.cpp`\n- `StorageMaintenance.cpp`\n- `StorageMap.cpp`\n- `platform/android/src/com/iisacc/society/storage/DriveStore.java`\n- `platform/android/src/com/iisacc/society/storage/SocietyDocumentsProvider.java`\n- `platform/android/src/com/iisacc/society/storage/SocietyInternalProvider.java`\n- `platform/apple/LocalDriveStore.swift`\n- `platform/apple/SharedDriveLocation.swift`\n- `platform/desktop/MountDaemon.cpp`\n- `platform/ios/live-activity/TaskActivityBridge.swift`\n- `platform/linux/FuseMount.cpp`\n- `platform/macos/DirectoryMount.swift`\n- `platform/macos/DiskImage.mm`\n- `platform/macos/FSKit/SocietyFSVolume+FSVolumeOperations.swift`\n- `platform/macos/build_native.py`\n- `platform/windows/DokanMount.cpp`\n- `src/Gui/PreviewCache.cpp`\n- `tools/drive.cpp`\n",
       "items": [
         {
           "marker": "-",
@@ -204,7 +218,7 @@
         },
         {
           "marker": "-",
-          "text": "`src/iiSocietyContainer/PreviewCache.cpp`",
+          "text": "`src/Gui/PreviewCache.cpp`",
           "checked": null
         },
         {
@@ -230,11 +244,11 @@
     "commands": [],
     "links": [
       {
-        "block_id": "b000005",
+        "block_id": "b000007",
         "label": "ownership contract",
         "target": "../../iiFileProvider/docs/FILE_OWNERSHIP.md",
         "kind": "relative",
-        "line": 5
+        "line": 9
       }
     ],
     "tables": []

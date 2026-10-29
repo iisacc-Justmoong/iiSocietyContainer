@@ -25,6 +25,10 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(CTest)
+if(BUILD_TESTING)
+    add_test(NAME iiSocietyContainer.source_layout COMMAND "${CMAKE_COMMAND}"
+        "-DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/source_layout.cmake")
+endif()
 find_package(Threads REQUIRED)
 find_package(iiFileProviderTemporary CONFIG REQUIRED)
 
@@ -156,13 +160,19 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
         "$<INSTALL_INTERFACE:$<$<BOOL:$<TARGET_PROPERTY:QT_CONSUMES_METATYPES>>:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/metatypes/${society_sharing_metatypes_name}>>")
     install(TARGETS iiSocietyContainerSharing EXPORT iiSocietyContainerTargets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    foreach(_header DashboardFiles PreviewCache SocietyApplication)
+        file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/include/iiSocietyContainer/${_header}.h"
+            CONTENT "#pragma once\n#include \"${CMAKE_CURRENT_SOURCE_DIR}/src/Gui/${_header}.h\"\n")
+    endforeach()
     add_library(iiSocietyContainerGui ${_library_type}
-        src/iiSocietyContainer/PreviewCache.h src/iiSocietyContainer/PreviewCache.cpp
-        src/iiSocietyContainer/DashboardFiles.h src/iiSocietyContainer/DashboardFiles.cpp
-        src/iiSocietyContainer/SocietyApplication.h src/iiSocietyContainer/SocietyApplication.cpp)
+        src/Gui/PreviewCache.h src/Gui/PreviewCache.cpp
+        src/Gui/DashboardFiles.h src/Gui/DashboardFiles.cpp
+        src/Gui/SocietyApplication.h src/Gui/SocietyApplication.cpp)
     add_library(iiSocietyContainer::Gui ALIAS iiSocietyContainerGui)
     target_compile_features(iiSocietyContainerGui PUBLIC cxx_std_23)
-    target_include_directories(iiSocietyContainerGui PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
+    target_include_directories(iiSocietyContainerGui PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>")
     target_compile_definitions(iiSocietyContainerGui PRIVATE IISOCIETYCONTAINER_GUI_BUILD)
     target_link_libraries(iiSocietyContainerGui PUBLIC iiSocietyContainerSharing Qt6::Quick
         PRIVATE Qt6::Concurrent iiFileProvider::iiFileProvider iiFileProvider::Native)
@@ -186,7 +196,7 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
     install(TARGETS iiSocietyContainerGui EXPORT iiSocietyContainerTargets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     install(FILES FileActions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-    install(FILES src/iiSocietyContainer/DashboardFiles.h src/iiSocietyContainer/SocietyApplication.h src/iiSocietyContainer/PreviewCache.h
+    install(FILES src/Gui/DashboardFiles.h src/Gui/SocietyApplication.h src/Gui/PreviewCache.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iiSocietyContainer)
 endif()
 

@@ -1,6 +1,8 @@
 # iiSocietyContainer
 
 Project-owned fixed assets belong in `resources/`. User models and files remain in their Society containers.
+GUI file actions, preview caching, and application integration live together in
+`src/Gui/`; their existing `<iiSocietyContainer/...>` include names remain stable.
 
 Storage may be a directory package or an explicitly application-owned logical
 disk. An entitled Apple client can bootstrap persistent storage in the shared
