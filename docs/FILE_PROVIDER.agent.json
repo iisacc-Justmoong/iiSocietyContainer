@@ -1,0 +1,248 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:ac02113161a6ba4314558ac87852e8111d616816cf93bd019b9c82dd31d943fa",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/FILE_PROVIDER.md",
+    "sha256": "5063124f78057a5131cf48a0c7c5c9eca14366014c31adc6c02d21946832aab8",
+    "bytes": 1584,
+    "line_count": 37,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "File creation ownership in iiSocietyContainer",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# File creation ownership in iiSocietyContainer\n",
+      "level": 1,
+      "title": "File creation ownership in iiSocietyContainer"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "Drive/model directories, previews and mount-backed creation use provider factories. FUSE, Dokan and FSKit retain their existing descriptor confinement and flags. Native Swift sources and the Android storage bridge are supplied by iiFileProvider.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 8,
+      "raw": "The common [ownership contract](../../iiFileProvider/docs/FILE_OWNERSHIP.md) defines stream, staging, control-file and\ninstalled-package rules. Source regression tests remain with this module; the\nworkspace creation audit also checks these boundaries. Build/deployment and target\nruntime validation are separate evidence.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "Changed boundaries:\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 12,
+      "raw": "\n\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "list",
+      "start_line": 13,
+      "end_line": 37,
+      "raw": "- `DirectoryStorage.cpp`\n- `FileOperations.cpp`\n- `ModelLayout.cpp`\n- `ModelStore.cpp`\n- `PhotosLayout.cpp`\n- `SharedStorage.cpp`\n- `SocietyDrive.cpp`\n- `StorageDirectoryModel.cpp`\n- `StorageMaintenance.cpp`\n- `StorageMap.cpp`\n- `platform/android/src/com/iisacc/society/storage/DriveStore.java`\n- `platform/android/src/com/iisacc/society/storage/SocietyDocumentsProvider.java`\n- `platform/android/src/com/iisacc/society/storage/SocietyInternalProvider.java`\n- `platform/apple/LocalDriveStore.swift`\n- `platform/apple/SharedDriveLocation.swift`\n- `platform/desktop/MountDaemon.cpp`\n- `platform/ios/live-activity/TaskActivityBridge.swift`\n- `platform/linux/FuseMount.cpp`\n- `platform/macos/DirectoryMount.swift`\n- `platform/macos/DiskImage.mm`\n- `platform/macos/FSKit/SocietyFSVolume+FSVolumeOperations.swift`\n- `platform/macos/build_native.py`\n- `platform/windows/DokanMount.cpp`\n- `src/iiSocietyContainer/PreviewCache.cpp`\n- `tools/drive.cpp`\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "`DirectoryStorage.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`FileOperations.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`ModelLayout.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`ModelStore.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`PhotosLayout.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`SharedStorage.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`SocietyDrive.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`StorageDirectoryModel.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`StorageMaintenance.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`StorageMap.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/android/src/com/iisacc/society/storage/DriveStore.java`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/android/src/com/iisacc/society/storage/SocietyDocumentsProvider.java`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/android/src/com/iisacc/society/storage/SocietyInternalProvider.java`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/apple/LocalDriveStore.swift`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/apple/SharedDriveLocation.swift`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/desktop/MountDaemon.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/ios/live-activity/TaskActivityBridge.swift`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/linux/FuseMount.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/macos/DirectoryMount.swift`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/macos/DiskImage.mm`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/macos/FSKit/SocietyFSVolume+FSVolumeOperations.swift`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/macos/build_native.py`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`platform/windows/DokanMount.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`src/iiSocietyContainer/PreviewCache.cpp`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`tools/drive.cpp`",
+          "checked": null
+        }
+      ]
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "File creation ownership in iiSocietyContainer",
+      "anchor": "file-creation-ownership-in-iisocietycontainer",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000005",
+        "label": "ownership contract",
+        "target": "../../iiFileProvider/docs/FILE_OWNERSHIP.md",
+        "kind": "relative",
+        "line": 5
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

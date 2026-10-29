@@ -57,12 +57,13 @@ std::unique_ptr<FileRepository> SharedStorage::fileRepository(FileRepositoryCont
     if (!m_drive.isReady()) throw std::runtime_error("The Society drive is not ready.");
     if (context.work.application.empty()) context.work.application = utf8(QCoreApplication::applicationName().isEmpty() ? QStringLiteral("Society") : QCoreApplication::applicationName());
     if (context.work.applicationVersion.empty()) context.work.applicationVersion = utf8(QCoreApplication::applicationVersion());
-    if (context.work.project.empty()) context.work.project = utf8(m_drive.identifier());
+    const auto repositoryId = m_drive.storageKind() == SocietyDrive::StorageKind::LogicalDisk ? m_drive.storageIdentifier() : m_drive.identifier();
+    if (context.work.project.empty()) context.work.project = utf8(repositoryId);
     if (context.device.empty()) context.device = utf8(QSysInfo::machineHostName());
     std::vector<FileRepositorySection> sections;
     for (const auto section : m_drive.sections()) sections.push_back({utf8(storeSectionKey(section)), detail::nativePath(m_drive.sectionPath(section))});
     const auto pinned = m_drive;
-    return std::make_unique<FileRepository>(detail::nativePath(m_drive.rootPath()), utf8(m_drive.identifier()),
+    return std::make_unique<FileRepository>(detail::nativePath(m_drive.rootPath()), utf8(repositoryId),
         std::move(sections), std::move(context), access, [pinned] { return pinned.isReady(); });
 }
 std::string SharedStorage::managedFilePath(StoreSection section, const QString &relative) const {
@@ -98,7 +99,8 @@ bool SharedStorage::reconcileFiles(QString *error, std::stop_token stop) const {
 QJsonObject SharedStorage::fileTracking(StoreSection section, const QString &relative, QString *error) const {
     try {
         if (filePath(section, relative, error).isEmpty()) return {};
-        if (!std::filesystem::exists(FileRepository::packagePath(detail::nativePath(m_drive.rootPath()), utf8(m_drive.identifier())))) return {{"status", "pending"}};
+        const auto repositoryId = m_drive.storageKind() == SocietyDrive::StorageKind::LogicalDisk ? m_drive.storageIdentifier() : m_drive.identifier();
+        if (!std::filesystem::exists(FileRepository::packagePath(detail::nativePath(m_drive.rootPath()), utf8(repositoryId)))) return {{"status", "pending"}};
         auto repository = fileRepository({}, FileRepository::Access::ReadOnly);
         const auto current = repository->lookup(managedFilePath(section, relative));
         if (!current) return {{"status", "pending"}};
@@ -118,7 +120,8 @@ QJsonObject SharedStorage::fileTracking(StoreSection section, const QString &rel
 QJsonObject SharedStorage::searchFiles(const QJsonObject &request, QString *error) const {
     try {
         if (!m_drive.isReady()) throw std::runtime_error("The Society drive is not ready.");
-        if (!std::filesystem::exists(FileRepository::packagePath(detail::nativePath(m_drive.rootPath()), utf8(m_drive.identifier())))) return {{"files", QJsonArray{}}, {"pending", true}};
+        const auto repositoryId = m_drive.storageKind() == SocietyDrive::StorageKind::LogicalDisk ? m_drive.storageIdentifier() : m_drive.identifier();
+        if (!std::filesystem::exists(FileRepository::packagePath(detail::nativePath(m_drive.rootPath()), utf8(repositoryId)))) return {{"files", QJsonArray{}}, {"pending", true}};
         auto repository = fileRepository({}, FileRepository::Access::ReadOnly);
         const auto limit = unsignedValue(request.value("limit"), 256);
         if (!limit || limit > 1024) throw std::runtime_error("Search limit must be 1 to 1024.");

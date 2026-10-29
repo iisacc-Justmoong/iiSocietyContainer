@@ -56,14 +56,16 @@ std::expected<DirectoryStorage::Location, std::string> DirectoryStorage::prepare
             return std::unexpected("Choose an existing absolute directory without redirected components.");
         if (legacyImage(parent)) return std::unexpected("Choose a normal directory outside the legacy disk image.");
         for (auto ancestor = parent.parent_path(); !ancestor.empty();) {
-            if (packageName(ancestor) || std::filesystem::exists(ancestor / ".society-drive.json") || legacyImage(ancestor))
+            if (packageName(ancestor) || std::filesystem::exists(ancestor / ".society-drive.json")
+                || std::filesystem::exists(std::filesystem::symlink_status(ancestor / ".society-logical-disk")) || legacyImage(ancestor))
                 return std::unexpected("A Society source cannot be inside another container.");
             const auto next = ancestor.parent_path();
             if (next == ancestor) break;
             ancestor = next;
         }
         if (packageName(parent)) return Location{parent, false};
-        if (std::filesystem::exists(parent / ".society-drive.json"))
+        if (std::filesystem::exists(parent / ".society-drive.json")
+            || std::filesystem::exists(std::filesystem::symlink_status(parent / ".society-logical-disk")))
             return std::unexpected("An existing Society source must be a .societycontainer package.");
         const auto path = parent / "Society.societycontainer";
         std::error_code error;

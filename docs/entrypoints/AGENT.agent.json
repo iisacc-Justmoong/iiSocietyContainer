@@ -1,0 +1,276 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:589a976870a30a2640403937ef1411dd2176046ada41d3ba8fe255984c24a8a7",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "AGENT.md",
+    "sha256": "ffd417a1d60955bdd51f9f26389048cc114630d5ea5b4e415918c01787df8a01",
+    "bytes": 2873,
+    "line_count": 28,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "iiSocietyContainer 작업 규칙",
+    "role": "instructions",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# iiSocietyContainer 작업 규칙\n",
+      "level": 1,
+      "title": "iiSocietyContainer 작업 규칙"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "list",
+      "start_line": 3,
+      "end_line": 10,
+      "raw": "- 패키지와 앱 소유 논리 디스크는 같은 섹션·식별·파일 입출력 계약을 제공한다. 확장자만 제거하여 일반 폴더를 신뢰하지 않는다.\n- 공통 접근 계층은 iiSocietyContainer이며 모든 iisacc 제품이 같은 저장소를 탐색한다. 최초 앱 ID는 생성 출처이며 앱별 데이터 분리 기준이 아니다. Windows·Linux의 공유 데이터 루트도 이 계약을 사용한다.\n- Apple 자동 부트스트랩은 실제 App Group과 entitlement를 요구한다. 실패 시 앱 전용 저장소에 새 원본을 만들지 않는다.\n- Society 인수는 공유 등록의 관리자를 바꾸고 기존 경로·UUID·모델·관리 이력을 보존한다. 열린 파일을 가진 저장소를 임의로 이동하지 않는다.\n- 동기화 논리 UUID와 기기 내 저장소 식별자를 구분한다. 논리 디스크의 기존 원본·이력은 호스트 변경으로 분리하지 않는다.\n- 기존 사용자 파일, 리디렉션, 손상된 등록과 독립 패키지의 보관·복구 경계를 보존한다.\n- 새 SDK 소스와 같은 이름의 헤더는 `src/` 아래에 함께 두고 공개 인터페이스는 설치 소비자로 검증한다.\n- 소스 변경에는 테스트와 한국어 `docs/` 문서를 갱신하고 `README.md`는 영어로 작성한다. 모든 빌드·검증 산출물은 `build/` 아래에 둔다.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "패키지와 앱 소유 논리 디스크는 같은 섹션·식별·파일 입출력 계약을 제공한다. 확장자만 제거하여 일반 폴더를 신뢰하지 않는다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "공통 접근 계층은 iiSocietyContainer이며 모든 iisacc 제품이 같은 저장소를 탐색한다. 최초 앱 ID는 생성 출처이며 앱별 데이터 분리 기준이 아니다. Windows·Linux의 공유 데이터 루트도 이 계약을 사용한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Apple 자동 부트스트랩은 실제 App Group과 entitlement를 요구한다. 실패 시 앱 전용 저장소에 새 원본을 만들지 않는다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Society 인수는 공유 등록의 관리자를 바꾸고 기존 경로·UUID·모델·관리 이력을 보존한다. 열린 파일을 가진 저장소를 임의로 이동하지 않는다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "동기화 논리 UUID와 기기 내 저장소 식별자를 구분한다. 논리 디스크의 기존 원본·이력은 호스트 변경으로 분리하지 않는다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "기존 사용자 파일, 리디렉션, 손상된 등록과 독립 패키지의 보관·복구 경계를 보존한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "새 SDK 소스와 같은 이름의 헤더는 `src/` 아래에 함께 두고 공개 인터페이스는 설치 소비자로 검증한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "소스 변경에는 테스트와 한국어 `docs/` 문서를 갱신하고 `README.md`는 영어로 작성한다. 모든 빌드·검증 산출물은 `build/` 아래에 둔다.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "html",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "<!-- workspace-docs:agent:start -->\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "heading",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "## 문서 구조와 에이전트 탐색\n",
+      "level": 2,
+      "title": "문서 구조와 에이전트 탐색"
+    },
+    {
+      "id": "b000007",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "list",
+      "start_line": 15,
+      "end_line": 21,
+      "raw": "- 프로젝트 루트의 `README.md`는 사람용 영문 진입 문서이며 `AGENT.md`는 에이전트 진입점이다.\n- 하위 인간용 Markdown과 구조화된 agent JSON을 함께 유지한다. Markdown이 원본이며 JSON은 원문 해시와 줄 범위를 가진 파생 문서이다.\n- 먼저 [docs/agent-index.json](docs/agent-index.json)에서 관련 문서와 JSON 투영을 찾는다. 원문 SHA-256이 다르면 현재 Markdown을 읽고 투영을 갱신한다.\n- JSON의 규칙 후보는 검색용 어휘 일치 결과이다. 과거 기록·예제·실패 상태를 현재 지시나 검증 완료로 자동 해석하지 않는다.\n- 기존 프로젝트별 규칙, 동결된 증거, 라이선스, 외부 원본, 사용자 데이터와 다른 작업의 변경을 보존한다.\n- 이 문서 재편 지침은 과거 작업의 기능 구현·배포를 자동 재개하라는 요청이 아니다. 현재 사용자의 작업 범위를 우선한다.\n- 문서를 수정하면 JSON 쌍·색인을 함께 갱신하고 검증한다. 기존 소스 변경에 대한 빌드·테스트 규칙은 계속 따른다.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "프로젝트 루트의 `README.md`는 사람용 영문 진입 문서이며 `AGENT.md`는 에이전트 진입점이다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "하위 인간용 Markdown과 구조화된 agent JSON을 함께 유지한다. Markdown이 원본이며 JSON은 원문 해시와 줄 범위를 가진 파생 문서이다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "먼저 [docs/agent-index.json](docs/agent-index.json)에서 관련 문서와 JSON 투영을 찾는다. 원문 SHA-256이 다르면 현재 Markdown을 읽고 투영을 갱신한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "JSON의 규칙 후보는 검색용 어휘 일치 결과이다. 과거 기록·예제·실패 상태를 현재 지시나 검증 완료로 자동 해석하지 않는다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "기존 프로젝트별 규칙, 동결된 증거, 라이선스, 외부 원본, 사용자 데이터와 다른 작업의 변경을 보존한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "이 문서 재편 지침은 과거 작업의 기능 구현·배포를 자동 재개하라는 요청이 아니다. 현재 사용자의 작업 범위를 우선한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "문서를 수정하면 JSON 쌍·색인을 함께 갱신하고 검증한다. 기존 소스 변경에 대한 빌드·테스트 규칙은 계속 따른다.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000009",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "Workspace에서 이 프로젝트의 문서를 갱신하는 명령은 다음과 같다.\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "fenced_code",
+      "start_line": 25,
+      "end_line": 27,
+      "raw": "```sh\npython3 ../../Engineering/WorkspaceDocumentation/App/workspace_docs.py --workspace ../.. sync --project SDK/iiSocietyContainer\n```\n",
+      "language": "sh",
+      "code": "python3 ../../Engineering/WorkspaceDocumentation/App/workspace_docs.py --workspace ../.. sync --project SDK/iiSocietyContainer\n",
+      "closed": true
+    },
+    {
+      "id": "b000013",
+      "kind": "html",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "<!-- workspace-docs:agent:end -->\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "iiSocietyContainer 작업 규칙",
+      "anchor": "iisocietycontainer-작업-규칙",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000006",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "문서 구조와 에이전트 탐색",
+      "anchor": "문서-구조와-에이전트-탐색",
+      "start_line": 13
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 3,
+        "text": "- 패키지와 앱 소유 논리 디스크는 같은 섹션·식별·파일 입출력 계약을 제공한다. 확장자만 제거하여 일반 폴더를 신뢰하지 않는다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000003",
+        "line": 6,
+        "text": "- Society 인수는 공유 등록의 관리자를 바꾸고 기존 경로·UUID·모델·관리 이력을 보존한다. 열린 파일을 가진 저장소를 임의로 이동하지 않는다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000003",
+        "line": 7,
+        "text": "- 동기화 논리 UUID와 기기 내 저장소 식별자를 구분한다. 논리 디스크의 기존 원본·이력은 호스트 변경으로 분리하지 않는다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000008",
+        "line": 18,
+        "text": "- JSON의 규칙 후보는 검색용 어휘 일치 결과이다. 과거 기록·예제·실패 상태를 현재 지시나 검증 완료로 자동 해석하지 않는다.",
+        "basis": "lexical_match",
+        "context": "list"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000012",
+        "language": "sh",
+        "code": "python3 ../../Engineering/WorkspaceDocumentation/App/workspace_docs.py --workspace ../.. sync --project SDK/iiSocietyContainer\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000008",
+        "label": "docs/agent-index.json",
+        "target": "docs/agent-index.json",
+        "kind": "relative",
+        "line": 17
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

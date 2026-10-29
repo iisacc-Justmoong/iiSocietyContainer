@@ -1,0 +1,778 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7fe31ec210c21c9d1025ba95ee1b6f54fe4f9693c1de509b1d448a0fb7014f42",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/README.md",
+    "sha256": "c0d091236c8850125798f6fc6eb2c2932b0893f7986d4e2763c4aeba8711ffec",
+    "bytes": 2891,
+    "line_count": 39,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "iiSocietyContainer Documentation",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# iiSocietyContainer Documentation\n",
+      "level": 1,
+      "title": "iiSocietyContainer Documentation"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "html",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "<!-- workspace-docs:document-map:start -->\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "heading",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "## Human and agent document map\n",
+      "level": 2,
+      "title": "Human and agent document map"
+    },
+    {
+      "id": "b000005",
+      "kind": "blank",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "paragraph",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "Markdown is the maintained human source. Agent JSON is a structured, source-traceable projection.\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "table",
+      "start_line": 8,
+      "end_line": 38,
+      "raw": "| Document | Agent JSON |\n| --- | --- |\n| [`AGENT.md`](../AGENT.md) | [JSON](entrypoints/AGENT.agent.json) |\n| [`FileLoading.md`](../FileLoading.md) | [JSON](entrypoints/FileLoading.agent.json) |\n| [`README.md`](../README.md) | [JSON](entrypoints/README.agent.json) |\n| [`docs/APPLE_TEST_LIFETIME.md`](APPLE_TEST_LIFETIME.md) | [JSON](APPLE_TEST_LIFETIME.agent.json) |\n| [`docs/ContainerAliases.md`](ContainerAliases.md) | [JSON](ContainerAliases.agent.json) |\n| [`docs/DirectoryStorage.md`](DirectoryStorage.md) | [JSON](DirectoryStorage.agent.json) |\n| [`docs/DiskImage.md`](DiskImage.md) | [JSON](DiskImage.agent.json) |\n| [`docs/FILE_PROVIDER.md`](FILE_PROVIDER.md) | [JSON](FILE_PROVIDER.agent.json) |\n| [`docs/FileActions.md`](FileActions.md) | [JSON](FileActions.agent.json) |\n| [`docs/FileLoading.md`](FileLoading.md) | [JSON](FileLoading.agent.json) |\n| [`docs/FilePresentation.md`](FilePresentation.md) | [JSON](FilePresentation.agent.json) |\n| [`docs/FileTree.md`](FileTree.md) | [JSON](FileTree.agent.json) |\n| [`docs/Files.md`](Files.md) | [JSON](Files.agent.json) |\n| [`docs/GenerationHistory.md`](GenerationHistory.md) | [JSON](GenerationHistory.agent.json) |\n| [`docs/LogicalStorage.md`](LogicalStorage.md) | [JSON](LogicalStorage.agent.json) |\n| [`docs/ManagedFiles.md`](ManagedFiles.md) | [JSON](ManagedFiles.agent.json) |\n| [`docs/Models.md`](Models.md) | [JSON](Models.agent.json) |\n| [`docs/NativeBuild.md`](NativeBuild.md) | [JSON](NativeBuild.agent.json) |\n| [`docs/Photos.md`](Photos.md) | [JSON](Photos.agent.json) |\n| [`docs/StorageMaintenance.md`](StorageMaintenance.md) | [JSON](StorageMaintenance.agent.json) |\n| [`docs/WindowsBuildAndRun.md`](WindowsBuildAndRun.md) | [JSON](WindowsBuildAndRun.agent.json) |\n| [`docs/WindowsControlDirectories.md`](WindowsControlDirectories.md) | [JSON](WindowsControlDirectories.agent.json) |\n| [`docs/WindowsModelReadBoundary.md`](WindowsModelReadBoundary.md) | [JSON](WindowsModelReadBoundary.agent.json) |\n| [`docs/WindowsValidation.md`](WindowsValidation.md) | [JSON](WindowsValidation.agent.json) |\n| [`docs/documentation-structure.md`](documentation-structure.md) | [JSON](documentation-structure.agent.json) |\n| [`platform/android/README.md`](../platform/android/README.md) | [JSON](mirrors/platform/android/README.agent.json) |\n| [`platform/desktop/README.md`](../platform/desktop/README.md) | [JSON](mirrors/platform/desktop/README.agent.json) |\n| [`platform/ios/README.md`](../platform/ios/README.md) | [JSON](mirrors/platform/ios/README.agent.json) |\n| [`platform/macos/README.md`](../platform/macos/README.md) | [JSON](mirrors/platform/macos/README.agent.json) |\n",
+      "columns": [
+        "Document",
+        "Agent JSON"
+      ],
+      "rows": [
+        [
+          "[`AGENT.md`](../AGENT.md)",
+          "[JSON](entrypoints/AGENT.agent.json)"
+        ],
+        [
+          "[`FileLoading.md`](../FileLoading.md)",
+          "[JSON](entrypoints/FileLoading.agent.json)"
+        ],
+        [
+          "[`README.md`](../README.md)",
+          "[JSON](entrypoints/README.agent.json)"
+        ],
+        [
+          "[`docs/APPLE_TEST_LIFETIME.md`](APPLE_TEST_LIFETIME.md)",
+          "[JSON](APPLE_TEST_LIFETIME.agent.json)"
+        ],
+        [
+          "[`docs/ContainerAliases.md`](ContainerAliases.md)",
+          "[JSON](ContainerAliases.agent.json)"
+        ],
+        [
+          "[`docs/DirectoryStorage.md`](DirectoryStorage.md)",
+          "[JSON](DirectoryStorage.agent.json)"
+        ],
+        [
+          "[`docs/DiskImage.md`](DiskImage.md)",
+          "[JSON](DiskImage.agent.json)"
+        ],
+        [
+          "[`docs/FILE_PROVIDER.md`](FILE_PROVIDER.md)",
+          "[JSON](FILE_PROVIDER.agent.json)"
+        ],
+        [
+          "[`docs/FileActions.md`](FileActions.md)",
+          "[JSON](FileActions.agent.json)"
+        ],
+        [
+          "[`docs/FileLoading.md`](FileLoading.md)",
+          "[JSON](FileLoading.agent.json)"
+        ],
+        [
+          "[`docs/FilePresentation.md`](FilePresentation.md)",
+          "[JSON](FilePresentation.agent.json)"
+        ],
+        [
+          "[`docs/FileTree.md`](FileTree.md)",
+          "[JSON](FileTree.agent.json)"
+        ],
+        [
+          "[`docs/Files.md`](Files.md)",
+          "[JSON](Files.agent.json)"
+        ],
+        [
+          "[`docs/GenerationHistory.md`](GenerationHistory.md)",
+          "[JSON](GenerationHistory.agent.json)"
+        ],
+        [
+          "[`docs/LogicalStorage.md`](LogicalStorage.md)",
+          "[JSON](LogicalStorage.agent.json)"
+        ],
+        [
+          "[`docs/ManagedFiles.md`](ManagedFiles.md)",
+          "[JSON](ManagedFiles.agent.json)"
+        ],
+        [
+          "[`docs/Models.md`](Models.md)",
+          "[JSON](Models.agent.json)"
+        ],
+        [
+          "[`docs/NativeBuild.md`](NativeBuild.md)",
+          "[JSON](NativeBuild.agent.json)"
+        ],
+        [
+          "[`docs/Photos.md`](Photos.md)",
+          "[JSON](Photos.agent.json)"
+        ],
+        [
+          "[`docs/StorageMaintenance.md`](StorageMaintenance.md)",
+          "[JSON](StorageMaintenance.agent.json)"
+        ],
+        [
+          "[`docs/WindowsBuildAndRun.md`](WindowsBuildAndRun.md)",
+          "[JSON](WindowsBuildAndRun.agent.json)"
+        ],
+        [
+          "[`docs/WindowsControlDirectories.md`](WindowsControlDirectories.md)",
+          "[JSON](WindowsControlDirectories.agent.json)"
+        ],
+        [
+          "[`docs/WindowsModelReadBoundary.md`](WindowsModelReadBoundary.md)",
+          "[JSON](WindowsModelReadBoundary.agent.json)"
+        ],
+        [
+          "[`docs/WindowsValidation.md`](WindowsValidation.md)",
+          "[JSON](WindowsValidation.agent.json)"
+        ],
+        [
+          "[`docs/documentation-structure.md`](documentation-structure.md)",
+          "[JSON](documentation-structure.agent.json)"
+        ],
+        [
+          "[`platform/android/README.md`](../platform/android/README.md)",
+          "[JSON](mirrors/platform/android/README.agent.json)"
+        ],
+        [
+          "[`platform/desktop/README.md`](../platform/desktop/README.md)",
+          "[JSON](mirrors/platform/desktop/README.agent.json)"
+        ],
+        [
+          "[`platform/ios/README.md`](../platform/ios/README.md)",
+          "[JSON](mirrors/platform/ios/README.agent.json)"
+        ],
+        [
+          "[`platform/macos/README.md`](../platform/macos/README.md)",
+          "[JSON](mirrors/platform/macos/README.agent.json)"
+        ]
+      ]
+    },
+    {
+      "id": "b000009",
+      "kind": "html",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "<!-- workspace-docs:document-map:end -->\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "iiSocietyContainer Documentation",
+      "anchor": "iisocietycontainer-documentation",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000004",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Human and agent document map",
+      "anchor": "human-and-agent-document-map",
+      "start_line": 4
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000008",
+        "label": "`AGENT.md`",
+        "target": "../AGENT.md",
+        "kind": "relative",
+        "line": 10
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/AGENT.agent.json",
+        "kind": "relative",
+        "line": 10
+      },
+      {
+        "block_id": "b000008",
+        "label": "`FileLoading.md`",
+        "target": "../FileLoading.md",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/FileLoading.agent.json",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000008",
+        "label": "`README.md`",
+        "target": "../README.md",
+        "kind": "relative",
+        "line": 12
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/README.agent.json",
+        "kind": "relative",
+        "line": 12
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/APPLE_TEST_LIFETIME.md`",
+        "target": "APPLE_TEST_LIFETIME.md",
+        "kind": "relative",
+        "line": 13
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "APPLE_TEST_LIFETIME.agent.json",
+        "kind": "relative",
+        "line": 13
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/ContainerAliases.md`",
+        "target": "ContainerAliases.md",
+        "kind": "relative",
+        "line": 14
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "ContainerAliases.agent.json",
+        "kind": "relative",
+        "line": 14
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/DirectoryStorage.md`",
+        "target": "DirectoryStorage.md",
+        "kind": "relative",
+        "line": 15
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "DirectoryStorage.agent.json",
+        "kind": "relative",
+        "line": 15
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/DiskImage.md`",
+        "target": "DiskImage.md",
+        "kind": "relative",
+        "line": 16
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "DiskImage.agent.json",
+        "kind": "relative",
+        "line": 16
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/FILE_PROVIDER.md`",
+        "target": "FILE_PROVIDER.md",
+        "kind": "relative",
+        "line": 17
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "FILE_PROVIDER.agent.json",
+        "kind": "relative",
+        "line": 17
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/FileActions.md`",
+        "target": "FileActions.md",
+        "kind": "relative",
+        "line": 18
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "FileActions.agent.json",
+        "kind": "relative",
+        "line": 18
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/FileLoading.md`",
+        "target": "FileLoading.md",
+        "kind": "relative",
+        "line": 19
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "FileLoading.agent.json",
+        "kind": "relative",
+        "line": 19
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/FilePresentation.md`",
+        "target": "FilePresentation.md",
+        "kind": "relative",
+        "line": 20
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "FilePresentation.agent.json",
+        "kind": "relative",
+        "line": 20
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/FileTree.md`",
+        "target": "FileTree.md",
+        "kind": "relative",
+        "line": 21
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "FileTree.agent.json",
+        "kind": "relative",
+        "line": 21
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/Files.md`",
+        "target": "Files.md",
+        "kind": "relative",
+        "line": 22
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "Files.agent.json",
+        "kind": "relative",
+        "line": 22
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/GenerationHistory.md`",
+        "target": "GenerationHistory.md",
+        "kind": "relative",
+        "line": 23
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "GenerationHistory.agent.json",
+        "kind": "relative",
+        "line": 23
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/LogicalStorage.md`",
+        "target": "LogicalStorage.md",
+        "kind": "relative",
+        "line": 24
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "LogicalStorage.agent.json",
+        "kind": "relative",
+        "line": 24
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/ManagedFiles.md`",
+        "target": "ManagedFiles.md",
+        "kind": "relative",
+        "line": 25
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "ManagedFiles.agent.json",
+        "kind": "relative",
+        "line": 25
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/Models.md`",
+        "target": "Models.md",
+        "kind": "relative",
+        "line": 26
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "Models.agent.json",
+        "kind": "relative",
+        "line": 26
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/NativeBuild.md`",
+        "target": "NativeBuild.md",
+        "kind": "relative",
+        "line": 27
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "NativeBuild.agent.json",
+        "kind": "relative",
+        "line": 27
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/Photos.md`",
+        "target": "Photos.md",
+        "kind": "relative",
+        "line": 28
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "Photos.agent.json",
+        "kind": "relative",
+        "line": 28
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/StorageMaintenance.md`",
+        "target": "StorageMaintenance.md",
+        "kind": "relative",
+        "line": 29
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "StorageMaintenance.agent.json",
+        "kind": "relative",
+        "line": 29
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/WindowsBuildAndRun.md`",
+        "target": "WindowsBuildAndRun.md",
+        "kind": "relative",
+        "line": 30
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "WindowsBuildAndRun.agent.json",
+        "kind": "relative",
+        "line": 30
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/WindowsControlDirectories.md`",
+        "target": "WindowsControlDirectories.md",
+        "kind": "relative",
+        "line": 31
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "WindowsControlDirectories.agent.json",
+        "kind": "relative",
+        "line": 31
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/WindowsModelReadBoundary.md`",
+        "target": "WindowsModelReadBoundary.md",
+        "kind": "relative",
+        "line": 32
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "WindowsModelReadBoundary.agent.json",
+        "kind": "relative",
+        "line": 32
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/WindowsValidation.md`",
+        "target": "WindowsValidation.md",
+        "kind": "relative",
+        "line": 33
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "WindowsValidation.agent.json",
+        "kind": "relative",
+        "line": 33
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/documentation-structure.md`",
+        "target": "documentation-structure.md",
+        "kind": "relative",
+        "line": 34
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "documentation-structure.agent.json",
+        "kind": "relative",
+        "line": 34
+      },
+      {
+        "block_id": "b000008",
+        "label": "`platform/android/README.md`",
+        "target": "../platform/android/README.md",
+        "kind": "relative",
+        "line": 35
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "mirrors/platform/android/README.agent.json",
+        "kind": "relative",
+        "line": 35
+      },
+      {
+        "block_id": "b000008",
+        "label": "`platform/desktop/README.md`",
+        "target": "../platform/desktop/README.md",
+        "kind": "relative",
+        "line": 36
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "mirrors/platform/desktop/README.agent.json",
+        "kind": "relative",
+        "line": 36
+      },
+      {
+        "block_id": "b000008",
+        "label": "`platform/ios/README.md`",
+        "target": "../platform/ios/README.md",
+        "kind": "relative",
+        "line": 37
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "mirrors/platform/ios/README.agent.json",
+        "kind": "relative",
+        "line": 37
+      },
+      {
+        "block_id": "b000008",
+        "label": "`platform/macos/README.md`",
+        "target": "../platform/macos/README.md",
+        "kind": "relative",
+        "line": 38
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "mirrors/platform/macos/README.agent.json",
+        "kind": "relative",
+        "line": 38
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000008",
+        "columns": [
+          "Document",
+          "Agent JSON"
+        ],
+        "rows": [
+          [
+            "[`AGENT.md`](../AGENT.md)",
+            "[JSON](entrypoints/AGENT.agent.json)"
+          ],
+          [
+            "[`FileLoading.md`](../FileLoading.md)",
+            "[JSON](entrypoints/FileLoading.agent.json)"
+          ],
+          [
+            "[`README.md`](../README.md)",
+            "[JSON](entrypoints/README.agent.json)"
+          ],
+          [
+            "[`docs/APPLE_TEST_LIFETIME.md`](APPLE_TEST_LIFETIME.md)",
+            "[JSON](APPLE_TEST_LIFETIME.agent.json)"
+          ],
+          [
+            "[`docs/ContainerAliases.md`](ContainerAliases.md)",
+            "[JSON](ContainerAliases.agent.json)"
+          ],
+          [
+            "[`docs/DirectoryStorage.md`](DirectoryStorage.md)",
+            "[JSON](DirectoryStorage.agent.json)"
+          ],
+          [
+            "[`docs/DiskImage.md`](DiskImage.md)",
+            "[JSON](DiskImage.agent.json)"
+          ],
+          [
+            "[`docs/FILE_PROVIDER.md`](FILE_PROVIDER.md)",
+            "[JSON](FILE_PROVIDER.agent.json)"
+          ],
+          [
+            "[`docs/FileActions.md`](FileActions.md)",
+            "[JSON](FileActions.agent.json)"
+          ],
+          [
+            "[`docs/FileLoading.md`](FileLoading.md)",
+            "[JSON](FileLoading.agent.json)"
+          ],
+          [
+            "[`docs/FilePresentation.md`](FilePresentation.md)",
+            "[JSON](FilePresentation.agent.json)"
+          ],
+          [
+            "[`docs/FileTree.md`](FileTree.md)",
+            "[JSON](FileTree.agent.json)"
+          ],
+          [
+            "[`docs/Files.md`](Files.md)",
+            "[JSON](Files.agent.json)"
+          ],
+          [
+            "[`docs/GenerationHistory.md`](GenerationHistory.md)",
+            "[JSON](GenerationHistory.agent.json)"
+          ],
+          [
+            "[`docs/LogicalStorage.md`](LogicalStorage.md)",
+            "[JSON](LogicalStorage.agent.json)"
+          ],
+          [
+            "[`docs/ManagedFiles.md`](ManagedFiles.md)",
+            "[JSON](ManagedFiles.agent.json)"
+          ],
+          [
+            "[`docs/Models.md`](Models.md)",
+            "[JSON](Models.agent.json)"
+          ],
+          [
+            "[`docs/NativeBuild.md`](NativeBuild.md)",
+            "[JSON](NativeBuild.agent.json)"
+          ],
+          [
+            "[`docs/Photos.md`](Photos.md)",
+            "[JSON](Photos.agent.json)"
+          ],
+          [
+            "[`docs/StorageMaintenance.md`](StorageMaintenance.md)",
+            "[JSON](StorageMaintenance.agent.json)"
+          ],
+          [
+            "[`docs/WindowsBuildAndRun.md`](WindowsBuildAndRun.md)",
+            "[JSON](WindowsBuildAndRun.agent.json)"
+          ],
+          [
+            "[`docs/WindowsControlDirectories.md`](WindowsControlDirectories.md)",
+            "[JSON](WindowsControlDirectories.agent.json)"
+          ],
+          [
+            "[`docs/WindowsModelReadBoundary.md`](WindowsModelReadBoundary.md)",
+            "[JSON](WindowsModelReadBoundary.agent.json)"
+          ],
+          [
+            "[`docs/WindowsValidation.md`](WindowsValidation.md)",
+            "[JSON](WindowsValidation.agent.json)"
+          ],
+          [
+            "[`docs/documentation-structure.md`](documentation-structure.md)",
+            "[JSON](documentation-structure.agent.json)"
+          ],
+          [
+            "[`platform/android/README.md`](../platform/android/README.md)",
+            "[JSON](mirrors/platform/android/README.agent.json)"
+          ],
+          [
+            "[`platform/desktop/README.md`](../platform/desktop/README.md)",
+            "[JSON](mirrors/platform/desktop/README.agent.json)"
+          ],
+          [
+            "[`platform/ios/README.md`](../platform/ios/README.md)",
+            "[JSON](mirrors/platform/ios/README.agent.json)"
+          ],
+          [
+            "[`platform/macos/README.md`](../platform/macos/README.md)",
+            "[JSON](mirrors/platform/macos/README.agent.json)"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

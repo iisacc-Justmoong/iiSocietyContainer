@@ -1,16 +1,32 @@
 # iiSocietyContainer
 
+Project-owned fixed assets belong in `resources/`. User models and files remain in their Society containers.
+
+Storage may be a directory package or an explicitly application-owned logical
+disk. An entitled Apple client can bootstrap persistent storage in the shared
+iisacc App Group before Society is installed. Society later adopts the same
+paths, identity, models, generated files and managed history through the shared
+registration. See [logical storage and ownership](docs/LogicalStorage.md).
+
 Native `FileRepository` and the `SharedStorage` adapter connect actual files to
 iiFileProvider RAW originals, mutable revisions, work sessions, classification
 search and ontology directories. Public files retain their native paths. See
 [managed storage and search](docs/ManagedFiles.md) for intake, cursors and recovery.
 
-[Windows 빌드 및 실행](docs/WindowsBuildAndRun.md)
+[Windows build and execution](docs/WindowsBuildAndRun.md)
 
 Package release: **0.16.2** (2026-10-19). This patch packages the current
 source snapshot; build, test and installation evidence is recorded in the SDK
 patch-release report. Earlier versioned feature notes remain historical.
 
+
+All iisacc products share the `.societycontainer` storage contract through
+iiSocietyContainer on every platform. `ApplicationStorage::openForApplication()`
+reuses the selected drive or bootstraps one suite-wide disk. Windows and Linux
+resolve an app-independent user data root; Apple App Groups and Android's signed
+provider are platform access adapters. Desktop deployments can configure
+`IISACC_SHARED_STORAGE_ROOT`. Read-only discovery never creates a disk. See
+[shared storage and bootstrap](docs/LogicalStorage.md).
 
 Applications can retain a read-only `Container` object and logical file Aliases.
 `iiSocietyHelper` supplies their state, payload availability and previews; the
@@ -214,7 +230,7 @@ if (storage) {
 
 On desktop, `QStandardPaths::GenericConfigLocation/iisacc/Society/storage.json` atomically stores the original path and drive UUID. `open()` priority is explicit path, `SOCIETY_CONTAINER_PATH`, and common settings. Test and isolated execution change the config file to the absolute path `SOCIETY_STORAGE_SETTINGS_PATH`. If the drive UUID of the set path changes, it returns an error without arbitrary switching, asking Society to select again. This is local repository discovery for the same user environment and does not implement account authentication, network synchronization, or remote inference.
 
-The model list enumerates the Diffusers directory including `Models/` `.safetensor` · `.safetensors` files (case-insensitive) and `model_index.json`. Individual weights inside the package are not redundantly listed as separate models. Hidden items, symbolic links, and paths going outside the boundary are excluded. This list is a candidate list of storage formats and does not confirm the type of Diffusion · LLM, the role of checkpoint · LoRA, or executability. Model meaning and whether inference support is available are verified by the engine of the consuming app.
+The model list enumerates `.safetensors`, legacy `.safetensor`, and `.gguf` files in `Models/` (case-insensitive) and Diffusers directories containing `model_index.json`. ONNX files are not model candidates. Individual weights inside a package are not redundantly listed. Hidden items, symbolic links, and paths going outside the boundary are excluded. The list is a candidate inventory, not validation of file contents, architecture or executability. Existing files remain in the container.
 
 A reference is `{containerId, path, format, fingerprint}`. `path` is a path relative to `Models/`, and `fingerprint` is a change-detection value based on each file's relative path, size, modification time, and first 64 KiB. It is neither a hash of all weights nor an immutable snapshot. References to another drive or to deleted, redirected, or modified models are rejected; full weight provenance is recorded by the actual generation engine. `ensureDirectory()` creates only relative paths beneath the specified section and rejects `..`, `.`, empty intermediate components, backslashes, colons, NUL, and redirection. General file-system access also supports hidden files and directories, while model discovery continues to exclude hidden entries. This is not an isolation mechanism that blocks concurrent file-system changes.
 
@@ -366,3 +382,12 @@ The QML-facing Container builds a private Alias index on snapshot publication.
 Repeated key lookup reads accepted metadata directly without rescanning every
 row, touching files or changing revision/notification state. Its exported object
 layout is preserved; see [Container Aliases](docs/ContainerAliases.md).
+
+<!-- workspace-docs:readme:start -->
+## Documentation entry points
+
+- Human overview: this English `README.md`.
+- Agent instructions: [AGENT.md](AGENT.md).
+- Human documentation: [documentation index](docs/README.md).
+- Structured agent documentation: [agent index](docs/agent-index.json).
+<!-- workspace-docs:readme:end -->

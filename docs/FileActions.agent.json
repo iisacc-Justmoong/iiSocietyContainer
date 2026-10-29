@@ -1,0 +1,234 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:9774715ae41d7e0dae278dd89b71cf7c507751ff8b26e33ff73be1585793286e",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/FileActions.md",
+    "sha256": "bade5e62db21ce499656dc083d671cc9943eea1060a65f21e26d3a44f79cbbb2",
+    "bytes": 6294,
+    "line_count": 23,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "파일 작업",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "html",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "<a id=\"file-operations\"></a>\n"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "heading",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "# 파일 작업\n",
+      "level": 1,
+      "title": "파일 작업"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "관리 저장소를 사용하는 현재 버전에서 `Remove`는 `Deleted`의 실제 파일을 제거하고 편집본에 tombstone을 기록한다. 보관된 RAW 원본과 이력은 남으므로 이를 모든 저장 데이터의 영구 소거로 표현하지 않는다. Society의 확인 화면은 이 보관 규칙을 안내한다. 아래의 기존 \"영구 제거\" 설명은 공개 파일 경로의 unlink를 뜻한다. 관리되지 않은 과거 파일은 삭제 순간에 소급하여 원본을 보관하지 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "0.15.0의 `FileOperations::createDirectory(parent, name)`와 `Action::Move`는 디렉터리 생성 및 파일·디렉터리 이동을 추가한다. 기존 이름을 덮어쓰지 않고, 섹션 루트를 보호하며, 이동은 같은 파일 시스템의 대체 없는 rename으로 수행한다. 경로·충돌·준비 상태와 트리 재조회 예시는 [컨테이너 파일 트리](FileTree.md)의 디렉터리 관리 계약을 따른다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "`FileOperations`는 차단형 드라이브 바인딩 파일 시스템 API입니다. 워커 스레드에서 호출하십시오. `FileActions`는 옵션인 `iiSocietyContainer::Gui` 타깃에서 비동기 Qt GUI 어댑터입니다. 소비자는 `Gui` CMake 구성 요소를 요청합니다; Core 전용 소비자는 기존 Core 링크 의존성을 유지합니다. `IISOCIETYCONTAINER_BUILD_GUI=OFF`는 클립보드 및 공유 지원을 생략합니다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "지원되는 작업은 클립보드 파일 - URL 복사, 경로 복사, 붙여넣기, 복제, 이름 바꾸기, `Deleted`로 이동, 그리고 `Deleted`에서 영구 삭제입니다. macOS 공유는 `NSSharingServicePicker`를 사용합니다; SDK에 의해 수신자가 선택되지 않거나 메시지가 전송되지 않습니다. 다른 플랫폼은 네이티브 어댑터가 제공될 때까지 `canShare=false`를 광고합니다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "공개 섹션 루트는 이름을 변경하거나 삭제하거나 교체할 수 없습니다. 목적지는 선택한 드라이브를 교차하거나 심볼릭 링크/교차로를 따를 수 없습니다. 붙여넣기는 명시적으로 선택된 일반 외부 파일을 읽을 수 있습니다. 기존 대상 파일은 절대 덮어쓰지 않으며, 중복/붙여넣기/쓰레기할 때는 사용되지 않은 이름을 선택하십시오. 리네임은 충돌을 보고합니다. 영구 제거는 `Deleted`에 한해 허용됩니다; GUI는 해당 작업에 대한 명시적인 확인을 받습니다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "복사본은 숨겨진 스테이징 경로를 사용하며 완료된 후에만 나타납니다. APFS 클론은 사용 가능한 경우 사용되며, 다른 파일 시스템에서는 일반 복사가 이루어집니다. 소스가 변경되었거나 복사 실패가 발생하면 스테이징된 출력이 폐기됩니다. 복사 출판 및 일반 이름 변경은 복제 작업 잠금을 공유합니다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "삭제는 물질화, 거주성 확인, 해시, 모델/패키지 검사, 및 복제 잠금을 우회합니다. 휴지통은 일반적으로 `Deleted` 로 대체 없는 이름 변경을 사용합니다. macOS 네이티브 디스크에서는 파일과 개인 삭제용이 별도의 볼륨을 사용합니다. 이 경우 소스를 개인 임시 경로로 복사하고, 소스를 확인하며, 파일 볼륨에 임시 원본을 유지한 후 삭제용 복사를 게시한 다음 그 원본을 제거합니다. 실패한 복사는 소스를 보존합니다. 영구 제거는 일반 파일 시스템 언링크/재귀 디렉토리 제거를 사용하며, `Deleted` 내부에서만 수행됩니다. 디렉토리는 임의의 수의 파일을 포함할 수 있으므로 영구 제거는 디렉토리 탐색 및 언링크 작업 비용이며 모델 내용 읽기 비용이 아닙니다. 부분 로컬 패키지는 현재 상태로 이동 및 제거할 수 있습니다. 호스트 삭제 메시지가 있는 원격 전용 항목은 즉시 실패하며, 삭제 동작은 다운로드 대기열에 등록하지 않습니다. 기존 동기화 스캔은 동작 완료와 무관하게 결과 변경 사항을 나중에 게시합니다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "로컬 원본은 매니페스트에 `localIdentifier`와 `replicaReady`가 없는 일반 패키지이며, 호스트 등록 여부와 무관하게 실제 파일을 기준으로 조회한다. 명시적으로 선언된 로컬 호스트는 기존의 검증된 `.society-sync/primary.json` 디스크립터로도 식별한다. 모델과 디렉터리 뷰는 실제 경로의 존재를 즉시 존중하므로, 색인이 아직 일부만 생성되거나 오래되어도 사용자가 넣은 파일을 숨기거나 삭제된 행을 되살리지 않는다. 오래된 묘비도 디렉터리 보기에서 새로 이동하거나 복원한 파일을 숨길 수 없다. `adoptReplicaIdentity()`로 복제 식별 정보를 가진 패키지는 초기 복제 완료 전후 모두 카탈로그 기준을 유지한다. 빈 카탈로그는 이전 로컬 캐시를 모델로 되살리지 않으며, 캐시가 없어도 원격 전용 행을 유지하고 캐시 퇴거를 삭제로 간주하지 않는다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "컨텍스트 메뉴를 열어도 콘텐츠를 요청하지 않습니다. 원본을 사용하는 작업은 `StorageDirectoryModel`를 통해 선택된 파일이나 패키지만 구체화합니다. 현재 원격 전용 항목은 로컬 이름 바꾸기 작업 전에 구현을 완료해야 하며, 이름 바꾸는 부분적으로 다운로드된 디렉터리를 이동하지 않습니다. 오류는 보이며 원본은 그대로 유지됩니다. 호스트 전체 풀은 시작되지 않습니다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "`file_operations` 는 패키지, 충돌, 복구 가능한 휴지통, 영구 제거 경계, 보호된 루트, 및 경로 리디렉션 범위를 다룹니다. 희소 8 GiB 픽스처 픽스처, 오래된 카탈로그, 점유된 복제 잠금, 부분 패키지, 및 중첩된 심링크는 삭제가 콘텐츠에 의존하지 않거나 선택된 트리를 벗어난 링크를 따르지 않음을 확인합니다. `file_actions` 는 비동기 클립보드/붙여넣기/이름 변경/휴지통, 선택된 원격 구체화, 및 다운로드 없는 삭제를 다룹니다. `shared_storage` 는 재인덱싱 전 호스트 목록 업데이트 및 원격 전용 복제 행 보존을 다룹니다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000003",
+      "parent_id": null,
+      "level": 1,
+      "title": "파일 작업",
+      "anchor": "파일-작업",
+      "start_line": 3
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 5,
+        "text": "관리 저장소를 사용하는 현재 버전에서 `Remove`는 `Deleted`의 실제 파일을 제거하고 편집본에 tombstone을 기록한다. 보관된 RAW 원본과 이력은 남으므로 이를 모든 저장 데이터의 영구 소거로 표현하지 않는다. Society의 확인 화면은 이 보관 규칙을 안내한다. 아래의 기존 \"영구 제거\" 설명은 공개 파일 경로의 unlink를 뜻한다. 관리되지 않은 과거 파일은 삭제 순간에 소급하여 원본을 보관하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 19,
+        "text": "로컬 원본은 매니페스트에 `localIdentifier`와 `replicaReady`가 없는 일반 패키지이며, 호스트 등록 여부와 무관하게 실제 파일을 기준으로 조회한다. 명시적으로 선언된 로컬 호스트는 기존의 검증된 `.society-sync/primary.json` 디스크립터로도 식별한다. 모델과 디렉터리 뷰는 실제 경로의 존재를 즉시 존중하므로, 색인이 아직 일부만 생성되거나 오래되어도 사용자가 넣은 파일을 숨기거나 삭제된 행을 되살리지 않는다. 오래된 묘비도 디렉터리 보기에서 새로 이동하거나 복원한 파일을 숨길 수 없다. `adoptReplicaIdentity()`로 복제 식별 정보를 가진 패키지는 초기 복제 완료 전후 모두 카탈로그 기준을 유지한다. 빈 카탈로그는 이전 로컬 캐시를 모델로 되살리지 않으며, 캐시가 없어도 원격 전용 행을 유지하고 캐시 퇴거를 삭제로 간주하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000007",
+        "label": "컨테이너 파일 트리",
+        "target": "FileTree.md",
+        "kind": "relative",
+        "line": 7
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -1,6 +1,7 @@
 #include <iiFileProviderDevice.h>
 #include <SocietyDrive.h>
 #include <ModelStore.h>
+#include <ApplicationStorage.h>
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonArray>
@@ -15,6 +16,18 @@ int main(int argc, char** argv)
     const auto args = app.arguments();
     iiFileProvider::FileDevice output;
     output.open(stdout, QIODevice::WriteOnly);
+    if ((args.size() == 4 && (args[1] == "application" || args[1] == "logical")) || (args.size() == 3 && args[1] == "adopt-application")) {
+        QString error; std::optional<SocietyDrive> drive;
+        if (args[1] == "logical") drive = SocietyDrive::createLogical(args[2], args[3], &error);
+        else {
+            const auto storage = args[1] == "application" ? ApplicationStorage::openInGroup(args[2], args[3], &error)
+                : ApplicationStorage::adoptInGroup(args[2], &error);
+            if (storage) drive = storage->drive();
+        }
+        if (!drive) { output.write(QJsonDocument(QJsonObject{{"error", error}}).toJson()); return 1; }
+        output.write(QJsonDocument(QJsonObject{{"identifier", drive->identifier()}, {"storageId", drive->storageIdentifier()},
+            {"rootPath", drive->rootPath()}, {"ownerApplication", drive->ownerApplication()}}).toJson()); return 0;
+    }
     if (args.size() == 2 && args[1] == QStringLiteral("catalog")) {
         QJsonArray sections;
         for (const auto section : allStoreSections()) {
@@ -46,7 +59,7 @@ int main(int argc, char** argv)
         output.write(QJsonDocument(QJsonObject{{"models", models}, {"error", error}}).toJson()); return error.isEmpty() ? 0 : 1;
     }
     if (args.size() != 3 || (args[1] != "create" && args[1] != "open")) {
-        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <existing-absolute-parent-or-package> | open <existing-package> | models <directory> | organize-models <directory>\n");
+        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <existing-absolute-parent-or-package> | open <existing-storage> | logical <path> <application> | application <shared-group> <application> | adopt-application <shared-group> | models <directory> | organize-models <directory>\n");
         return 2;
     }
     QString error;

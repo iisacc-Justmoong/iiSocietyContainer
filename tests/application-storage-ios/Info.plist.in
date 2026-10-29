@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleIdentifier</key><string>@probe_identifier@</string>
+    <key>CFBundleExecutable</key><string>@probe_name@</string>
+    <key>CFBundleName</key><string>@probe_name@</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>MinimumOSVersion</key><string>17.0</string>
+    <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+    <key>LSApplicationQueriesSchemes</key><array><string>society</string></array>
+    <key>SocietyAppGroup</key><string>group.com.iisacc.society</string>
+    <key>UILaunchScreen</key><dict/>
+    <key>UIApplicationSceneManifest</key><dict>
+        <key>UIApplicationSupportsMultipleScenes</key><false/>
+        <key>UISceneConfigurations</key><dict>
+            <key>UIWindowSceneSessionRoleApplication</key><array><dict>
+                <key>UISceneConfigurationName</key><string>StorageProbe</string>
+                <key>UISceneDelegateClassName</key><string>StorageProbeSceneDelegate</string>
+            </dict></array>
+        </dict>
+    </dict>
+</dict></plist>

@@ -2,6 +2,7 @@
 #include <iiFileProviderPresentation.h>
 #include <iiFileProviderNative.h>
 #include "StorageMaintenance.h"
+#include "src/Storage/LogicalDiskFormat.h"
 #include <TemporaryLease.h>
 #include <algorithm>
 #include <array>
@@ -191,7 +192,7 @@ bool validRoot(const fs::path& root, std::string_view expected, const std::optio
     const auto current = identity(root);
     auto extension = root.extension().string();
     std::ranges::transform(extension, extension.begin(), [](unsigned char value) { return std::tolower(value); });
-    if (extension != ".societycontainer" || !uuid(expected) || !current
+    if ((extension != ".societycontainer" && !detail::logicalOwner(root)) || !uuid(expected) || !current
         || (original && current != original) || legacy(root)) return false;
     for (auto parent = root.parent_path(); !parent.empty();) {
         if (legacy(parent)) return false;

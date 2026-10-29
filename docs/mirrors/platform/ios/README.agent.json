@@ -1,0 +1,828 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:b92e84efa19ecd74521c3428a15d5bcfe31db8a15a2ed2eb051958b86c420171",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "platform/ios/README.md",
+    "sha256": "64d7c609f8d0366af0ef63cac696f2602a3638fce12679473ab675d2fd9f1e2f",
+    "bytes": 12824,
+    "line_count": 99,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "iOS / iPadOS Society",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# iOS / iPadOS Society\n",
+      "level": 1,
+      "title": "iOS / iPadOS Society"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "At iOS   16  and above, Apple's [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)is used. It includes `SocietyFileProvider.appex` in the Society app and provides `Society` location in the file app and other apps' document pickers. It shares macOS and `platform/apple/FilesDriveStore.swift` , `LocalDriveStore.swift` , `FileProviderExtension.swift` . No separate drivers or paid services are added. Foundation, FileProvider , CryptoKit , and UIKit are frameworks of the Apple SDK and follow the usage conditions of that SDK.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "html",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "<a id=\"저장-위치와-노출-범위\"></a>\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "heading",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "## Storage location and exposure scope\n",
+      "level": 2,
+      "title": "Storage location and exposure scope"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "The app and extension use the same App Group. The default identifier is `group.com.iisacc.society`. Its source is one `Society.societycontainer` package directly inside the OS-provided group. First preparation creates no outside `Library/Application Support` scaffolding. C++ `SocietyDrive::create(path)` initializes the UUID manifest and nine sections, and subsequent execution reuses the same UUID. If the previous managed `Library/Application Support/Society` directory exists, preparation validates its schema-1 manifest and section directories, rejects image markers or redirects, and moves it into the package without copying or rewriting the manifest. Unrelated directories are not managed.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "table",
+      "start_line": 11,
+      "end_line": 16,
+      "raw": "|Access path|Actual content|\n| --- | --- |\n|File app → Society → `/`|Children of `Society.societycontainer/Files/`|\n|File app → Society → `/Example.txt`|`Society.societycontainer/Files/Example.txt`|\n|Society app → container home|Nine source sections|\n|Society app → Models|`Society.societycontainer/Models/`|\n",
+      "columns": [
+        "Access path",
+        "Actual content"
+      ],
+      "rows": [
+        [
+          "File app → Society → `/`",
+          "Children of `Society.societycontainer/Files/`"
+        ],
+        [
+          "File app → Society → `/Example.txt`",
+          "`Society.societycontainer/Files/Example.txt`"
+        ],
+        [
+          "Society app → container home",
+          "Nine source sections"
+        ],
+        [
+          "Society app → Models",
+          "`Society.societycontainer/Models/`"
+        ]
+      ]
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "Do not add an intermediate folder named  `Files` to the file app root. Asset Library, Deleted, Forked, Generation History, Models, Published, Thinking Space are excluded from the file app's enumeration, item lookup, download, creation, modification, move, and deletion paths. Originals and indexes are also not published. If a regular folder with the same name is created on the public drive, it is created inside Files as  `Files/Models` . No additional specifications are provided by area.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "Originals are separated from the app's Documents and File Provider replica storage locations. The app's  `UIFileSharingEnabled` is false. Other regular apps cannot read the Original App Group and access documents via the picker in Files items published by Society. Apps and extensions with App Group entitlement can access  Society  Original areas and  8  Original areas.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "The iOS system Files connection requires the shared package path. Arbitrary external-folder bookmarks are not passed to the extension. OS-managed File Provider replicas and temporary materialization remain under iOS control; source files, the provider index, and Society-managed application state belong to the package. macOS retains package selection and security-scoped connection.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "html",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "<a id=\"연결과-변경-반영\"></a>\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "heading",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "## Connection and Change Reflection\n",
+      "level": 2,
+      "title": "Connection and Change Reflection"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "Society's  iOS  start flow is the order of shared path preparation →  C++  drive open →  UUID  based domain registration. At  iOS ,  `QProcess` ,  `pluginkit` ,  macOS  security scope bookmarks,  `domain.userInfo` , and FSEvents are not used.  `IosDriveBridge.swift`  calls the  FileProvider  API from the app process and passes the result to the  Qt  controller. If the App Group is not obtained, an error is displayed and no bypass to another storage location is performed.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "Registered locations are selected from the file app's Locations. If the OS requires initial activation, Society is activated from Locations. The app's  `Open in Files`  opens standard  [UIDocumentPickerViewController](https://developer.apple.com/documentation/uikit/uidocumentpickerviewcontroller)starting with a public root URL. Private URLs or undocumented Files app  URL  schemes are not used. If the location is still inactive, a document picker that allows location selection is opened.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "When inspecting the contents of a public URL, start and end security-scoped access according to the [getUserVisibleURL access contract](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/getuservisibleurl(for:completionhandler:)). The document picker's presentation target is found in the active scene or the existing UIApplication windows of Qt 6.8. If no key window is specified, a visible normal window is used.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "Extensions run when the system needs them even after the app exits. Work performed in the file app is reflected in the original through the common Files repository. iOS receives the coordinated change of the Files original as `NSFilePresenter` and updates the working set when the extension itself writes and when Society returns to the foreground and refreshes. App features that write directly to the original use file coordination and must request an update as `refreshSystem()` after completion. The current Society navigation screen provides reading and navigation of the original.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "Connection success is displayed when, in addition to domain registration and public URL return, enumeration of the root folder through the system File Provider also succeeds. If a registered location exists but querying the extension's original fails, the connection error is maintained.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "Original enumeration calculates relative paths as normalized path components for each URL. iOS 's App Group root is `/var/...` , and cases where enumerated items are returned as `/private/var/...` are also treated as the same original. Cutting the path based on string length prevents the problem where the parent of a nested folder is miscalculated and the entire Files becomes `Content Unavailable` . After normalization, items outside the original and enumerated symbolic links continue to be rejected.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "Repository index transactions are serialized as `NSFileCoordinator` and the latest ID and change history on the disk are re-read from each transaction. Even if the app and extension maintain separate repository instances, they do not issue different IDs or overwrite the change history. The exposure boundary for system root and item operations is verified with the same code as macOS . Synchronization between remote devices is a separate feature from this File Provider connection.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "html",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "<a id=\"빌드-구성\"></a>\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "heading",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "## Build configuration\n",
+      "level": 2,
+      "title": "Build configuration"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "paragraph",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "Full Xcode 16 and above, iPhoneOS / iPhoneSimulator SDK, Qt 6.8.3 iOS, and LVRS · iiSocietyContainer · iiSocietyHelper built for the target SDK are required. The iOS app of Society connects to this storage and Helper SDK currently being called. You cannot build the iOS app with Command Line Tools alone. Even if the CPU is the same arm64, macOS, iOS device, and iOS simulator library do not substitute for each other.\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "When building the SDK for iOS , the C++  library becomes a static library. Since the target executable is not run on the host, CLI and macOS  helpers are not created. Apple common sources and iOS  CMake  functions are included in the SDK  installation. Examples are run from the SDK  root.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "fenced_code",
+      "start_line": 50,
+      "end_line": 60,
+      "raw": "```sh\ncmake -S . -B build/ios-device -G Xcode \\\n  -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \\\n  -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 -DCMAKE_OSX_ARCHITECTURES=arm64 \\\n  -DCMAKE_TOOLCHAIN_FILE=/Volumes/Storage/Qt/6.8.3/ios/lib/cmake/Qt6/qt.toolchain.cmake \\\n  -DQT_HOST_PATH=/Volumes/Storage/Qt/6.8.3/macos \\\n  -DBUILD_TESTING=OFF \\\n  -DCMAKE_INSTALL_PREFIX=/Volumes/Storage/Workspace/build/ios-device/install\ncmake --build build/ios-device --config Debug\ncmake --install build/ios-device --config Debug\n```\n",
+      "language": "sh",
+      "code": "cmake -S . -B build/ios-device -G Xcode \\\n  -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \\\n  -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 -DCMAKE_OSX_ARCHITECTURES=arm64 \\\n  -DCMAKE_TOOLCHAIN_FILE=/Volumes/Storage/Qt/6.8.3/ios/lib/cmake/Qt6/qt.toolchain.cmake \\\n  -DQT_HOST_PATH=/Volumes/Storage/Qt/6.8.3/macos \\\n  -DBUILD_TESTING=OFF \\\n  -DCMAKE_INSTALL_PREFIX=/Volumes/Storage/Workspace/build/ios-device/install\ncmake --build build/ios-device --config Debug\ncmake --install build/ios-device --config Debug\n",
+      "closed": true
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 61,
+      "end_line": 61,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "The simulator uses `iphonesimulator` , `build/ios-simulator` , and `/Volumes/Storage/Workspace/build/ios-simulator/install` . The rest of the required SDKs and LVRS are prepared in the same target's installation prefix. Society's `ios-device` , `ios-simulator`  presets explicitly request only the packages in that prefix. Missing packages are not replaced with the desktop library.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "Society Run the following from the root. `SOCIETY_IOS_TEAM` specifies the developer team. App ID `com.iisacc.society` and extension ID `com.iisacc.society.fileprovider` both require provisioning to use the same App Group.\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 65,
+      "end_line": 65,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "fenced_code",
+      "start_line": 66,
+      "end_line": 69,
+      "raw": "```sh\ncmake --preset ios-device -DSOCIETY_IOS_TEAM=<development-team-id>\ncmake --build --preset ios-device\n```\n",
+      "language": "sh",
+      "code": "cmake --preset ios-device -DSOCIETY_IOS_TEAM=<development-team-id>\ncmake --build --preset ios-device\n",
+      "closed": true
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 70,
+      "end_line": 70,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 71,
+      "end_line": 71,
+      "raw": "`iiSocietyContainer_add_ios_file_provider()` configures the extension target, app and extension's Info.plist and entitlement, shared container catalog, Swift bridge, Xcode's Embed App Extensions step, and copy-time signing. The app Info.plist declares two safetensors extensions as brought-in UTIs belonging to `public.data`, so Society's document picker can distinguish the models. Do not declare full Documents sharing or automatic model execution from other apps. The app's main function holds Qt /LVRS. The minimum deployment target is iOS 16, and the iOS 18 added `supportsSyncingTrash` setting is used only after version verification. The item does not advertise the trash function in previous versions and does not link the Deleted area to OS trash.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 72,
+      "end_line": 72,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "html",
+      "start_line": 73,
+      "end_line": 73,
+      "raw": "<a id=\"검증-범위\"></a>\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 74,
+      "end_line": 74,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "heading",
+      "start_line": 75,
+      "end_line": 75,
+      "raw": "## Verification Scope\n",
+      "level": 2,
+      "title": "Verification Scope"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 77,
+      "end_line": 77,
+      "raw": "The host CTest's `shared_location` verifies shared storage location, refusal of bypass via link, ID after restart, separate index instances for app and extension, and file boundaries. `ios_package_contract` configures the actual plist template with CMake to verify app ID extension ID App Group public document settings and C++ catalog matching, and parses iOS conditional Swift syntax. If the entire Xcode is present, the native build verification below is also performed. Distinguish host verification and native build from device execution evidence.\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 78,
+      "end_line": 78,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "paragraph",
+      "start_line": 79,
+      "end_line": 79,
+      "raw": "On actual device/simulator, check signed Society app installation, 8 area exploration, file app location activation, direct enumeration of the public root, create/edit/rename/move/delete, persistence after app restart, and non-public area non-exposure. iOS device ABI build, simulator execution, and actual device file app verification results are recorded separately.\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "html",
+      "start_line": 81,
+      "end_line": 81,
+      "raw": "<a id=\"네이티브-빌드-검증\"></a>\n"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 82,
+      "end_line": 82,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "heading",
+      "start_line": 83,
+      "end_line": 83,
+      "raw": "## Native Build Verification\n",
+      "level": 2,
+      "title": "Native Build Verification"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "paragraph",
+      "start_line": 85,
+      "end_line": 85,
+      "raw": "Swift bridge and File Provider extension do not inherit from Qt's AUTOMOC AUTOUIC AUTORCC. `-parse-as-library` and `-application-extension` apply only to Swift compilation. Passing Swift option to Qt's auto-generated C++ file prevents the issue where actual iOS build fails. `ios_package_contract` builds and links actual bridge and extension with C++ object together if the entire Xcode and iPhoneOS SDK are present, without signing. If the SDK is absent, skip this part and continue running existing plist entitlement catalog Swift syntax verification. Device execution is separate.\n"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 86,
+      "end_line": 86,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "paragraph",
+      "start_line": 87,
+      "end_line": 87,
+      "raw": "Do not use `versionNoLongerAvailable` errors not provided by iOS. If the repository refuses work on an old version, return a Cocoa file conflict error guiding refresh to iOS and do not overwrite the changed original. Maintain macOS existing error mapping.\n"
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 88,
+      "end_line": 88,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "html",
+      "start_line": 89,
+      "end_line": 89,
+      "raw": "<a id=\"독립적인-live-activity\"></a>\n"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 90,
+      "end_line": 90,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "heading",
+      "start_line": 91,
+      "end_line": 91,
+      "raw": "## Independent Live Activity\n",
+      "level": 2,
+      "title": "Independent Live Activity"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 92,
+      "end_line": 92,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "paragraph",
+      "start_line": 93,
+      "end_line": 93,
+      "raw": "`iiSocietyContainer_add_ios_live_activity(App TEAM ... BRIDGE_TARGET ...)` includes ActivityKit C Bridge and WidgetKit extension in the app. Activate Swift and configure the app Info.plist, then call `BRIDGE_TARGET`, which is the C++ target that calls the bridge, with the default being the app. iOS supports 16.2 and above, maintaining the minimum version of the existing app.\n"
+    },
+    {
+      "id": "b000076",
+      "kind": "blank",
+      "start_line": 94,
+      "end_line": 94,
+      "raw": "\n"
+    },
+    {
+      "id": "b000077",
+      "kind": "paragraph",
+      "start_line": 95,
+      "end_line": 95,
+      "raw": "Display lifetime is independent of `BGContinuedProcessingTask` execution permission. `begin` restores existing cards by job ID, while `update` delivers only actual progress. Only `finish(completed)` and explicit `finish(cancelled)` terminate the Activity. `paused` / `failed` preserves the last progress state. Even if the app is force-terminated, the system retains the cards. The maximum display duration is 90 seconds, and if the system reflects a stale state, it displays a status check prompt. There may be a delay when the system screen refreshes. This display does not guarantee execution of suspended local operations or server progress. The maximum display lifetime set by the OS applies.\n"
+    },
+    {
+      "id": "b000078",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000079",
+      "kind": "paragraph",
+      "start_line": 97,
+      "end_line": 97,
+      "raw": "Cards deleted by the user are not recreated by timers or app relaunch. Only new explicit job requests can be restarted via `allow_restart`. Completed cards display the last result according to the system default policy. During execution, iOS's continued-processing system display may appear separately. To prevent background permission expiration, fake progress is not sent. `live-activity-state.json` records only the last issued status and Activity ID.\n"
+    },
+    {
+      "id": "b000080",
+      "kind": "blank",
+      "start_line": 98,
+      "end_line": 98,
+      "raw": "\n"
+    },
+    {
+      "id": "b000081",
+      "kind": "paragraph",
+      "start_line": 99,
+      "end_line": 99,
+      "raw": "`ios_package_contract` validates pause, fail, complete, cancel, and state restoration, then builds iOS SDK with Swift bridge and WidgetKit extension. Device display lifetime must be validated via separate app termination/relaunch tests.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "iOS / iPadOS Society",
+      "anchor": "ios--ipados-society",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000007",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Storage location and exposure scope",
+      "anchor": "storage-location-and-exposure-scope",
+      "start_line": 7
+    },
+    {
+      "block_id": "b000021",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Connection and Change Reflection",
+      "anchor": "connection-and-change-reflection",
+      "start_line": 26
+    },
+    {
+      "block_id": "b000039",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Build configuration",
+      "anchor": "build-configuration",
+      "start_line": 44
+    },
+    {
+      "block_id": "b000057",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Verification Scope",
+      "anchor": "verification-scope",
+      "start_line": 75
+    },
+    {
+      "block_id": "b000065",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Native Build Verification",
+      "anchor": "native-build-verification",
+      "start_line": 83
+    },
+    {
+      "block_id": "b000073",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Independent Live Activity",
+      "anchor": "independent-live-activity",
+      "start_line": 91
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000013",
+        "line": 18,
+        "text": "Do not add an intermediate folder named  `Files` to the file app root. Asset Library, Deleted, Forked, Generation History, Models, Published, Thinking Space are excluded from the file app's enumeration, item lookup, download, creation, modification, move, and deletion paths. Originals and indexes are also not published. If a regular folder with the same name is created on the public drive, it is created inside Files as  `Files/Models` . No additional specifications are provided by area.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 34,
+        "text": "Extensions run when the system needs them even after the app exits. Work performed in the file app is reflected in the original through the common Files repository. iOS receives the coordinated change of the Files original as `NSFilePresenter` and updates the working set when the extension itself writes and when Society returns to the foreground and refreshes. App features that write directly to the original use file coordination and must request an update as `refreshSystem()` after completion. The current Society navigation screen provides reading and navigation of the original.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 40,
+        "text": "Repository index transactions are serialized as `NSFileCoordinator` and the latest ID and change history on the disk are re-read from each transaction. Even if the app and extension maintain separate repository instances, they do not issue different IDs or overwrite the change history. The exposure boundary for system root and item operations is verified with the same code as macOS . Synchronization between remote devices is a separate feature from this File Provider connection.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000041",
+        "line": 46,
+        "text": "Full Xcode 16 and above, iPhoneOS / iPhoneSimulator SDK, Qt 6.8.3 iOS, and LVRS · iiSocietyContainer · iiSocietyHelper built for the target SDK are required. The iOS app of Society connects to this storage and Helper SDK currently being called. You cannot build the iOS app with Command Line Tools alone. Even if the CPU is the same arm64, macOS, iOS device, and iOS simulator library do not substitute for each other.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000047",
+        "line": 62,
+        "text": "The simulator uses `iphonesimulator` , `build/ios-simulator` , and `/Volumes/Storage/Workspace/build/ios-simulator/install` . The rest of the required SDKs and LVRS are prepared in the same target's installation prefix. Society's `ios-device` , `ios-simulator`  presets explicitly request only the packages in that prefix. Missing packages are not replaced with the desktop library.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000053",
+        "line": 71,
+        "text": "`iiSocietyContainer_add_ios_file_provider()` configures the extension target, app and extension's Info.plist and entitlement, shared container catalog, Swift bridge, Xcode's Embed App Extensions step, and copy-time signing. The app Info.plist declares two safetensors extensions as brought-in UTIs belonging to `public.data`, so Society's document picker can distinguish the models. Do not declare full Documents sharing or automatic model execution from other apps. The app's main function holds Qt /LVRS. The minimum deployment target is iOS 16, and the iOS 18 added `supportsSyncingTrash` setting is used only after version verification. The item does not advertise the trash function in previous versions and does not link the Deleted area to OS trash.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000067",
+        "line": 85,
+        "text": "Swift bridge and File Provider extension do not inherit from Qt's AUTOMOC AUTOUIC AUTORCC. `-parse-as-library` and `-application-extension` apply only to Swift compilation. Passing Swift option to Qt's auto-generated C++ file prevents the issue where actual iOS build fails. `ios_package_contract` builds and links actual bridge and extension with C++ object together if the entire Xcode and iPhoneOS SDK are present, without signing. If the SDK is absent, skip this part and continue running existing plist entitlement catalog Swift syntax verification. Device execution is separate.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000069",
+        "line": 87,
+        "text": "Do not use `versionNoLongerAvailable` errors not provided by iOS. If the repository refuses work on an old version, return a Cocoa file conflict error guiding refresh to iOS and do not overwrite the changed original. Maintain macOS existing error mapping.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000081",
+        "line": 99,
+        "text": "`ios_package_contract` validates pause, fail, complete, cancel, and state restoration, then builds iOS SDK with Swift bridge and WidgetKit extension. Device display lifetime must be validated via separate app termination/relaunch tests.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000045",
+        "language": "sh",
+        "code": "cmake -S . -B build/ios-device -G Xcode \\\n  -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \\\n  -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 -DCMAKE_OSX_ARCHITECTURES=arm64 \\\n  -DCMAKE_TOOLCHAIN_FILE=/Volumes/Storage/Qt/6.8.3/ios/lib/cmake/Qt6/qt.toolchain.cmake \\\n  -DQT_HOST_PATH=/Volumes/Storage/Qt/6.8.3/macos \\\n  -DBUILD_TESTING=OFF \\\n  -DCMAKE_INSTALL_PREFIX=/Volumes/Storage/Workspace/build/ios-device/install\ncmake --build build/ios-device --config Debug\ncmake --install build/ios-device --config Debug\n"
+      },
+      {
+        "block_id": "b000051",
+        "language": "sh",
+        "code": "cmake --preset ios-device -DSOCIETY_IOS_TEAM=<development-team-id>\ncmake --build --preset ios-device\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "replicated File Provider",
+        "target": "https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension",
+        "kind": "external",
+        "line": 3
+      },
+      {
+        "block_id": "b000025",
+        "label": "UIDocumentPickerViewController",
+        "target": "https://developer.apple.com/documentation/uikit/uidocumentpickerviewcontroller",
+        "kind": "external",
+        "line": 30
+      },
+      {
+        "block_id": "b000027",
+        "label": "getUserVisibleURL access contract",
+        "target": "https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/getuservisibleurl(for:completionhandler:)",
+        "kind": "external",
+        "line": 32
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000011",
+        "columns": [
+          "Access path",
+          "Actual content"
+        ],
+        "rows": [
+          [
+            "File app → Society → `/`",
+            "Children of `Society.societycontainer/Files/`"
+          ],
+          [
+            "File app → Society → `/Example.txt`",
+            "`Society.societycontainer/Files/Example.txt`"
+          ],
+          [
+            "Society app → container home",
+            "Nine source sections"
+          ],
+          [
+            "Society app → Models",
+            "`Society.societycontainer/Models/`"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

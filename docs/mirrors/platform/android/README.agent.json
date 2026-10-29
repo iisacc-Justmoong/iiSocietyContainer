@@ -1,0 +1,371 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:047ad3ff42afdf134fd7dc52a2e6a1839160c9752cd7aa37bc9deb6b8b7b5be6",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "platform/android/README.md",
+    "sha256": "b050aa3b6fb44e9e2a9c53d2725b051beaa2344f2f4cdf2474bf11b552144c2f",
+    "bytes": 5368,
+    "line_count": 38,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Android Society file system",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "html",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "<a id=\"android-society-파일-시스템\"></a>\n"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "heading",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "# Android Society file system\n",
+      "level": 1,
+      "title": "Android Society file system"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "On Android 9 (API 28) and later, the Society app retains the same UUID manifest and nine sections in its app-private `files/Society.societycontainer`. Provider SQLite state and its sidecars live in `.society-runtime/android-provider/` inside that package. A previous valid managed `files/Society` directory is moved into the package without copying user files or changing its manifest; the previous provider database is moved into the package with its sidecars and rolls back on migration failure. Legacy disk-image markers are rejected. The system Files app and file-open/save pickers provide a single `Society` location whose root is **the contents of Files**. The other eight sections are not registered with the document provider. Even after the app exits, Android starts the provider process when needed. Neither an always-running user daemon nor unrestricted external-storage permission is required.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "html",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "<a id=\"society-앱-패키지\"></a>\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "heading",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "## Society app package\n",
+      "level": 2,
+      "title": "Society app package"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "Call Qt Android target with `iiSocietyContainer_add_android_file_provider(Society)`. This function places the Manifest, Java provider, and common `Sections.json` in the build directory. The package ID and public authority of the Society app are `com.iisacc.society` and `com.iisacc.society.documents` respectively. Do not call this function for other apps.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "The public provider uses [Android DocumentsProvider](https://developer.android.com/guide/topics/providers/create-document-provider). It accesses with `MANAGE_DOCUMENTS` and user-granted URI permissions, implementing root lookup, enumeration, read-write, create, rename, move, delete, parent-child relationships, and document paths. Opaque document IDs in SQLite are maintained even after process restart and name change/move via the provider. Original changes are reflected upon lookup and notified via FileObserver. The original path cannot be directly entered via document ID or moved up. Symbolic links, special files, and container replacement are rejected.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "`androidDriveRequest(default|register|refresh|path)` connects to the DriveController of Society and the provider. Before reporting success, `register`, `refresh`, and `path` query the installed provider and require its root UUID and public document ID to match. Replies identify `connectionKind: documentsProvider` and `isMounted: false`: Android provides a Files location rather than a kernel drive letter. `default` prepares the source and does not claim it is connected. `path` opens the Society location of the system files app. `.safetensor` / `.safetensors` model selection is classified by the display name of ContentResolver and copies to Models through the content URI file engine of Android Qt.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "html",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "<a id=\"다른-iisacc-앱의-공통-저장소\"></a>\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "heading",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "## Common storage of other iisacc apps\n",
+      "level": 2,
+      "title": "Common storage of other iisacc apps"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "The consumer app calls `iiSocietyContainer_configure_android_client(target)` and signs with the **Society app signature certificate**. This function maintains the consumer app's Manifest/package ID, adds internal provider lookup declarations, signature permission requests, and only `SocietyClient.java`. It does not create a separate Society drive.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "`com.iisacc.society.internal` is an internal ContentProvider that is not exposed in the public file picker. In addition to signature permissions, it verifies the calling UID's actual signature. Through this route, `fileSystem` in iiSocietyHelper 0.5 opens the same UUID and nine sections. `path()`/`url()` returns **content URI**in other Android apps; files are read and written with `QFile`, and folders are enumerated with `entries()`. Directories are prepared with `ensureDirectory()`. Desktop and Society owner apps retain the original absolute paths. Another app's private absolute path must not be passed to `QDir`, an external process, or a native inference engine. Such consumers must copy the URI contents into their own cache before passing them to the engine.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "Due to Android signature identity and app sandbox rules, iOS App Group is not emulated with only path strings. The native path API of `SharedStorage` is for Android Society owned apps, while other Android apps use the Helper file system API or internal URIs. This change is a file system sharing feature and is not a function to remove the execution time limit of Android background app observation.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "html",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "<a id=\"빌드와-검사\"></a>\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "heading",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "## Build and Inspection\n",
+      "level": 2,
+      "title": "Build and Inspection"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "Society's `tools/build_android.py` builds Qt 6.8.3, NDK r27c/r26b, and LVRS of the same ABI to build Container → Helper → app below `build/android/`. The device inspection tool using Android platform 36/build-tools 36.0.0 is as follows.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "fenced_code",
+      "start_line": 33,
+      "end_line": 36,
+      "raw": "```sh\npython3 tests/android/run_device.py --apk <Society APK> --sdk <Android SDK> \\\n  --java <JDK 21> --build <build/device-tests> --serial <disposable-emulator>\n```\n",
+      "language": "sh",
+      "code": "python3 tests/android/run_device.py --apk <Society APK> --sdk <Android SDK> \\\n  --java <JDK 21> --build <build/device-tests> --serial <disposable-emulator>\n",
+      "closed": true
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "Call the provider of the actual APK with ContentResolver to check CRUD ·boundary·cancel·restart. Sign the APK with a test key and do not remove or overwrite existing other signed apps. The `tests/android/` in the Helper storage is a consumer app that reads and writes to nine areas from a separate app UID. After matching with Society and signing with the test key, run it to record `SOCIETY_ANDROID_PEER` results in logcat. Cross-build, emulator, and physical device verification are separate validation steps.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000003",
+      "parent_id": null,
+      "level": 1,
+      "title": "Android Society file system",
+      "anchor": "android-society-file-system",
+      "start_line": 3
+    },
+    {
+      "block_id": "b000009",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Society app package",
+      "anchor": "society-app-package",
+      "start_line": 9
+    },
+    {
+      "block_id": "b000019",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Common storage of other iisacc apps",
+      "anchor": "common-storage-of-other-iisacc-apps",
+      "start_line": 19
+    },
+    {
+      "block_id": "b000029",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Build and Inspection",
+      "anchor": "build-and-inspection",
+      "start_line": 29
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 5,
+        "text": "On Android 9 (API 28) and later, the Society app retains the same UUID manifest and nine sections in its app-private `files/Society.societycontainer`. Provider SQLite state and its sidecars live in `.society-runtime/android-provider/` inside that package. A previous valid managed `files/Society` directory is moved into the package without copying user files or changing its manifest; the previous provider database is moved into the package with its sidecars and rolls back on migration failure. Legacy disk-image markers are rejected. The system Files app and file-open/save pickers provide a single `Society` location whose root is **the contents of Files**. The other eight sections are not registered with the document provider. Even after the app exits, Android starts the provider process when needed. Neither an always-running user daemon nor unrestricted external-storage permission is required.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 11,
+        "text": "Call Qt Android target with `iiSocietyContainer_add_android_file_provider(Society)`. This function places the Manifest, Java provider, and common `Sections.json` in the build directory. The package ID and public authority of the Society app are `com.iisacc.society` and `com.iisacc.society.documents` respectively. Do not call this function for other apps.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 23,
+        "text": "`com.iisacc.society.internal` is an internal ContentProvider that is not exposed in the public file picker. In addition to signature permissions, it verifies the calling UID's actual signature. Through this route, `fileSystem` in iiSocietyHelper 0.5 opens the same UUID and nine sections. `path()`/`url()` returns **content URI**in other Android apps; files are read and written with `QFile`, and folders are enumerated with `entries()`. Directories are prepared with `ensureDirectory()`. Desktop and Society owner apps retain the original absolute paths. Another app's private absolute path must not be passed to `QDir`, an external process, or a native inference engine. Such consumers must copy the URI contents into their own cache before passing them to the engine.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 38,
+        "text": "Call the provider of the actual APK with ContentResolver to check CRUD ·boundary·cancel·restart. Sign the APK with a test key and do not remove or overwrite existing other signed apps. The `tests/android/` in the Helper storage is a consumer app that reads and writes to nine areas from a separate app UID. After matching with Society and signing with the test key, run it to record `SOCIETY_ANDROID_PEER` results in logcat. Cross-build, emulator, and physical device verification are separate validation steps.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000033",
+        "language": "sh",
+        "code": "python3 tests/android/run_device.py --apk <Society APK> --sdk <Android SDK> \\\n  --java <JDK 21> --build <build/device-tests> --serial <disposable-emulator>\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000013",
+        "label": "Android DocumentsProvider",
+        "target": "https://developer.android.com/guide/topics/providers/create-document-provider",
+        "kind": "external",
+        "line": 13
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

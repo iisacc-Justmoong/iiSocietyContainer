@@ -6,11 +6,16 @@
 
 namespace iiSocietyContainer {
 
-/// A persistent .societycontainer directory package with nine section directories.
+/// A persistent package or explicitly declared logical disk with nine sections.
 /// Native system adapters and application browsers share this same layout.
 class IISOCIETYCONTAINER_EXPORT SocietyDrive
 {
 public:
+    enum class StorageKind { Package, LogicalDisk };
+    [[nodiscard]] static std::optional<SocietyDrive> createLogical(
+        const QString &directoryPath, const QString &ownerApplication, QString *error = nullptr);
+    [[nodiscard]] StorageKind storageKind() const;
+    [[nodiscard]] QString ownerApplication() const;
     /// Creates Society.societycontainer beneath an existing parent directory.
     /// Selecting an existing drive reuses its identity. No disk image is created.
     [[nodiscard]] static std::optional<SocietyDrive> createAt(
@@ -21,8 +26,8 @@ public:
     /// before initialization; open() enforces the same source-location boundary.
     [[nodiscard]] static std::optional<SocietyDrive> create(
         const QString& directoryPath, QString* error = nullptr);
-    /// Opens only a canonical .societycontainer package with a valid manifest.
-    /// Bare directories, redirected roots and legacy disk images are rejected.
+    /// Opens a canonical package or an explicitly owned logical disk with a valid
+    /// manifest. Bare directories, redirects and legacy images are rejected.
     /// Empty current layouts create no extra state; supported layout upgrades
     /// preserve the existing contents and UUID.
     [[nodiscard]] static std::optional<SocietyDrive> open(
@@ -39,6 +44,8 @@ public:
         const QString& expectedIdentifier, QString* error = nullptr);
 
     [[nodiscard]] QString identifier() const;
+    /// Stable device-local storage identity, retained when a host UUID is adopted.
+    [[nodiscard]] QString storageIdentifier() const;
     /// Public drive label is Society, including when opening a legacy manifest.
     [[nodiscard]] QString displayName() const;
     [[nodiscard]] QString rootPath() const;

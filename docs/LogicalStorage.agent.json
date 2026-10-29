@@ -1,0 +1,607 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:051b0c1afc1517bcf279cb8a1ecc4b0208ac82bce88fccf5d25218cf8c34f386",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/LogicalStorage.md",
+    "sha256": "8020d532adefe9c9922b8865af817a97b3931b1e51bd3ef263304c5b376ed320",
+    "bytes": 11604,
+    "line_count": 167,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "제품군 공통 저장소와 논리 디스크 인수",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 제품군 공통 저장소와 논리 디스크 인수\n",
+      "level": 1,
+      "title": "제품군 공통 저장소와 논리 디스크 인수"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "iiSocietyContainer의 저장 공간은 `.societycontainer` 패키지 또는 앱이 명시적으로\n소유한 논리 디스크로 존재한다. 논리 디스크는 메모리 임시 파일시스템이 아니라,\n기존 아홉 섹션·모델 참조·파일 원본·관리 이력 API를 제공하는 영속 저장 공간이다.\n직접 접근 가능한 논리 디스크는 패키지 확장자와 Society 앱 설치 없이 파일 입출력을\n제공한다. Android의 제공자 설치 조건은 아래 플랫폼별 공유 위치에 명시한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 12,
+      "raw": "공통 접근 계층은 `.societycontainer`의 manifest·섹션·파일·모델·이력 계약을 구현하는\niiSocietyContainer이다. 모든 iisacc 제품은 이 계층을 통해 같은 원본을 연다. 최초\n생성 앱 ID는 생성 출처를 기록하며 제품별로 별도 저장소를 나누는 키가 아니다.\nApple App Group은 Apple의 공유 권한과 위치를 제공하는 어댑터이다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "heading",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "## 플랫폼별 공유 위치\n",
+      "level": 2,
+      "title": "플랫폼별 공유 위치"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 16,
+      "end_line": 20,
+      "raw": "`ApplicationStorage::sharedRoot()`는 디스크를 생성하지 않고 공유 루트를 찾는다.\n기존 `sharedGroupRoot()`도 같은 함수의 호환 이름이다. Windows·Linux에서는\nQt의 `GenericDataLocation` 아래 `iisacc/Society`를 사용한다. Windows는 일반적인\n사용자 환경에서 `%LOCALAPPDATA%/iisacc/Society`, Linux는 `$XDG_DATA_HOME/iisacc/Society`\n또는 `~/.local/share/iisacc/Society`이다. 제품명·실행 파일명·조직명에 의존하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 22,
+      "end_line": 26,
+      "raw": "데스크톱 배포는 `IISACC_SHARED_STORAGE_ROOT`로 공통 루트를 지정할 수 있다. 모든\n제품에 같은 절대 정규 경로를 전달한다. 경로가 아직 없으면 최초의 명시적인\n`openForApplication()`에서만 준비하며, 읽기 전용 `SharedStorage::open()`은 생성하지\n않는다. 상대 경로·빈 재정의·파일·리디렉션은 거절한다. 기존 `SOCIETY_CONTAINER_PATH`와\n정상적인 기본 선택 설정이 먼저 적용되며, 손상된 선택을 무시하고 새 원본을 만들지 않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 28,
+      "end_line": 32,
+      "raw": "iOS와 권한이 구성된 macOS 앱은 실제 App Group을 사용한다. Android의 다른 앱은\n동일 서명을 검증하는 ContentProvider와 Helper의 URI 기반 FileSystem API로 같은\n컨테이너를 연다. Android에서는 현재 Society 제공자 패키지가 설치되어 있어야 하며,\n앱이 화면에 실행 중일 필요는 없다. 다른 UID의 앱 전용 절대 경로를 공유 경로로\n간주하지 않는다. 웹·미구현 플랫폼에는 데스크톱 경로를 임의로 대입하지 않는다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "heading",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "## 최초 앱의 저장 공간\n",
+      "level": 2,
+      "title": "최초 앱의 저장 공간"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 36,
+      "end_line": 39,
+      "raw": "Apple 앱은 `SocietyAppGroup` Info.plist 값과 일치하는 App Group entitlement를\n가져야 한다. `ApplicationStorage::openForApplication(\"com.iisacc.dreamscapes\")`는\n기존 선택 저장소를 먼저 재사용하고, 선택이 없으면 NSFileManager가 반환한 공유\n그룹 안에 다음 공간을 준비한다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "fenced_code",
+      "start_line": 41,
+      "end_line": 51,
+      "raw": "```text\n<App Group>/Library/Application Support/iisacc/\n  Logical Disks/com.iisacc.dreamscapes/\n    .society-logical-disk\n    .society-drive.json\n    Models/\n    Generation History/\n    Files/\n    ... 나머지 섹션과 SDK 관리 이력\n  Society/storage.json\n```\n",
+      "language": "text",
+      "code": "<App Group>/Library/Application Support/iisacc/\n  Logical Disks/com.iisacc.dreamscapes/\n    .society-logical-disk\n    .society-drive.json\n    Models/\n    Generation History/\n    Files/\n    ... 나머지 섹션과 SDK 관리 이력\n  Society/storage.json\n",
+      "closed": true
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 53,
+      "end_line": 56,
+      "raw": "Windows·Linux와 명시적인 데스크톱 공유 루트에서도 같은 등록·논리 디스크 정책을\n사용한다. 등록의 내부 상대 경로는 기존 Apple·Swift 어댑터와의 호환을 유지한다.\n다른 제품이 `openForApplication()`을 호출하면 등록된 원본을 재사용하므로 두 번째\n제품 ID로 또 다른 논리 디스크를 만들지 않는다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 58,
+      "end_line": 61,
+      "raw": "`.society-logical-disk`는 버전과 최초 소유 앱 ID를 명시한 작은 선언이다. 일반\n사용자 폴더를 확장자 검사 완화만으로 Society 저장소로 취급하지 않는다. 신규·빈\n디렉터리 또는 동일 앱의 선언이 있는 공간만 생성 API로 사용할 수 있다. 리디렉션,\n중첩 저장소, 기존 사용자 파일, 손상된 선언·등록 정보는 보존하고 거절한다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 63,
+      "end_line": 69,
+      "raw": "등록 파일은 그룹 기준 상대 경로, 등록 시점의 논리 UUID, 기기 내 `storageId`, 최초 소유\n앱과 현재 관리 앱을 가진다. 그룹 준비는 프로세스 간 잠금으로 직렬화하고 등록은\n원자적으로 확정한다. 기존 패키지가 있으면 이를 재사용하며 다른 빈 디스크를\n만들지 않는다. 권한이 없거나 기존 선택이 손상되었을 때 앱 전용 Documents·Cache로\n조용히 대체하지 않는다. iOS에서는 명시적으로 여는 논리 디스크와 `openInGroup()`의\n루트도 entitlement로 허용된 실제 App Group 안에 있어야 한다. 그룹 검증은 디렉터리와\n등록 파일을 생성하기 전에 수행한다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 70,
+      "end_line": 70,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 71,
+      "end_line": 73,
+      "raw": "파일 쓰기는 iiFileProvider가 담당한다. iOS 논리 디스크에는 최초 잠금 해제 이후\n접근 가능한 데이터 보호를 적용한다. 모델과 생성 결과는 캐시 정리 대상으로\n취급하지 않는다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 74,
+      "end_line": 74,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "heading",
+      "start_line": 75,
+      "end_line": 75,
+      "raw": "## Society 설치 후 인수\n",
+      "level": 2,
+      "title": "Society 설치 후 인수"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 77,
+      "end_line": 82,
+      "raw": "`ApplicationStorage::adoptInGroup(group)`와 iOS의 `SharedDriveLocation.prepareRoot()`는\n기존 공유 등록을 검증하고 관리 앱을 `com.iisacc.society`로 변경한다. 실제 모델과\n이미지, 열린 파일 경로, 디스크 UUID, RAW 원본·리비전·세션·온톨로지 이력을 그대로\n사용한다. 큰 파일을 다른 패키지로 복사하거나 기존 앱이 쓰는 경로를 이동하지 않는다.\n따라서 Society 설치 후의 마이그레이션은 같은 공유 저장소의 인수로 완료할 수 있다.\nFile Provider도 같은 등록을 읽고 기존 공개 파일 식별자를 유지한다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 83,
+      "end_line": 83,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 84,
+      "end_line": 89,
+      "raw": "기존 Society 패키지와 논리 디스크는 같은 SocietyDrive 인터페이스로 사용한다.\n`storageKind()`가 형태를 구분하고 `ownerApplication()`은 논리 디스크의 최초 소유\n앱을 반환한다. 현재 관리 앱은 `ApplicationStorage::registration()`에서 확인한다.\n`identifier()`는 동기화 호스트의 논리 UUID를 따를 수 있고 `storageIdentifier()`는\n기기 내 저장 공간을 식별한다. 논리 디스크의 관리 원본·이력과 공유 등록은 안정적인\n기기 식별자를 사용하므로 호스트 UUID가 변경되어도 분리되지 않는다.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 90,
+      "end_line": 90,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 91,
+      "end_line": 94,
+      "raw": "앱 소유 논리 디스크가 처음 인증된 호스트에 연결될 때에는 기존 앱 파일을 남기고\n호스트 초기 상태를 적용한다. 남아 있는 로컬 파일은 이후 일반 변경 제안으로\n호스트에 전송한다. 같은 경로의 충돌은 기존 안전 동기화 계약으로 보존한다. 별도로\n선택한 독립 패키지를 다른 호스트에 연결할 때의 기존 보관·복구 정책은 유지한다.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 95,
+      "end_line": 95,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "heading",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "## 공개 API\n",
+      "level": 2,
+      "title": "공개 API"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 97,
+      "end_line": 97,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "fenced_code",
+      "start_line": 98,
+      "end_line": 108,
+      "raw": "```cpp\n#include <ApplicationStorage.h>\n\nQString error;\nauto storage = iiSocietyContainer::ApplicationStorage::openForApplication(\n    \"com.iisacc.dreamscapes\", &error);\nif (storage) {\n    const auto models = storage->filePath(iiSocietyContainer::StoreSection::Models);\n    const auto history = storage->filePath(iiSocietyContainer::StoreSection::GenerationHistory);\n}\n```\n",
+      "language": "cpp",
+      "code": "#include <ApplicationStorage.h>\n\nQString error;\nauto storage = iiSocietyContainer::ApplicationStorage::openForApplication(\n    \"com.iisacc.dreamscapes\", &error);\nif (storage) {\n    const auto models = storage->filePath(iiSocietyContainer::StoreSection::Models);\n    const auto history = storage->filePath(iiSocietyContainer::StoreSection::GenerationHistory);\n}\n",
+      "closed": true
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 109,
+      "end_line": 109,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "paragraph",
+      "start_line": 110,
+      "end_line": 115,
+      "raw": "`openInGroup(group, app)`는 호출자가 소유·검증한 정규 공유 루트에 대한 이식 가능한\n정책 진입점이며 격리된 테스트에도 사용한다. 제품의 자동 선택은\n`openForApplication()`을 사용하며 플랫폼 어댑터가 공유 위치를 결정한다.\niiSocietyHelper는 동일한 동작을 `FileSystem::openForApplication()`으로 제공한다.\nUI·문서 보기 객체의 지연 초기화는 계속 유지하며 저장소 소유자가 명시적으로\n처음 공간을 열 때만 생성한다.\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 116,
+      "end_line": 116,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 117,
+      "end_line": 120,
+      "raw": "네이티브 `LogicalDisk`는 Qt 없는 FileTree 컴포넌트에 속한다. 공유 선택·모델·이력\n계약인 `ApplicationStorage`는 기존 Core 어댑터에 속한다. 패키지는\n`iiSocietyContainer_HAS_LOGICAL_DISKS`와 `iiSocietyContainer_HAS_APPLICATION_STORAGE`로\n해당 기능을 표시한다.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 121,
+      "end_line": 121,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "heading",
+      "start_line": 122,
+      "end_line": 122,
+      "raw": "## 검증 경계\n",
+      "level": 2,
+      "title": "검증 경계"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 124,
+      "end_line": 130,
+      "raw": "`tests/logical_storage.cpp`는 패키지 없는 최초 앱, 재열기, 모델·이미지 파일과\n관리 이력을 보존하는 인수, 기존 패키지 재사용, 잘못된 등록·충돌 파일 거부,\n여러 번의 호스트 UUID 변경을 검증한다. `SharedDriveLocationTests.swift`는 C++\nSDK가 생성한 등록을 네이티브 드라이브·File Provider가 인수하고 원래 앱이 다시\n여는 양방향 호환을 검증한다. Helper의 앱 저장소 회귀는 프로세스 없는 입출력과\n실제 TLS 모델 다운로드·기존 생성 결과의 호스트 이전을 포함한다. Apple 권한과\n기기 실행 결과는 소스·호스트 테스트 결과와 구분하여 기록한다.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 131,
+      "end_line": 131,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 132,
+      "end_line": 135,
+      "raw": "제품군 회귀는 명시적인 컨테이너 선택 없이 서로 다른 두 제품이 같은 경로·UUID·\n모델 원본을 얻는지, 읽기 전용 탐색이 부트스트랩하지 않는지, 기존 선택과 손상된\n설정·리디렉션이 새 저장소로 분기하지 않는지를 검사한다. macOS의 격리된 공유 루트\n검증은 Windows·Linux 운영체제에서의 실행 검증과 구분한다.\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 136,
+      "end_line": 136,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 137,
+      "end_line": 139,
+      "raw": "논리 저장소 회귀는 실제 원자 저장과 관리 이력 저널을 사용한다. 확장된 테스트\n묶음의 CTest 제한은 300초이며, 외장 저장소에서 다른 빌드와 입출력을 공유할 때의\n검증 예산이다. 제품의 동기화 완료 시간이나 파일 입출력 지연 보장으로 해석하지 않는다.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 140,
+      "end_line": 140,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 141,
+      "end_line": 147,
+      "raw": "`tests/application-storage-ios`는 실제 iOS App Group API를 호출하는 두 개의\n격리된 검증 앱이다. `run_simulator.py`가 Society가 설치되지 않은 새 시뮬레이터에서\n첫 앱의 기본 저장소 준비, 모델 저장·PNG 게시, 다른 앱의 실제 Swift Society\n진입점을 통한 인수, 첫 앱의\n재열기를 순서대로 실행한다. 같은 경로·저장소 식별자·원본 바이트·관리 이력을\n검사하고 결과 JSON과 실행 로그를 보존한다. 검증 전용 시뮬레이터는 완료 후\n종료·삭제하며 설치된 사용자 앱과 실제 App Group 데이터는 사용하지 않는다.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 148,
+      "end_line": 148,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "paragraph",
+      "start_line": 149,
+      "end_line": 155,
+      "raw": "2026-10-25에는 iOS 27의 새 iPhone 18 Pro 시뮬레이터에서 세 단계를 실행하였다.\nSociety 미설치 상태의 첫 앱이 실제 App Group 안에 논리 디스크를 생성하고 모델\n8,193바이트와 PNG 70바이트를 기록하였다. 별도 앱이 Society의 Swift 인수 함수를\n실행한 뒤 첫 앱을 다시 실행하여 동일 경로·저장소 UUID·원본 바이트·관리 이력을\n확인하였다. 앱 전용 디렉터리의 공유 루트 지정도 생성 전에 거부하였다. 실행 결과는\n`build/application-storage-ios/results/result.json`에 기록한다. 이는 저장소 SDK의\niOS 실행 증거이며 제품의 실기기 재설치와 구분한다.\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 156,
+      "end_line": 156,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "heading",
+      "start_line": 157,
+      "end_line": 157,
+      "raw": "## 파일 제공자 경계와 소유권 잠금\n",
+      "level": 2,
+      "title": "파일 제공자 경계와 소유권 잠금"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 158,
+      "end_line": 158,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 159,
+      "end_line": 163,
+      "raw": "논리 저장소 예제의 임시 디렉터리는 `iiFileProvider::TemporaryDirectory`가 생성·정리한다.\nApple 공유 저장소의 C++ 및 Swift 등록 잠금 파일은 각각 Native 및 Swift 공급자의\n디스크립터 API로 생성한다. 기존 `O_NOFOLLOW`, `O_CLOEXEC`, 소유자 전용 `0600` 권한,\n동일 inode 유지, 비차단 `flock`과 5초 기한을 보존한다. 기록 파일로 분류하여 프리뷰를\n만드는 대신 공급자의 내부 디스크립터 생성 경계만 사용한다.\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 164,
+      "end_line": 164,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "paragraph",
+      "start_line": 165,
+      "end_line": 167,
+      "raw": "논리 저장소와 Swift 공유 위치 검사는 심볼릭 링크 잠금 경로 거절, 원본 대상 보존,\n새 잠금의 빈 내용과 소유자 전용 권한을 검증한다. 전체 파일 생성 감사의 제외 목록이나\n성공 기준은 변경하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "제품군 공통 저장소와 논리 디스크 인수",
+      "anchor": "제품군-공통-저장소와-논리-디스크-인수",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000007",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "플랫폼별 공유 위치",
+      "anchor": "플랫폼별-공유-위치",
+      "start_line": 14
+    },
+    {
+      "block_id": "b000015",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "최초 앱의 저장 공간",
+      "anchor": "최초-앱의-저장-공간",
+      "start_line": 34
+    },
+    {
+      "block_id": "b000029",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Society 설치 후 인수",
+      "anchor": "society-설치-후-인수",
+      "start_line": 75
+    },
+    {
+      "block_id": "b000037",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "공개 API",
+      "anchor": "공개-api",
+      "start_line": 96
+    },
+    {
+      "block_id": "b000045",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "검증 경계",
+      "anchor": "검증-경계",
+      "start_line": 122
+    },
+    {
+      "block_id": "b000057",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "파일 제공자 경계와 소유권 잠금",
+      "anchor": "파일-제공자-경계와-소유권-잠금",
+      "start_line": 157
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000009",
+        "line": 20,
+        "text": "또는 `~/.local/share/iisacc/Society`이다. 제품명·실행 파일명·조직명에 의존하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 32,
+        "text": "간주하지 않는다. 웹·미구현 플랫폼에는 데스크톱 경로를 임의로 대입하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 59,
+        "text": "사용자 폴더를 확장자 검사 완화만으로 Society 저장소로 취급하지 않는다. 신규·빈",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 67,
+        "text": "조용히 대체하지 않는다. iOS에서는 명시적으로 여는 논리 디스크와 `openInGroup()`의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 73,
+        "text": "취급하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000031",
+        "line": 80,
+        "text": "사용한다. 큰 파일을 다른 패키지로 복사하거나 기존 앱이 쓰는 경로를 이동하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000051",
+        "line": 139,
+        "text": "검증 예산이다. 제품의 동기화 완료 시간이나 파일 입출력 지연 보장으로 해석하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000053",
+        "line": 147,
+        "text": "종료·삭제하며 설치된 사용자 앱과 실제 App Group 데이터는 사용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000061",
+        "line": 167,
+        "text": "성공 기준은 변경하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

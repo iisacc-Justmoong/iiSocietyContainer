@@ -19,12 +19,24 @@ enum SharedDriveLocationTests {
             _ = IisaccFileProvider.waitForPresentations()
             try? manager.removeItem(at: group)
         }
+        let redirectedGroup = base.appendingPathComponent("guard-group-" + UUID().uuidString)
+        let sentinel = base.appendingPathComponent("guard-target-" + UUID().uuidString)
+        try manager.createDirectory(at: redirectedGroup, withIntermediateDirectories: false)
+        try Data("unchanged".utf8).write(to: sentinel)
+        defer { try? manager.removeItem(at: redirectedGroup); try? manager.removeItem(at: sentinel) }
+        try manager.createSymbolicLink(at: redirectedGroup.appendingPathComponent(".iisacc-storage.guard"), withDestinationURL: sentinel)
+        try reject { _ = try SharedDriveLocation(group: redirectedGroup).prepareRoot() }
+        try check(Data(contentsOf: sentinel) == Data("unchanged".utf8), "The ownership guard must never follow a redirected target")
         let location = SharedDriveLocation(group: group)
         try reject { _ = try location.existingRoot() }
         let root = try location.prepareRoot()
+        let guardAttributes = try manager.attributesOfItem(atPath: group.appendingPathComponent(".iisacc-storage.guard").path)
+        try check((guardAttributes[.posixPermissions] as? NSNumber)?.intValue == 0o600,
+                  "The provider-owned guard must retain private permissions")
+
         try check(root.path == group.appendingPathComponent("Society.societycontainer").path,
                   "The source must be private app-group storage")
-        try check(Set(manager.contentsOfDirectory(atPath: group.path)) == ["Society.societycontainer"],
+        try check(Set(manager.contentsOfDirectory(atPath: group.path)) == ["Society.societycontainer", ".iisacc-storage.guard"],
                   "Preparing the shared source must create one package without outside scaffolding")
         try check(location.prepareRoot() == root, "Reopening the app must preserve the same source")
         try reject { try location.validate(root: group.appendingPathComponent("Documents")) }
@@ -89,6 +101,46 @@ enum SharedDriveLocationTests {
         try manager.removeItem(at: root)
         try manager.createSymbolicLink(at: root, withDestinationURL: base)
         try reject { _ = try location.prepareRoot() }
+        // Dreamscapes is the first app on a clean shared container. Society's
+        // native owner and File Provider later adopt the same source in place.
+        let logicalGroup = base.appendingPathComponent("logical-app-group-" + UUID().uuidString)
+        try IisaccFileProvider.createDirectory(at: logicalGroup, withIntermediateDirectories: false)
+        defer { _ = IisaccFileProvider.waitForPresentations(); try? manager.removeItem(at: logicalGroup) }
+        func sdkApplication() throws -> [String: Any] {
+            let process = Process(); let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: CommandLine.arguments[2])
+            process.arguments = ["application", logicalGroup.path, "com.iisacc.dreamscapes"]
+            process.standardOutput = pipe; try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+            try check(process.terminationStatus == 0, "Application-owned SDK storage failed")
+            return try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        }
+        let application = try sdkApplication()
+        let logicalRoot = URL(fileURLWithPath: application["rootPath"] as! String, isDirectory: true)
+        let logicalLocation = SharedDriveLocation(group: logicalGroup)
+        let registration = logicalGroup.appendingPathComponent("Library/Application Support/iisacc/Society/storage.json")
+        func owner() throws -> String { (try JSONSerialization.jsonObject(with: Data(contentsOf: registration)) as! [String: Any])["managingApplication"] as! String }
+        try check(logicalRoot.pathExtension != "societycontainer", "The app disk must not require a directory-package name")
+        try check(logicalLocation.existingRoot() == logicalRoot, "The extension must discover the app's logical disk")
+        try check(owner() == "com.iisacc.dreamscapes", "Read-only discovery must preserve the application owner")
+        let clientStore = try LocalDriveStore(root: logicalRoot, catalog: catalog)
+        let original = base.appendingPathComponent("logical-original-" + UUID().uuidString + ".png")
+        try IisaccFileProvider.write(Data("generated image".utf8), to: original)
+        defer { _ = IisaccFileProvider.waitForPresentations(); try? manager.removeItem(at: original) }
+        let generated = try clientStore.create(parent: "section:generation-history", name: "generated.png", directory: false,
+                                              contents: original)
+        let sharedFile = try clientStore.create(parent: "section:files", name: "From Dreamscapes.txt", directory: false,
+                                               contents: original)
+        try check(logicalLocation.prepareRoot() == logicalRoot, "Society adoption must preserve the source path")
+        try check(owner() == "com.iisacc.society", "Society must take over the shared registration")
+        let societyStore = try LocalDriveStore(root: logicalLocation.existingRoot(), catalog: catalog)
+        let publicStore = try FilesDriveStore(root: logicalLocation.existingRoot(), catalog: catalog)
+        try check(societyStore.manifest.identifier == application["identifier"] as! String, "Adoption must preserve the logical UUID")
+        try check(societyStore.item(generated.id).id == generated.id, "Generated-image IDs must survive adoption")
+        try check(publicStore.item(sharedFile.id).id == sharedFile.id, "Files IDs must survive File Provider discovery")
+        try check(!manager.fileExists(atPath: logicalGroup.appendingPathComponent("Society.societycontainer").path), "Adoption must not create a duplicate disk")
+        let reopenedApplication = try sdkApplication()
+        try check(reopenedApplication["rootPath"] as! String == logicalRoot.path && owner() == "com.iisacc.society", "The originating app must reopen Society's adopted storage")
         print("Shared app source, restart, stable IDs, Files projection and redirect checks passed")
     }
 }

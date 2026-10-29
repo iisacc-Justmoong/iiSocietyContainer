@@ -165,8 +165,10 @@ final class LocalDriveStore {
 
     static func validateSourceLocation(_ root: URL, home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) throws {
         let resolved = root.resolvingSymlinksInPath().standardizedFileURL
-        guard resolved.pathExtension == "societycontainer" else {
-            throw DriveStoreError.invalid("Society manages only .societycontainer packages.")
+        if resolved.pathExtension != "societycontainer" {
+            guard try logicalOwner(at: resolved) != nil else {
+                throw DriveStoreError.invalid("Society requires a package or an explicitly owned logical disk.")
+            }
         }
         for marker in ["Info.plist", "bands", ".society-disk.plist"] {
             let item = resolved.appendingPathComponent(marker)
@@ -193,6 +195,31 @@ final class LocalDriveStore {
                 throw DriveStoreError.invalid("A Society source cannot be inside another container. Choose its original source folder.")
             }
         }
+    }
+
+    static func validApplicationIdentifier(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.count <= 128 && !value.hasPrefix(".") && !value.hasSuffix(".")
+            && !value.contains("..") && value.contains(".")
+            && value.utf8.allSatisfy { let c = Int($0); return (65...90).contains(c) || (97...122).contains(c) || (48...57).contains(c) || c == 45 || c == 46 }
+    }
+    static func logicalOwner(at root: URL) throws -> String? {
+        let marker = root.appendingPathComponent(".society-logical-disk")
+        var state = stat()
+        if lstat(marker.path, &state) != 0 {
+            if errno == ENOENT { return nil }
+            throw DriveStoreError.invalid("The logical disk declaration is unavailable.")
+        }
+        guard state.st_mode & S_IFMT == S_IFREG, state.st_size > 0, state.st_size <= 180,
+              marker.resolvingSymlinksInPath().path == marker.path else {
+            throw DriveStoreError.invalid("The logical disk declaration is invalid or redirected.")
+        }
+        let bytes = try Data(contentsOf: marker)
+        guard let text = String(data: bytes, encoding: .utf8), text.hasPrefix("iisacc.logical-disk.v1\n"), text.hasSuffix("\n") else {
+            throw DriveStoreError.invalid("Unsupported logical disk declaration.")
+        }
+        let owner = String(text.dropFirst("iisacc.logical-disk.v1\n".count).dropLast())
+        guard validApplicationIdentifier(owner) else { throw DriveStoreError.invalid("Invalid logical disk owner.") }
+        return owner
     }
 
     static func validateName(_ name: String) throws {

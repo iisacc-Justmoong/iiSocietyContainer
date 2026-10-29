@@ -1,0 +1,389 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:c78c730599e302815c1e52ec4d01adbbc73d1d5cb8ad9781d0475a01611f62cc",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/FilePresentation.md",
+    "sha256": "6d91cd5fa6bafbd78da3bca0909a870c0c4ac26ab8c0a197391497eff5a913df",
+    "bytes": 6442,
+    "line_count": 99,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Persistent file presentation",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Persistent file presentation\n",
+      "level": 1,
+      "title": "Persistent file presentation"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "heading",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "## Required public file-information contract\n",
+      "level": 2,
+      "title": "Required public file-information contract"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 12,
+      "raw": "Every readable, resident regular asset in a verified Society public section can\nbe inspected through iiFileProvider, irrespective of its extension and whether\nit has been indexed or created by an iisacc app. An inspection finishes missing\npresentation work on demand instead of depending on a background scan having\nalready reached that file. Original bytes retain their format. Unsupported or\nover-budget media returns a truthful `information` preview; unreadable, missing,\nredirected or concurrently changed files, or unavailable presentation storage,\nreturn an explicit failure.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 19,
+      "raw": "`FileTree::presentation(relativePath)` is the native C++23 interface. It returns\nthe provider's typed `PresentationRecord`, including file details, media\nproperties, preview bytes, source version and actual attribute embedding status.\nLinking `iiSocietyContainer::FileTree` imports `iiFileProvider::Native` publicly\nand does not import Qt. `entry`, `children` and `snapshot` retain metadata-only\ntraversal and never decode every listed original.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 23,
+      "raw": "`SharedStorage::fileInformation(section, relativePath, error)` is the application\nand host projection. It is blocking and should execute on a GUI's I/O worker.\nThe `iiFileProvider.FileInformation` schema-1 document includes:\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "table",
+      "start_line": 25,
+      "end_line": 33,
+      "raw": "| Field | Content |\n| --- | --- |\n| `container`, `path` | Pinned container identity and logical section-relative key; no native host path |\n| `details` | Name, extension, detected MIME type, original byte size, nanosecond modification time, format-specific properties |\n| `preview` | Kind, MIME type, dimensions, base64 bytes and SHA-256, using the provider's 512-pixel bounded representation |\n| `sourceVersion`, `embedded` | Source-bound presentation version and actual native-attribute publication result |\n| `classification.status` | `ready`, `absent` or `invalid`; never silently trusts malformed annotations |\n| `classification.metadata` | Published title, description, keywords, 0–5 rating, color label, custom fields and collection keys when ready |\n| `classification.collections` | Published stable collection keys and display names when ready |\n",
+      "columns": [
+        "Field",
+        "Content"
+      ],
+      "rows": [
+        [
+          "`container`, `path`",
+          "Pinned container identity and logical section-relative key; no native host path"
+        ],
+        [
+          "`details`",
+          "Name, extension, detected MIME type, original byte size, nanosecond modification time, format-specific properties"
+        ],
+        [
+          "`preview`",
+          "Kind, MIME type, dimensions, base64 bytes and SHA-256, using the provider's 512-pixel bounded representation"
+        ],
+        [
+          "`sourceVersion`, `embedded`",
+          "Source-bound presentation version and actual native-attribute publication result"
+        ],
+        [
+          "`classification.status`",
+          "`ready`, `absent` or `invalid`; never silently trusts malformed annotations"
+        ],
+        [
+          "`classification.metadata`",
+          "Published title, description, keywords, 0–5 rating, color label, custom fields and collection keys when ready"
+        ],
+        [
+          "`classification.collections`",
+          "Published stable collection keys and display names when ready"
+        ]
+      ]
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 41,
+      "raw": "The provider validates the classification companion without creating an index or\nrewriting it. A missing classification does not prevent details/preview access;\nan invalid classification does not turn into fabricated defaults. The original\npresentation is revalidated after classification is read. The combined document\nis limited to 3 MiB; preview and classification retain their stricter individual\nlimits. Reserved provider documents, directories, symlinks and path traversal\nare excluded from asset inspection.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 43,
+      "end_line": 51,
+      "raw": "`StorageDirectoryModel` publishes `fileInformationProvider` and\n`fileInformationKey` for file rows. These lightweight roles identify the common\nprovider and logical inspection key without decoding every directory entry.\niiSocietyHelper exposes `FileSystem::fileInformation` for selected local storage\nand `Client::inspectHostFile` for asynchronous direct host access. A remote or\nnonresident original can be inspected through that authenticated host interface\nwithout materializing its payload. The host serves 256-KiB chunks, pins the\nsource version and whole information-document hash, and refuses mixed revisions.\nSee [the host protocol](../../iiSocietyHelper/docs/Sync/README.md).\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "heading",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "## Intake and persistence\n",
+      "level": 2,
+      "title": "Intake and persistence"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 55,
+      "end_line": 60,
+      "raw": "SocietyDrive consumers use iiFileProvider 0.7 to generate file details and\nportable embedded previews. Opening a verified drive registers the public\nsections, excluding Deleted, with the native intake monitor. Files copied into\nthe original drive by Finder, another file manager or another application are\nobserved after two stable scans. Source directory identity and the expected\nmanifest identity remain pinned; redirects and private/control trees are ignored.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 61,
+      "end_line": 61,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 62,
+      "end_line": 66,
+      "raw": "The worker slices traversal and decoding so a large initial inventory does not\noccupy the application event loop. The Qt preview cache reads the provider's\nbounded PNG projection. Its thumbnail key normalizes native change-time over\nthe current process's own preview-attribute publication; adding a first embedded\npreview therefore preserves other queued requests for the same content.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 67,
+      "end_line": 67,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 68,
+      "end_line": 84,
+      "raw": "The native Apple Files adapter notifies after atomic content replacement. FSKit\nnotifies the Swift provider after writing/closing a descriptor and after rename\npublication, including an empty newly created file. Provider preview documents\nand temporary lease/control state are excluded from the public C++ FileTree,\nQt listing, dashboard and Swift Files projections.\nSwift enumeration skips descendants only for a control directory. Encountering\na hidden companion or lease file must not skip the visible children of its\nparent directory; the native Files regression checks this alongside stable IDs.\nDirectory projections use stable creation metadata because visible children have\ntheir own versions. Writing private derived companions therefore does not create\nspurious public anchors or evict historical snapshots.\nAndroid's DocumentsProvider and internal listing use the owner's shared control\nname rule through DriveStore path validation, including previously issued item\nidentifiers. Public hidden files remain valid. Private control directories do\nnot receive recursive native watchers. The host Java naming regression compiles\nall Android bridge sources against an SDK jar and exercises these boundaries\nwithout claiming device execution.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 85,
+      "end_line": 85,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 86,
+      "end_line": 91,
+      "raw": "Original data forks remain byte-for-byte intact. Native attributes/streams carry\ndetails and preview bytes where supported. The hidden\n`.<filename>.iisacc-preview` companion retains the same portable asset projection\nwhen a transfer discards extended attributes. Its source change token journals\nthe post-embedding native state. Classification `.iisacc.json` documents are\nindependent and remain under Catalog revision control.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 92,
+      "end_line": 92,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 93,
+      "end_line": 99,
+      "raw": "Full representation, codec limits, lifecycle hooks and API examples are in\n[iiFileProvider's presentation contract](../../iiFileProvider/docs/FILE_PRESENTATION.md).\nThe storage monitor is hosted by a process that owns the selected drive; a\nSociety window is not required when a storage consumer/daemon is running.\nOpening the current deployed application alone does not prove that it contains\nthese source changes; build, package-consumer and target-runtime evidence are\nreported separately.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Persistent file presentation",
+      "anchor": "persistent-file-presentation",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000003",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Required public file-information contract",
+      "anchor": "required-public-file-information-contract",
+      "start_line": 3
+    },
+    {
+      "block_id": "b000017",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Intake and persistence",
+      "anchor": "intake-and-persistence",
+      "start_line": 53
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 3,
+        "text": "## Required public file-information contract",
+        "basis": "lexical_match",
+        "context": "heading"
+      },
+      {
+        "block_id": "b000007",
+        "line": 19,
+        "text": "traversal and never decode every listed original.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 22,
+        "text": "and host projection. It is blocking and should execute on a GUI's I/O worker.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 31,
+        "text": "| `classification.status` | `ready`, `absent` or `invalid`; never silently trusts malformed annotations |",
+        "basis": "lexical_match",
+        "context": "table"
+      },
+      {
+        "block_id": "b000023",
+        "line": 74,
+        "text": "a hidden companion or lease file must not skip the visible children of its",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 96,
+        "text": "Society window is not required when a storage consumer/daemon is running.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000015",
+        "label": "the host protocol",
+        "target": "../../iiSocietyHelper/docs/Sync/README.md",
+        "kind": "relative",
+        "line": 51
+      },
+      {
+        "block_id": "b000027",
+        "label": "iiFileProvider's presentation contract",
+        "target": "../../iiFileProvider/docs/FILE_PRESENTATION.md",
+        "kind": "relative",
+        "line": 94
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000011",
+        "columns": [
+          "Field",
+          "Content"
+        ],
+        "rows": [
+          [
+            "`container`, `path`",
+            "Pinned container identity and logical section-relative key; no native host path"
+          ],
+          [
+            "`details`",
+            "Name, extension, detected MIME type, original byte size, nanosecond modification time, format-specific properties"
+          ],
+          [
+            "`preview`",
+            "Kind, MIME type, dimensions, base64 bytes and SHA-256, using the provider's 512-pixel bounded representation"
+          ],
+          [
+            "`sourceVersion`, `embedded`",
+            "Source-bound presentation version and actual native-attribute publication result"
+          ],
+          [
+            "`classification.status`",
+            "`ready`, `absent` or `invalid`; never silently trusts malformed annotations"
+          ],
+          [
+            "`classification.metadata`",
+            "Published title, description, keywords, 0–5 rating, color label, custom fields and collection keys when ready"
+          ],
+          [
+            "`classification.collections`",
+            "Published stable collection keys and display names when ready"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

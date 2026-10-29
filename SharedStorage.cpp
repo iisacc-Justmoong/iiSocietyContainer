@@ -2,6 +2,8 @@
 #include <iiFileProviderDevice.h>
 #include <iiFileProviderPresentation.h>
 #include "SharedStorage.h"
+#include <ApplicationStorage.h>
+#include <LogicalDisk.h>
 #include "ModelStore.h"
 #include "StorageMap.h"
 #include "DiskImage.h"
@@ -75,12 +77,12 @@ std::optional<StoredModel> inspect(const QString &path, const QString &base, con
     const QFileInfo info(path);
     const bool package = info.isDir() && QFileInfo::exists(iiFileProvider::Directory(path).filePath("model_index.json"));
     const auto extension = info.suffix().toLower();
-    if (!package && (!info.isFile() || (extension != "safetensor" && extension != "safetensors")))
+    if (!package && (!info.isFile() || (extension != "safetensors" && extension != "safetensor" && extension != "gguf")))
         return {};
     QCryptographicHash fingerprint(QCryptographicHash::Sha256);
     if (!inventory(path, base, fingerprint, path, previousId))
         return {};
-    QString format = package ? QStringLiteral("diffusers") : QStringLiteral("safetensors");
+    QString format = package ? QStringLiteral("diffusers") : (extension == "gguf" ? QStringLiteral("gguf") : QStringLiteral("safetensors"));
     if (package) {
         iiFileProvider::FileDevice manifest(iiFileProvider::Directory(path).filePath("model_index.json"));
         if (manifest.size() <= 1024 * 1024 && manifest.open(QIODevice::ReadOnly)) {
@@ -119,12 +121,16 @@ bool SharedStorage::setDefaultContainer(const QString &path, QString *error)
     const auto drive = SocietyDrive::open(path, error);
     if (!drive)
         return false;
-#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
 #ifdef Q_OS_IOS
-    const auto shared = iosSharedStorageRoot(error);
-#else
+    const auto group = ApplicationStorage::sharedGroupRoot(error);
+    if (group.isEmpty()) return false;
+    const auto shared = ApplicationStorage::selectedRoot(group, error);
+    if (shared.isEmpty() || drive->rootPath() != shared) {
+        fail(error, QStringLiteral("Select the registered Society storage inside this App Group.")); return false;
+    }
+    return true;
+#elif defined(Q_OS_ANDROID)
     const auto shared = androidSharedStorageRoot(error);
-#endif
     if (shared.isEmpty() || drive->rootPath() != shared) {
         fail(error, QStringLiteral("Mobile clients must use the managed Society container."));
         return false;
@@ -162,12 +168,23 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
     QString expectedId;
     if (selected.isEmpty())
         selected = qEnvironmentVariable("SOCIETY_CONTAINER_PATH");
-#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
 #ifdef Q_OS_IOS
-    const auto shared = iosSharedStorageRoot(error);
-#else
+    const auto group = ApplicationStorage::sharedGroupRoot(error);
+    if (group.isEmpty()) return {};
+    const auto explicitRoot = selected.isEmpty() ? QString{} : QFileInfo(selected).canonicalFilePath();
+    const bool ownedLogical = !explicitRoot.isEmpty() && explicitRoot.startsWith(group + '/')
+        && LogicalDisk::owner(detail::nativePath(explicitRoot)).has_value();
+    if (ownedLogical) selected = explicitRoot;
+    else {
+        const auto shared = ApplicationStorage::selectedRoot(group, error);
+        if (shared.isEmpty()) return {};
+        if (selected.isEmpty()) selected = shared;
+        if (QFileInfo(selected).canonicalFilePath() != shared) {
+            fail(error, QStringLiteral("Use a registered Society drive or an owned logical disk inside the entitled App Group.")); return {};
+        }
+    }
+#elif defined(Q_OS_ANDROID)
     const auto shared = androidSharedStorageRoot(error);
-#endif
     if (shared.isEmpty())
         return {};
     if (selected.isEmpty())
@@ -175,6 +192,23 @@ std::optional<SharedStorage> SharedStorage::open(const QString &path, QString *e
     if (QFileInfo(selected).canonicalFilePath() != shared) {
         fail(error, QStringLiteral("Use the managed Society container on this mobile platform."));
         return {};
+    }
+#endif
+#if !defined(Q_OS_IOS) && !defined(Q_OS_ANDROID)
+    const QFileInfo selectionInfo(settingsPath());
+    if (selected.isEmpty() && !selectionInfo.exists() && !selectionInfo.isSymLink() && !selectionInfo.isJunction()) {
+        if (settingsPath().isEmpty()) { fail(error, QStringLiteral("Use an absolute Society settings path.")); return {}; }
+        QString rootError; const auto group = ApplicationStorage::sharedRoot(&rootError);
+        if (group.isEmpty() && qEnvironmentVariableIsSet("IISACC_SHARED_STORAGE_ROOT")) { fail(error, rootError); return {}; }
+        if (!group.isEmpty() && QFileInfo::exists(group)) {
+            QString registrationError; const auto record = ApplicationStorage::registration(group, &registrationError);
+            if (!registrationError.isEmpty()) { fail(error, registrationError); return {}; }
+            const QFileInfo package(iiFileProvider::Directory(group).filePath("Society.societycontainer"));
+            if (!record.isEmpty() || package.exists() || package.isSymLink()) {
+                selected = ApplicationStorage::selectedRoot(group, error);
+                if (selected.isEmpty()) return {};
+            }
+        }
     }
 #endif
     if (selected.isEmpty()) {
@@ -362,7 +396,7 @@ QList<StoredModel> SharedStorage::models(QString *error) const
                 fingerprint.addData(it.key().toUtf8()); fingerprint.addData(it.value().value("version").toString().toUtf8());
                 available &= map.isResident(it.value()); size += it.value().value("size").toString().toLongLong();
             }
-            QString format = package ? "diffusers" : "safetensors";
+            QString format = package ? "diffusers" : (key.endsWith(".gguf", Qt::CaseInsensitive) ? "gguf" : "safetensors");
             if (package) {
                 iiFileProvider::FileDevice manifest(map.localPath(key + "/model_index.json"));
                 if (manifest.size() <= 1024 * 1024 && manifest.open(QIODevice::ReadOnly)
@@ -377,7 +411,7 @@ QList<StoredModel> SharedStorage::models(QString *error) const
             if (!nested) append(key, true);
         }
         for (auto it = entries.cbegin(); it != entries.cend(); ++it) {
-            if (!it.key().endsWith(".safetensors", Qt::CaseInsensitive) && !it.key().endsWith(".safetensor", Qt::CaseInsensitive)) continue;
+            if (!it.key().endsWith(".safetensors", Qt::CaseInsensitive) && !it.key().endsWith(".safetensor", Qt::CaseInsensitive) && !it.key().endsWith(".gguf", Qt::CaseInsensitive)) continue;
             bool nested = false; for (const auto &package : packages) if (it.key().startsWith(package + '/')) nested = true;
             if (!nested) append(it.key(), false);
         }
@@ -411,7 +445,10 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
     if (error) error->clear();
     const auto id = reference.value("path").toString();
     const auto base = m_drive.sectionPath(StoreSection::Models);
-    if (base.isEmpty() || reference.value("containerId").toString() != m_drive.identifier() || !relative(id)) {
+    const auto referenceContainer = reference.value("containerId").toString();
+    const bool knownContainer = referenceContainer == m_drive.identifier()
+        || (m_drive.storageKind() == SocietyDrive::StorageKind::LogicalDisk && referenceContainer == m_drive.storageIdentifier());
+    if (base.isEmpty() || !knownContainer || !relative(id)) {
         fail(error, QStringLiteral("The model reference does not belong to this Society container."));
         return {};
     }
@@ -419,7 +456,7 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
     if (QFileInfo::exists(iiFileProvider::Directory(m_drive.rootPath()).filePath(".society-sync/catalog.json"))) {
         for (const auto &model : models(error)) {
             if (model.id != id) continue;
-            if (model.reference(m_drive.identifier()) != reference) {
+            if (model.reference(referenceContainer) != reference) {
                 fail(error, "The Society model changed after it was selected. Select it again."); return {};
             }
             if (!model.available) { fail(error, "Download this model from its Society host before generation."); return {}; }
@@ -433,7 +470,7 @@ QString SharedStorage::resolveModel(const QJsonObject &reference, QString *error
     if (current.isEmpty()) return {};
     // Classification changes the location, not the bytes or the original reference contract.
     const auto model = inspect(current, base, id);
-    if (!model || model->reference(m_drive.identifier()) != reference) {
+    if (!model || model->reference(referenceContainer) != reference) {
         fail(error, QStringLiteral("The Society model changed after it was selected. Select it again."));
         return {};
     }

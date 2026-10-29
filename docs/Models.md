@@ -2,6 +2,10 @@
 
 `ModelStore`는 Society 컨테이너 내부 `Models/`의 분류·목록·이동·이전 경로 해석을 담당한다. 다음 23개 유형은 논리적 분류 계약이다. `SocietyDrive::create()`와 재열기, `ModelStore::ensureLayout()`은 미사용 분류 폴더를 미리 생성하지 않는다. 실제 모델을 가져오거나 분류 이동할 때 필요한 유형 폴더만 생성한다. 기존 파일을 정리하려면 `ModelStore::organize()`를 호출한다. 컨테이너 UUID와 9개 최상위 영역, 시스템 파일 공급자의 `Files/` 공개 범위는 유지한다.
 
+`SharedStorage::models()` lists `.safetensors`, legacy `.safetensor` and `.gguf` files, case-insensitively, and reports GGUF as its own format. ONNX files are excluded from model candidates. The same rules apply to local and synchronized catalogs; existing files and legacy references are preserved. This is a filename-based inventory, not proof of valid weights or executable architecture. Directory packages containing `model_index.json` retain their existing contract.
+
+On macOS arm64, the `build/safetensors-policy/` shared-storage suite and its staged installed consumer each passed 49 cases, including local and synchronized model lists, GGUF identification, ONNX exclusion, and preservation of existing files and references. The same 49 cases also passed in the canonical `build/` configuration. They do not establish model inference or behavior on other operating systems.
+
 ```text
 Models/
   Checkpoint/
@@ -124,7 +128,7 @@ CLI는 `iiSocietyContainerDriveTool model-types`, `models <container>`, `organiz
 
 `StorageModelCatalog::loading`은 디렉터리의 최초 조회만 나타낸다. 최초 완료 이후에는 파일 감시·폴링·명시적 `refresh()`가 백그라운드에서 실행되어도 같은 카탈로그의 `loadingChanged`, `modelsAboutToChange`, `modelsChanged`를 발생시키지 않는다. 실제 행·오류 변경은 스냅샷 비교로 게시하고 동시 요청은 하나의 후속 재검사로 합친다. 디렉터리 전환은 이전 비동기 결과를 폐기하고 새 최초 조회 상태를 시작한다.
 
-가중치 유형의 파일 카드는 safetensors/safetensor, GGUF/GGML, bin/ckpt/pt/pth, ONNX/PB/TFLite, H5/HDF5/NPZ/NPY, model/mlmodel/engine 확장자를 표시 대상으로 삼는다. README·LICENSE·NOTICE·독립 설정 JSON은 VAE 등 가중치 카드에 포함하지 않는다. 패키지는 한 카드로 유지한다. Wildcards는 txt/wildcards, Poses·Workflows·ComfyUI Workflows는 JSON/PNG/JPG/JPEG/WebP를 표시하며 Other는 미분류 파일을 유지한다. 이 규칙은 로컬 스캔과 메타데이터만 존재하는 동기화 카탈로그에서 동일하고, 파일 삭제·이동·다운로드 또는 가중치 실행을 수행하지 않는다. 확장자는 표시 후보 기준이며 가중치의 실행 가능성 검증은 아니다.
+The model catalog displays safetensors/safetensor, GGUF/GGML, bin/ckpt/pt/pth, PB/TFLite, H5/HDF5/NPZ/NPY and model/mlmodel/engine files as weight candidates. ONNX files are excluded from model cards in all categories, including Other, but remain stored and accessible through ordinary file APIs. README, LICENSE, NOTICE and independent configuration JSON are not weight cards. Packages remain a single card. Wildcards use txt/wildcards; Poses and Workflows use JSON and image files. The same rules apply to local and synchronized catalogs, without moving, deleting, downloading or executing files. Candidate listing does not establish inference compatibility.
 
 Krea2 가져오기는 검증된 텐서 시그니처(`txtfusion.projector.weight`, 호환되는 64-채널 `first.weight` 및 `last.linear.weight`)를 네이티브 및 ComfyUI 네임스페이스에서 사용합니다. 그들은 체크포인트로 분류되며, LoRA 탐지는 우선권을 유지합니다. 이전에 알 수 없었던 Krea2 파일을 정리하면 경로 참조를 유지하면서 Other에서 이동합니다. 잘린 텐서 페이로드는 인식된 Krea2 체크포인트에 해당되지 않습니다.
 

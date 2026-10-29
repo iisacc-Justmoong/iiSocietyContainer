@@ -1,0 +1,163 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:9d0d03d251a443c87bf68b4f0568f4f8302181f0ab9c959e0870ac65986cbde4",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/ContainerAliases.md",
+    "sha256": "a31b67e28aa265ce49364ff7d2934cda2271e16aa8d2cec260517f5fb56e44d4",
+    "bytes": 2621,
+    "line_count": 41,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Application container mirrors and file Aliases",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Application container mirrors and file Aliases\n",
+      "level": 1,
+      "title": "Application container mirrors and file Aliases"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 8,
+      "raw": "`iiSocietyContainer::Container` is a read-only QML binding object. It owns a\ncontainer ID, root address, availability, revision and Alias value snapshots.\nConstructing it, reading an Alias or filtering recent files performs no filesystem\nI/O. It does not mount storage, create placeholders, write payloads or infer\nexistence from a path. The storage bridge supplies its state with `synchronize()`.\n`refresh()` requests a new snapshot from that bridge.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 10,
+      "end_line": 15,
+      "raw": "An Alias contains `id` (container ID and logical key), `containerId`, `key`,\n`section`, `relativePath`, `name`, `exists`, `available`, `source`, `previewSource`,\n`thumbnailSource`, size and version metadata. `exists` means the logical object\nexists; `available` means its local payload can be read. A remote object may exist\nwithout any local file or parent directory. Its source is then empty. Aliases are\nmetadata references, not filesystem symlinks or copied image payloads.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 21,
+      "raw": "`iiSocietyHelper::FileSystem` owns a Container and synchronizes it from the pinned\nSociety drive and its catalog. Applications borrow this object and retain Alias\nvalues. They request publication, canvas persistence and previews through Helper.\nSource and replica identity remain separate from the application mirror. A\nsnapshot for another container cannot insert its Aliases into the current object.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 24,
+      "raw": "The QObject properties are the GUI binding boundary. The C++23 FileTree and\nMaintenance components retain their existing Qt-free interfaces.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 27,
+      "raw": "`iiSocietyContainer.alias` verifies snapshot-only access, unavailable payloads,\nremoval by synchronization and rejection of Aliases from another container.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 29,
+      "end_line": 34,
+      "raw": "Repeated `alias(key)` reads use a per-container metadata index built when the\nowner publishes a changed snapshot. It indexes the accepted, deduplicated and\nsorted rows, and is replaced before `stateChanged` is delivered. Query changes\nleave this unfiltered lookup intact; disconnection/replacement removes stale keys.\nReturned Alias maps remain value snapshots and cannot mutate the owner's data.\nLookup never probes storage or publishes a notification.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 36,
+      "end_line": 41,
+      "raw": "The index is an owned private child of the QML-facing QObject adapter. Exported\n`Container` headers, fields and object size remain unchanged so existing native\nowners that embed it by value keep their binary layout. The alias regression\nchecks replacement, duplicate/foreign/path filtering, independent containers,\nreentrant readers, caller-edited copies and a 10,000-row/2,000-query timing fixture.\nThe timing is metadata lookup only, not application frame rate or filesystem I/O.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Application container mirrors and file Aliases",
+      "anchor": "application-container-mirrors-and-file-aliases",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000013",
+        "line": 34,
+        "text": "Lookup never probes storage or publishes a notification.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

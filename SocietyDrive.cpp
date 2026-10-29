@@ -7,6 +7,7 @@
 #include "PhotosLayout.h"
 #include "DiskImage.h"
 #include "DirectoryStorage.h"
+#include <LogicalDisk.h>
 #include "StorageMaintenance.h"
 #include <QtCore/QFileInfo>
 #include <QtCore/QJsonArray>
@@ -74,11 +75,12 @@ QString sourceLocationError(const QString& path)
     while (ancestor.cdUp()) {
         const QFileInfo manifest(ancestor.filePath(QLatin1String(manifestName)));
         if (manifest.exists() || manifest.isSymLink() || manifest.isJunction()
+            || QFileInfo::exists(ancestor.filePath(".society-logical-disk"))
             || QFileInfo(ancestor.path()).suffix().compare("societycontainer", Qt::CaseInsensitive) == 0) {
             return QStringLiteral("A Society source cannot be inside another container. Choose its original source folder.");
         }
     }
-    if (!DirectoryStorage::isPackageDirectory(detail::nativePath(path)))
+    if (!DirectoryStorage::isPackageDirectory(detail::nativePath(path)) && !LogicalDisk::owner(detail::nativePath(path)))
         return QStringLiteral("The Society source must be an existing, unredirected .societycontainer directory package without legacy disk-image markers.");
     return {};
 }
@@ -104,10 +106,32 @@ SocietyDrive::SocietyDrive(QString root, QString identifier)
 {
     StorageMaintenance::monitor(detail::nativePath(m_rootPath), m_identifier.toStdString());
 }
+std::optional<SocietyDrive> SocietyDrive::createLogical(const QString &directoryPath, const QString &ownerApplication, QString *error) {
+    const auto prepared = LogicalDisk::prepare(detail::nativePath(directoryPath), ownerApplication.toStdString());
+    if (!prepared) { setError(error, QString::fromStdString(prepared.error())); return {}; }
+    return create(directoryPath, error);
+}
+SocietyDrive::StorageKind SocietyDrive::storageKind() const { return ownerApplication().isEmpty() ? StorageKind::Package : StorageKind::LogicalDisk; }
+QString SocietyDrive::ownerApplication() const {
+    // Valid packages never carry a logical owner. Keep their existing file
+    // operations independent of an extra marker/legacy-directory lookup.
+    if (m_rootPath.endsWith(".societycontainer", Qt::CaseInsensitive)) return {};
+    const auto owner = LogicalDisk::owner(detail::nativePath(m_rootPath)); return owner ? QString::fromStdString(*owner) : QString{};
+}
+QString SocietyDrive::storageIdentifier() const {
+    const QFileInfo info(iiFileProvider::Directory(m_rootPath).filePath(QLatin1String(manifestName)));
+    iiFileProvider::FileDevice file(info.filePath());
+    if (!info.isFile() || info.isSymLink() || info.size() > 65536 || !file.open(QIODevice::ReadOnly)) return {};
+    const auto record = QJsonDocument::fromJson(file.readAll()).object();
+    if (record.value("identifier") != m_identifier) return {};
+    const auto local = record.value("localIdentifier").toString();
+    return local.isEmpty() ? m_identifier : QUuid(local).isNull() ? QString{} : local;
+}
 
 std::optional<SocietyDrive> SocietyDrive::createAt(const QString& parentDirectory, QString* error)
 {
     setError(error, {});
+    if (LogicalDisk::owner(detail::nativePath(parentDirectory))) return create(parentDirectory, error);
     const auto location = DirectoryStorage::prepare(detail::nativePath(parentDirectory));
     if (!location) { setError(error, QString::fromStdString(location.error())); return {}; }
 #ifdef Q_OS_WIN

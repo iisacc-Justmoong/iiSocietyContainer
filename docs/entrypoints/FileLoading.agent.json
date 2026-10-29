@@ -1,0 +1,240 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:4f60b010b0dc395aafb0719e699cf842e8657fcef28f58daa5992289a7a8de57",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "FileLoading.md",
+    "sha256": "f8e2f1190d67992cf1701c3fb0c6b0290ccba5d1c62e3ec9fe5f213372ea7beb",
+    "bytes": 1065,
+    "line_count": 26,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Document moved",
+    "role": "compatibility",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Document moved\n",
+      "level": 1,
+      "title": "Document moved"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "html",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "<!-- workspace-docs:redirect -->\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "The maintained document is [FileLoading.md](docs/FileLoading.md).\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "html",
+      "start_line": 7,
+      "end_line": 8,
+      "raw": "<a id=\"파일-로딩-및-앱-로컬-캐시\"></a>\n[Continue to this section](docs/FileLoading.md#%ED%8C%8C%EC%9D%BC-%EB%A1%9C%EB%94%A9-%EB%B0%8F-%EC%95%B1-%EB%A1%9C%EC%BB%AC-%EC%BA%90%EC%8B%9C).\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "html",
+      "start_line": 10,
+      "end_line": 11,
+      "raw": "<a id=\"목록-캐시\"></a>\n[Continue to this section](docs/FileLoading.md#%EB%AA%A9%EB%A1%9D-%EC%BA%90%EC%8B%9C).\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "html",
+      "start_line": 13,
+      "end_line": 14,
+      "raw": "<a id=\"해시-및-미리보기-캐시\"></a>\n[Continue to this section](docs/FileLoading.md#%ED%95%B4%EC%8B%9C-%EB%B0%8F-%EB%AF%B8%EB%A6%AC%EB%B3%B4%EA%B8%B0-%EC%BA%90%EC%8B%9C).\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "html",
+      "start_line": 16,
+      "end_line": 17,
+      "raw": "<a id=\"검증과-측정\"></a>\n[Continue to this section](docs/FileLoading.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EC%B8%A1%EC%A0%95).\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "html",
+      "start_line": 19,
+      "end_line": 20,
+      "raw": "<a id=\"file-loading-and-app-local-caches\"></a>\n[Continue to this section](docs/FileLoading.md#file-loading-and-app-local-caches).\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "html",
+      "start_line": 22,
+      "end_line": 23,
+      "raw": "<a id=\"listing-cache\"></a>\n[Continue to this section](docs/FileLoading.md#listing-cache).\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "html",
+      "start_line": 25,
+      "end_line": 26,
+      "raw": "<a id=\"hash-and-preview-cache\"></a>\n[Continue to this section](docs/FileLoading.md#hash-and-preview-cache).\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Document moved",
+      "anchor": "document-moved",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000005",
+        "label": "FileLoading.md",
+        "target": "docs/FileLoading.md",
+        "kind": "relative",
+        "line": 5
+      },
+      {
+        "block_id": "b000007",
+        "label": "Continue to this section",
+        "target": "docs/FileLoading.md#%ED%8C%8C%EC%9D%BC-%EB%A1%9C%EB%94%A9-%EB%B0%8F-%EC%95%B1-%EB%A1%9C%EC%BB%AC-%EC%BA%90%EC%8B%9C",
+        "kind": "relative",
+        "line": 8
+      },
+      {
+        "block_id": "b000009",
+        "label": "Continue to this section",
+        "target": "docs/FileLoading.md#%EB%AA%A9%EB%A1%9D-%EC%BA%90%EC%8B%9C",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000011",
+        "label": "Continue to this section",
+        "target": "docs/FileLoading.md#%ED%95%B4%EC%8B%9C-%EB%B0%8F-%EB%AF%B8%EB%A6%AC%EB%B3%B4%EA%B8%B0-%EC%BA%90%EC%8B%9C",
+        "kind": "relative",
+        "line": 14
+      },
+      {
+        "block_id": "b000013",
+        "label": "Continue to this section",
+        "target": "docs/FileLoading.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EC%B8%A1%EC%A0%95",
+        "kind": "relative",
+        "line": 17
+      },
+      {
+        "block_id": "b000015",
+        "label": "Continue to this section",
+        "target": "docs/FileLoading.md#file-loading-and-app-local-caches",
+        "kind": "relative",
+        "line": 20
+      },
+      {
+        "block_id": "b000017",
+        "label": "Continue to this section",
+        "target": "docs/FileLoading.md#listing-cache",
+        "kind": "relative",
+        "line": 23
+      },
+      {
+        "block_id": "b000019",
+        "label": "Continue to this section",
+        "target": "docs/FileLoading.md#hash-and-preview-cache",
+        "kind": "relative",
+        "line": 26
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

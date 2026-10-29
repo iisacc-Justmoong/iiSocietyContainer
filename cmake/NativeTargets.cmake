@@ -5,15 +5,18 @@ if(NOT iiFileProviderObjects_DOCUMENT_API_VERSION EQUAL 1)
 endif()
 find_package(iiFileProviderCatalog 0.7.3 CONFIG REQUIRED)
 add_library(iiSocietyContainerFileTree ${_library_type} FileTree.h FileTree.cpp DirectoryStorage.h DirectoryStorage.cpp FileRepository.h FileRepository.cpp iiSocietyContainerExport.h)
+target_sources(iiSocietyContainerFileTree PRIVATE src/Storage/LogicalDisk.h src/Storage/LogicalDisk.cpp)
 add_library(iiSocietyContainer::FileTree ALIAS iiSocietyContainerFileTree)
 target_compile_features(iiSocietyContainerFileTree PUBLIC cxx_std_23)
 target_compile_definitions(iiSocietyContainerFileTree PRIVATE IISOCIETYCONTAINER_FILETREE_BUILD)
 target_include_directories(iiSocietyContainerFileTree PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/Storage>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 set_target_properties(iiSocietyContainerFileTree PROPERTIES EXPORT_NAME FileTree
     CXX_EXTENSIONS OFF VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR}
     CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)
+install(FILES src/Storage/LogicalDisk.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 add_library(iiSocietyContainerMaintenance ${_library_type} StorageMaintenance.h StorageMaintenance.cpp iiSocietyContainerExport.h)
 add_library(iiSocietyContainer::Maintenance ALIAS iiSocietyContainerMaintenance)

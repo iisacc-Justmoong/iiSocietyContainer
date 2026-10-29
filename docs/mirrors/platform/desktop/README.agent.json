@@ -1,0 +1,511 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:27cae3bb9eb25674c51f86492d1707d7f81a04a81331d26f4b9e95c085862aec",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "platform/desktop/README.md",
+    "sha256": "98d1e9c4a4dac4933cf1c616ef7e1658374a67401a3c87a8300b749c67811fab",
+    "bytes": 6419,
+    "line_count": 59,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Society drives of Windows and Linux",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "html",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "<a id=\"windows와-linux의-society-드라이브\"></a>\n"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "heading",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "# Society drives of Windows and Linux\n",
+      "level": 1,
+      "title": "Society drives of Windows and Linux"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "`iiSocietyContainerMount` is a user-session process separate from the Society app. It provides a Dokan 2 removable drive letter on Windows and a libfuse 3 mount on Linux. Both adapters use `FilesView` to project **only the contents of Society.societycontainer/Files** as the root. The remaining eight sections and `.society-drive.json` do not appear in the public drive. Society and Helper continue to use the original nine sections.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "Implement general file and folder creation, open, read, write, size change, name change, move, delete, and metadata and capacity queries. Do not provide symbolic links, Windows junction/reparse point, alternate data streams, or special files. The feature of adding ACL isolation for the same OS user who can directly open the original as a general directory is not included. Linux opens sub-paths with `openat` and `O_NOFOLLOW` and verifies the device, inode, and container UUID of the opened Files directory each time.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "html",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "<a id=\"빌드\"></a>\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "heading",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "## Build\n",
+      "level": 2,
+      "title": "Build"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "Common dependencies are CMake 3.24+, C++23, Qt **6.8.3** Core and Network. Tests additionally use Qt Test and Python 3.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "list",
+      "start_line": 15,
+      "end_line": 16,
+      "raw": "- Windows: Install the [Dokan 2](https://github.com/dokan-dev/dokany/releases)SDK and signed driver. Specify `-DDokan_ROOT=<SDK path>` in CMake. x64 · ARM64 ·x86 libraries are selected to match the target architecture. `dokan2.dll` and the corresponding version of the driver are required at deployment. Copying only the user-mode DLL cannot replace kernel driver installation.\n- Linux: Install `libfuse3-dev`, `fuse3`, `pkg-config`, C++ build tools. `fuse3 >= 3.10` and available `/dev/fuse` are required. Use user mounts and do not enable `allow_other`.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Windows: Install the [Dokan 2](https://github.com/dokan-dev/dokany/releases)SDK and signed driver. Specify `-DDokan_ROOT=<SDK path>` in CMake. x64 · ARM64 ·x86 libraries are selected to match the target architecture. `dokan2.dll` and the corresponding version of the driver are required at deployment. Copying only the user-mode DLL cannot replace kernel driver installation.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Linux: Install `libfuse3-dev`, `fuse3`, `pkg-config`, C++ build tools. `fuse3 >= 3.10` and available `/dev/fuse` are required. Use user mounts and do not enable `allow_other`.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "fenced_code",
+      "start_line": 18,
+      "end_line": 23,
+      "raw": "```sh\ncmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=<Qt path>\ncmake --build build --parallel\nctest --test-dir build --output-on-failure\ncmake --install build\n```\n",
+      "language": "sh",
+      "code": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=<Qt path>\ncmake --build build --parallel\nctest --test-dir build --output-on-failure\ncmake --install build\n",
+      "closed": true
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "The installation package provides the helper executable path as `iiSocietyContainer_MOUNT_EXECUTABLE`. The Society app also copies this executable to the app execution directory. The deployer must package the same Qt runtime and SDK DLL /shared library as Society.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "When `Dokan_ROOT` contains the architecture-matched `dokan2.dll` and `license.lgpl.txt`, the SDK stages the DLL and installs it with `LICENSE-Dokan.txt`. The package exposes these paths as `iiSocietyContainer_MOUNT_RUNTIME` and `iiSocietyContainer_MOUNT_LICENSE`, and Society copies them next to its executable. A missing user-mode DLL does not become a substitute for the required signed kernel driver.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "html",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "<a id=\"등록과-수명\"></a>\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "heading",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "## Registration and Lifecycle\n",
+      "level": 2,
+      "title": "Registration and Lifecycle"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "fenced_code",
+      "start_line": 33,
+      "end_line": 39,
+      "raw": "```sh\niiSocietyContainerMount register /absolute/path/to/Society.societycontainer\niiSocietyContainerMount list\niiSocietyContainerMount path <container-uuid>\niiSocietyContainerMount refresh <container-uuid>\niiSocietyContainerMount unregister <container-uuid>\n```\n",
+      "language": "sh",
+      "code": "iiSocietyContainerMount register /absolute/path/to/Society.societycontainer\niiSocietyContainerMount list\niiSocietyContainerMount path <container-uuid>\niiSocietyContainerMount refresh <container-uuid>\niiSocietyContainerMount unregister <container-uuid>\n",
+      "closed": true
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "The command returns JSON. On success, it includes `identifier`, `sourcePath`, `systemPath`, `enabled`, `isMounted`, and `filesystemType`; on failure, it includes `error`. `mount <source>` aliases registration and `unmount <id>` aliases removal. A protocol-test stub has no filesystem type and reports `isMounted: false`. Windows queries the real volume label, filesystem name, and UUID-derived serial before identifying the mount. Linux confirms the native FUSE filesystem. The first command starts the user session service when needed. OS restricts single instance and request access via a user-specific local socket. Registration information and the service lock are stored in `<container>/.society-runtime/mount-service/`. A service manages only that container; saved registrations pointing elsewhere are ignored. If the container UUID changes, existing registrations do not automatically accommodate the new source.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "Windows selects an available drive letter from S: and creates a `Society` volume for the current session. Linux mounts at `<container>/.society-runtime/mounts/<uuid>/Society`; redirected or nonempty backing directories are rejected. Only Files is enumerated, so the private runtime mount cannot recurse into itself. The operating system handles the mount root's `..` traversal as it does for other mounted volumes.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "At initial registration, Windows HKCU Run or Linux XDG autostart records the `serve` command. The small shared-storage selection pointer identifies the package on login; `serve <source>` can select it explicitly. OS socket creation, drive-letter registration, and login records are system bootstrap integration. Society's registry and lock remain inside the selected package, and the former `SOCIETY_MOUNT_STATE_DIRECTORY` external override is ignored. On service restart, valid registrations from that package are restored and the mount is held even if Society window is closed. Linux requests auto_unmount and recovers only this user's disconnected Society mount with the expected in-package point. Active or foreign mounts are preserved. `SOCIETY_STORAGE_SETTINGS_PATH` isolates the bootstrap pointer in tests, and `SOCIETY_MOUNT_AUTOSTART=0` omits login registration.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "html",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "<a id=\"검사와-의존성-선택\"></a>\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "heading",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "## Inspection and Dependency Selection\n",
+      "level": 2,
+      "title": "Inspection and Dependency Selection"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "`files_view` inspects the public boundary and UUID replacement. `mount_service` inspects registration, persistence, restart, and unmount using stub mounts. Actual mounts are verified with a separate command.\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "fenced_code",
+      "start_line": 53,
+      "end_line": 55,
+      "raw": "```sh\npython3 tests/native_mount.py <drive-tool> <mount-executable> <absolute-build-directory>\n```\n",
+      "language": "sh",
+      "code": "python3 tests/native_mount.py <drive-tool> <mount-executable> <absolute-build-directory>\n",
+      "closed": true
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 56,
+      "end_line": 56,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "This check creates only temporary copies and new drives and disables login registration. It checks and then releases read-write-rename-delete-apply-original-changes-block-private-area-restart-service on actual OS mounts. Execution on Windows requires the actual Dokan kernel driver and does not substitute for execution verification via cross-compilation alone.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 58,
+      "end_line": 58,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "Without creating a kernel driver directly, it uses maintained [Dokan API](https://dokan-dev.github.io/dokany-doc/html/)and [libfuse API](https://libfuse.github.io/doxygen/structfuse__operations.html). The Dokan user-mode library is LGPL-3.0 -or-later, and the libfuse library is LGPL-2.1 -or-later. The library is set as an external dynamic dependency, preserving the license, replaceability, and source provision obligation in the deployment configuration. No additional cloud services or usage fees are required.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000003",
+      "parent_id": null,
+      "level": 1,
+      "title": "Society drives of Windows and Linux",
+      "anchor": "society-drives-of-windows-and-linux",
+      "start_line": 3
+    },
+    {
+      "block_id": "b000011",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Build",
+      "anchor": "build",
+      "start_line": 11
+    },
+    {
+      "block_id": "b000025",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Registration and Lifecycle",
+      "anchor": "registration-and-lifecycle",
+      "start_line": 31
+    },
+    {
+      "block_id": "b000037",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Inspection and Dependency Selection",
+      "anchor": "inspection-and-dependency-selection",
+      "start_line": 49
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 5,
+        "text": "`iiSocietyContainerMount` is a user-session process separate from the Society app. It provides a Dokan 2 removable drive letter on Windows and a libfuse 3 mount on Linux. Both adapters use `FilesView` to project **only the contents of Society.societycontainer/Files** as the root. The remaining eight sections and `.society-drive.json` do not appear in the public drive. Society and Helper continue to use the original nine sections.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 7,
+        "text": "Implement general file and folder creation, open, read, write, size change, name change, move, delete, and metadata and capacity queries. Do not provide symbolic links, Windows junction/reparse point, alternate data streams, or special files. The feature of adding ACL isolation for the same OS user who can directly open the original as a general directory is not included. Linux opens sub-paths with `openat` and `O_NOFOLLOW` and verifies the device, inode, and container UUID of the opened Files directory each time.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 15,
+        "text": "- Windows: Install the [Dokan 2](https://github.com/dokan-dev/dokany/releases)SDK and signed driver. Specify `-DDokan_ROOT=<SDK path>` in CMake. x64 · ARM64 ·x86 libraries are selected to match the target architecture. `dokan2.dll` and the corresponding version of the driver are required at deployment. Copying only the user-mode DLL cannot replace kernel driver installation.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000015",
+        "line": 16,
+        "text": "- Linux: Install `libfuse3-dev`, `fuse3`, `pkg-config`, C++ build tools. `fuse3 >= 3.10` and available `/dev/fuse` are required. Use user mounts and do not enable `allow_other`.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000019",
+        "line": 25,
+        "text": "The installation package provides the helper executable path as `iiSocietyContainer_MOUNT_EXECUTABLE`. The Society app also copies this executable to the app execution directory. The deployer must package the same Qt runtime and SDK DLL /shared library as Society.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 27,
+        "text": "When `Dokan_ROOT` contains the architecture-matched `dokan2.dll` and `license.lgpl.txt`, the SDK stages the DLL and installs it with `LICENSE-Dokan.txt`. The package exposes these paths as `iiSocietyContainer_MOUNT_RUNTIME` and `iiSocietyContainer_MOUNT_LICENSE`, and Society copies them next to its executable. A missing user-mode DLL does not become a substitute for the required signed kernel driver.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 41,
+        "text": "The command returns JSON. On success, it includes `identifier`, `sourcePath`, `systemPath`, `enabled`, `isMounted`, and `filesystemType`; on failure, it includes `error`. `mount <source>` aliases registration and `unmount <id>` aliases removal. A protocol-test stub has no filesystem type and reports `isMounted: false`. Windows queries the real volume label, filesystem name, and UUID-derived serial before identifying the mount. Linux confirms the native FUSE filesystem. The first command starts the user session service when needed. OS restricts single instance and request access via a user-specific local socket. Registration information and the service lock are stored in `<container>/.society-runtime/mount-service/`. A service manages only that container; saved registrations pointing elsewhere are ignored. If the container UUID changes, existing registrations do not automatically accommodate the new source.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000045",
+        "line": 59,
+        "text": "Without creating a kernel driver directly, it uses maintained [Dokan API](https://dokan-dev.github.io/dokany-doc/html/)and [libfuse API](https://libfuse.github.io/doxygen/structfuse__operations.html). The Dokan user-mode library is LGPL-3.0 -or-later, and the libfuse library is LGPL-2.1 -or-later. The library is set as an external dynamic dependency, preserving the license, replaceability, and source provision obligation in the deployment configuration. No additional cloud services or usage fees are required.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000017",
+        "language": "sh",
+        "code": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=<Qt path>\ncmake --build build --parallel\nctest --test-dir build --output-on-failure\ncmake --install build\n"
+      },
+      {
+        "block_id": "b000027",
+        "language": "sh",
+        "code": "iiSocietyContainerMount register /absolute/path/to/Society.societycontainer\niiSocietyContainerMount list\niiSocietyContainerMount path <container-uuid>\niiSocietyContainerMount refresh <container-uuid>\niiSocietyContainerMount unregister <container-uuid>\n"
+      },
+      {
+        "block_id": "b000041",
+        "language": "sh",
+        "code": "python3 tests/native_mount.py <drive-tool> <mount-executable> <absolute-build-directory>\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000015",
+        "label": "Dokan 2",
+        "target": "https://github.com/dokan-dev/dokany/releases",
+        "kind": "external",
+        "line": 15
+      },
+      {
+        "block_id": "b000045",
+        "label": "Dokan API",
+        "target": "https://dokan-dev.github.io/dokany-doc/html/",
+        "kind": "external",
+        "line": 59
+      },
+      {
+        "block_id": "b000045",
+        "label": "libfuse API",
+        "target": "https://libfuse.github.io/doxygen/structfuse__operations.html",
+        "kind": "external",
+        "line": 59
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

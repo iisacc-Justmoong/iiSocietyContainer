@@ -1,0 +1,2251 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:fb0b648680b3bd670c3f959335a7429418a48b90d1726c5d87ac1e91d2214134",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "README.md",
+    "sha256": "c1c52f37f86f0f67cf5a6bd9dcffb9e6ee8477d1e6aa275745bd6b861c3c644d",
+    "bytes": 38398,
+    "line_count": 393,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "iiSocietyContainer",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# iiSocietyContainer\n",
+      "level": 1,
+      "title": "iiSocietyContainer"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "Project-owned fixed assets belong in `resources/`. User models and files remain in their Society containers.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 9,
+      "raw": "Storage may be a directory package or an explicitly application-owned logical\ndisk. An entitled Apple client can bootstrap persistent storage in the shared\niisacc App Group before Society is installed. Society later adopts the same\npaths, identity, models, generated files and managed history through the shared\nregistration. See [logical storage and ownership](docs/LogicalStorage.md).\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 14,
+      "raw": "Native `FileRepository` and the `SharedStorage` adapter connect actual files to\niiFileProvider RAW originals, mutable revisions, work sessions, classification\nsearch and ontology directories. Public files retain their native paths. See\n[managed storage and search](docs/ManagedFiles.md) for intake, cursors and recovery.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "[Windows build and execution](docs/WindowsBuildAndRun.md)\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 18,
+      "end_line": 20,
+      "raw": "Package release: **0.16.2** (2026-10-19). This patch packages the current\nsource snapshot; build, test and installation evidence is recorded in the SDK\npatch-release report. Earlier versioned feature notes remain historical.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 22,
+      "raw": "\n\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 29,
+      "raw": "All iisacc products share the `.societycontainer` storage contract through\niiSocietyContainer on every platform. `ApplicationStorage::openForApplication()`\nreuses the selected drive or bootstraps one suite-wide disk. Windows and Linux\nresolve an app-independent user data root; Apple App Groups and Android's signed\nprovider are platform access adapters. Desktop deployments can configure\n`IISACC_SHARED_STORAGE_ROOT`. Read-only discovery never creates a disk. See\n[shared storage and bootstrap](docs/LogicalStorage.md).\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 33,
+      "raw": "Applications can retain a read-only `Container` object and logical file Aliases.\n`iiSocietyHelper` supplies their state, payload availability and previews; the\nmirror does not access or save files. See [Container Aliases](docs/ContainerAliases.md).\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 45,
+      "raw": "Ordinary source drives now register identity-checked temporary-file and private\nlog maintenance: one process worker scans immediately and every five minutes,\ndeletes abandoned SDK temporaries without an age delay, and retains one newest\nlog per SDK-private log directory. Shared cross-process leases preserve active\nwrites and resumable transfers. Public `.tmp`/`.log` files and SQLite WAL files\nremain outside this policy. Recognized Finder `.DS_Store` metadata is removed\nonly at the source and Models roots; ordinary namesakes, links, public Files\nmetadata, and nested package metadata remain intact. The Qt-free `Maintenance` component and installed\n`iiSocietyContainerMaintenanceTool --once|--watch` are described in\n[StorageMaintenance.md](docs/StorageMaintenance.md). No maintenance operation\nrestores or mounts a legacy image.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "On macOS 26 and later, signed directory storage can also expose `Files/` as a real FSKit filesystem named Society. The original `.societycontainer` directory package, UUID, and schema-1 shared settings stay authoritative. See [directory storage and Finder mounting](docs/DirectoryStorage.md) for developer provisioning, extension activation, native CLI commands, and explicit OS-mount validation.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "Windows exposes the same Files boundary as a Dokan 2 removable drive with an identity-checked native volume. Android exposes a verified DocumentsProvider root in system Files rather than a kernel volume. Native replies distinguish these connection types; reconnect preserves the original source and UUID. See [desktop mounting](platform/desktop/README.md) and [Android integration](platform/android/README.md).\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "0.14.0 separates the original file and the host's repository list. `StorageMap` reads the logical key, version, size, hash, and local hold status of `.society-sync/catalog.json`, and atomically records a download request to fix a specific version at `.society-sync/requests/`. It does not create an empty original file for empty items. `available(keys)` must be true and the request status must be `ready` before using the file. It rejects path escapes, redirects, and lists from other containers.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "`StorageDirectoryModel` merges the actual directory and the host list in the worker thread to provide name, size, preview, and hold status. It selects only the immediate children of the current folder to validate the path, and reuses the parsing result for unchanged repository maps. `setFolder()` and `refresh()` do not wait for the GUI call and discard the late results of the previous folder. Empty folder URLs stop the lookup timer. `activate` requests the non-held file and sends `activated` after the verified download completes. `StorageModelCatalog` constructs the model card with name, path, format, size, and hold status without reading the original header or package if the host catalog exists. Catalog monitoring is limited to two directories, and local-only fallback monitoring is limited to a maximum of 64 items. `activatePath()` passes only the selected file or package as a version-fixed download request to the SDK and may send `objectReady` after completion. It maintains the structural judgment and import validation for local-only repositories. `SharedStorage::models()` also displays non-held models, and `resolveModel()` succeeds only when all required files are ready. The model reference of a package is fixed to the version of the entire configuration file. `shared_storage` tests check only-list models, request cancellation, opening after navigation and download completion without file creation.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 55,
+      "end_line": 55,
+      "raw": "`Files/` starts without default files or folders. Automatic creation and name reservation/deletion protection for Documents, Audios, 3D objects have been removed. Only existing empty default folders are one time cleaned up, preserving user content and folders created directly afterward. Refer to [Files contract](docs/Files.md). Photos is an independent top-level area.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 56,
+      "end_line": 56,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "The drive's display name is `Society`. Since 0.9.1, new manifests also record this name. Existing `Society Container` manifests open without modifying their UUIDs or files and are displayed as `Society`. Read boundaries in C++, Apple, and Android accept both names. The Windows volume name, Linux FUSE name, Android document root, and Apple File Provider root also use the same display name.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 58,
+      "end_line": 58,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "macOS re-invokes `register` with the existing original, updating the display name with the same File Provider domain ID. The domain is not removed. The installed Apple SDK's `NSFileProviderManager.addDomain` contract is used, following [Apple domain API](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/add(_:completionhandler:)). The adapter bundle name is also changed to `Society.app` to display the same name in the Finder sidebar. CMake's `iiSocietyContainer_NATIVE_APP` provides the new path, and the executable/bundle ID and Windows auto-launch registration key are kept as internal identifiers for existing integration.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 60,
+      "end_line": 60,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 61,
+      "end_line": 61,
+      "raw": "`iiSocietyContainer.drive` and `native_store` verify the new name, compatibility with the previous name, UUID, and preservation of the existing manifest. iOS package tests and Android provider tests check the name displayed on the system.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "Version 0.14.0 libraries using C++23 and Qt 6.8.3 Core (desktop·Android dynamic, iOS static) are. `DiskImage` creates a separate APFS disk image at the archive location and mounts it. The existing directory-based API is a low-level compatibility API for the logical layout. `SocietyDrive` consists of a persistent drive ID and 9 areas. macOS · iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider provide the contents of `Files/` to the system drive root. Society and iisacc app use internal 9 areas, and other Android apps use the same signed URI and Helper file system API.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 65,
+      "end_line": 77,
+      "raw": "`Models/` retains a 23-type logical taxonomy without precreating unused folders.\nNew and reopened drives leave empty Models directories empty; `ensureLayout()`\nvalidates existing categories. A writer's `categoryPath(type)` prepares only the\nrequested category, and model placement creates only its selected destination\nparents. Existing models, companions, folders, UUIDs, and the nine-section\ncontract remain intact. `ModelStore` is responsible for listing,\nauto-classification, manual type modification, and path interpretation, while\n`ModelClassifier` reads limited metadata. 0.11.1's `metadata()` queries the\narchitecture, precision, and explicit media classification to be displayed on\nthe consumer app's cards. 0.11.2 adds Anima checkpoint structure validation and\nSafetensors tensor dimension, data type, and byte range verification. Creation,\nlegacy cleanup, judgment rules, move history, and CLI contracts are described\nin the [Models management document](docs/Models.md).\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 78,
+      "end_line": 78,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "html",
+      "start_line": 79,
+      "end_line": 79,
+      "raw": "<a id=\"공개-api\"></a>\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "heading",
+      "start_line": 81,
+      "end_line": 81,
+      "raw": "## Public API\n",
+      "level": 2,
+      "title": "Public API"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 82,
+      "end_line": 82,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 83,
+      "end_line": 83,
+      "raw": "Version 0.15.0 adds live file metadata, immediate directory children, and recursive tree snapshots through `SocietyContainer::entry/entries/tree` and `SocietyDrive::entry/entries/tree`. Nodes expose native and relative paths, parent relationships, file type, size, modification time, permissions, loaded children, and lookup with `find()`. Depth and node limits keep traversal explicit. Drive snapshots preserve all nine logical sections and correctly map a separate Files volume. The standalone `iiSocietyContainer::FileTree` C++23 target has no Qt dependency. Directory creation and collision-safe moves extend `FileOperations`; see the [file tree API and examples](docs/FileTree.md).\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 85,
+      "end_line": 85,
+      "raw": "`SocietyDrive::create()` and `open()` do not accept a location inside another Society container as the source. On macOS, Finder replicas under `~/Library/CloudStorage/` are also rejected. Paths are resolved to their actual locations and validated before file creation, preventing 8 app areas from being recreated inside `Files/`. Shared storage settings and Helper file-system access apply the same boundary. The source retains 9 areas, while the system drive exposes only the contents of the source `Files/`. Recovery procedures are described in the [macOS file contract](platform/macos/README.md#파일-계약).\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 86,
+      "end_line": 86,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "fenced_code",
+      "start_line": 87,
+      "end_line": 105,
+      "raw": "```cpp\n#include <iiSocietyContainer.h>\n\nusing iiSocietyContainer::SocietyContainer;\nusing PathKind = SocietyContainer::PathKind;\n\nconst SocietyContainer container(QStringLiteral(\"/data/MyLibrary\"));\nif (!container.isValid()) {\n    qWarning(\"%s\", qPrintable(container.errorString()));\n    return;\n}\n\nconst QString root = container.rootPath(); // Normalized absolute directory path\nconst auto kind = container.classifyPath(QStringLiteral(\".\")); // PathKind::Root\nconst auto asset = container.classifyPath(QStringLiteral(\"assets/model.bin\"));\n// If the actual file exists within the root, this is PathKind::Entry.\nconst auto outside = container.classifyPath(QStringLiteral(\"../OtherLibrary\"));\n// PathKind::Outside\n```\n",
+      "language": "cpp",
+      "code": "#include <iiSocietyContainer.h>\n\nusing iiSocietyContainer::SocietyContainer;\nusing PathKind = SocietyContainer::PathKind;\n\nconst SocietyContainer container(QStringLiteral(\"/data/MyLibrary\"));\nif (!container.isValid()) {\n    qWarning(\"%s\", qPrintable(container.errorString()));\n    return;\n}\n\nconst QString root = container.rootPath(); // Normalized absolute directory path\nconst auto kind = container.classifyPath(QStringLiteral(\".\")); // PathKind::Root\nconst auto asset = container.classifyPath(QStringLiteral(\"assets/model.bin\"));\n// If the actual file exists within the root, this is PathKind::Entry.\nconst auto outside = container.classifyPath(QStringLiteral(\"../OtherLibrary\"));\n// PathKind::Outside\n",
+      "closed": true
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 106,
+      "end_line": 106,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 107,
+      "end_line": 107,
+      "raw": "`SocietyContainer` generator requires a non-empty actual file system directory path. Relative paths passed to the generator are interpreted based on the working directory at the time of creation. Subsequently, the root is fixed as a normalized absolute path, so even if the working directory changes, it points to the same space. Names with spaces and Unicode are preserved as is. Paths containing files, non-existent directories, NUL characters, and Qt resource paths are rejected, and upon generation failure, `isValid()` returns `false`, `rootPath()` returns an empty string, and `errorString()` returns an error description.\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 108,
+      "end_line": 108,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 109,
+      "end_line": 109,
+      "raw": "Relative paths passed to `classifyPath()` are interpreted based on the root of this space. The judgment results are as follows.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 110,
+      "end_line": 110,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "table",
+      "start_line": 111,
+      "end_line": 115,
+      "raw": "|Result|Meaning|\n| --- | --- |\n| `PathKind::Root` |The specified SocietyContainer directory itself|\n| `PathKind::Entry` |A file or directory that actually exists under the root|\n| `PathKind::Outside` |External paths, non-existent items, invalid input, or invalid containers|\n",
+      "columns": [
+        "Result",
+        "Meaning"
+      ],
+      "rows": [
+        [
+          "`PathKind::Root`",
+          "The specified SocietyContainer directory itself"
+        ],
+        [
+          "`PathKind::Entry`",
+          "A file or directory that actually exists under the root"
+        ],
+        [
+          "`PathKind::Outside`",
+          "External paths, non-existent items, invalid input, or invalid containers"
+        ]
+      ]
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 116,
+      "end_line": 116,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "paragraph",
+      "start_line": 117,
+      "end_line": 117,
+      "raw": "`.` is the root and an empty string is invalid input. Symbolic links are judged based on the actual target path. Links pointing from inside to outside are `Outside`, and links pointing from outside to inside items are `Entry`. Paths that go beyond the root with `..` and side directories with only the same prefix like `MyLibrary-backup` are also `Outside`. If the root itself is specified as a link, it is fixed to the initial target directory, and changing the original link to another location does not change the space's root.\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 118,
+      "end_line": 118,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 119,
+      "end_line": 119,
+      "raw": "Space specification is stored in the object. It does not create directories, rename names, or record marker files, nor does it modify existing content. To use in a separate execution, the object must be reconstructed with the same path. Since `isValid()` and path validation check the current file system, they become invalid if the specified root disappears or is replaced by a link pointing to a different location. Since it is based on the path, it becomes valid again if an actual directory is recreated at the same location. This is a path classification API, and it does not provide access control or file system isolation features that block concurrent file system changes.\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 120,
+      "end_line": 120,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 121,
+      "end_line": 121,
+      "raw": "Existing `iiSocietyContainer::helloWorld()` continues to return `Hello world!` for consumer compatibility. The container's public header and source are kept together in the project root, while the domain model's header and source are kept together in `src/Store/`. The public API uses platform-specific export/import macros for common `iiSocietyContainerExport.h`. CMake targets `iiSocietyContainer::iiSocietyContainer` and delivers C++20 requirements and Qt Core dependencies to the consumer.\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 122,
+      "end_line": 122,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "html",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "<a id=\"논리-영역\"></a>\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 124,
+      "end_line": 124,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "heading",
+      "start_line": 125,
+      "end_line": 125,
+      "raw": "## Logical Domain\n",
+      "level": 2,
+      "title": "Logical Domain"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 126,
+      "end_line": 126,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 127,
+      "end_line": 127,
+      "raw": "`iiSocietyContainer::StoreSection` enum clearly distinguishes domains. The domain's unique identifier is the enum value, and the string returned by `storeSectionName()` is the display name. The domain list is fixed in the following order.\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 128,
+      "end_line": 128,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "table",
+      "start_line": 129,
+      "end_line": 138,
+      "raw": "|identifier|display name|\n| --- | --- |\n| `StoreSection::AssetLibrary` | Asset Library |\n| `StoreSection::Deleted` | Deleted |\n| `StoreSection::Files` | Files |\n| `StoreSection::Forked` | Forked |\n| `StoreSection::GenerationHistory` | Generation History |\n| `StoreSection::Models` | Models |\n| `StoreSection::Published` | Published |\n| `StoreSection::ThinkingSpace` | Thinking Space |\n",
+      "columns": [
+        "identifier",
+        "display name"
+      ],
+      "rows": [
+        [
+          "`StoreSection::AssetLibrary`",
+          "Asset Library"
+        ],
+        [
+          "`StoreSection::Deleted`",
+          "Deleted"
+        ],
+        [
+          "`StoreSection::Files`",
+          "Files"
+        ],
+        [
+          "`StoreSection::Forked`",
+          "Forked"
+        ],
+        [
+          "`StoreSection::GenerationHistory`",
+          "Generation History"
+        ],
+        [
+          "`StoreSection::Models`",
+          "Models"
+        ],
+        [
+          "`StoreSection::Published`",
+          "Published"
+        ],
+        [
+          "`StoreSection::ThinkingSpace`",
+          "Thinking Space"
+        ]
+      ]
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 139,
+      "end_line": 139,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "fenced_code",
+      "start_line": 140,
+      "end_line": 151,
+      "raw": "```cpp\nusing iiSocietyContainer::StoreSection;\nusing iiSocietyContainer::storeSectionName;\n\nconst auto sections = container.sections(); // 9 sections for a valid container\nfor (const StoreSection section : sections) {\n    const QString name = storeSectionName(section);\n    // Identify the section with section and display name on screen.\n}\n\nconst bool hasModels = container.hasSection(StoreSection::Models);\n```\n",
+      "language": "cpp",
+      "code": "using iiSocietyContainer::StoreSection;\nusing iiSocietyContainer::storeSectionName;\n\nconst auto sections = container.sections(); // 9 sections for a valid container\nfor (const StoreSection section : sections) {\n    const QString name = storeSectionName(section);\n    // Identify the section with section and display name on screen.\n}\n\nconst bool hasModels = container.hasSection(StoreSection::Models);\n",
+      "closed": true
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 152,
+      "end_line": 152,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "paragraph",
+      "start_line": 153,
+      "end_line": 153,
+      "raw": "`allStoreSections()` returns a list of 9 areas regardless of container status. `container.sections()` and `container.hasSection()` reflect the current validity of the container. If the container is invalid, it returns an empty list and `false` respectively. For undefined enum values, `storeSectionName()` returns an empty string and `hasSection()` returns `false`.\n"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 154,
+      "end_line": 154,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "paragraph",
+      "start_line": 155,
+      "end_line": 155,
+      "raw": "region lookup for `SocietyContainer` is responsible only for identification and separation. Specifying an empty directory returns 9 regions, but does not create physical directories or modify existing files through lookup alone. All regions are provided in the same manner, without defining data formats, retention policies, or permissions per region. `classifyPath()` maintains the existing container boundary determination. The actual directory layout of the drive is explicitly initialized in `SocietyDrive::create()`.\n"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 156,
+      "end_line": 156,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "paragraph",
+      "start_line": 157,
+      "end_line": 157,
+      "raw": "Region definition and name list are handled by `src/Store/StoreSection.h` and `src/Store/StoreSection.cpp`. This sub-module does not reference container implementation, while the upper-level `SocietyContainer` uses the region model.\n"
+    },
+    {
+      "id": "b000076",
+      "kind": "blank",
+      "start_line": 158,
+      "end_line": 158,
+      "raw": "\n"
+    },
+    {
+      "id": "b000077",
+      "kind": "html",
+      "start_line": 159,
+      "end_line": 159,
+      "raw": "<a id=\"드라이브\"></a>\n"
+    },
+    {
+      "id": "b000078",
+      "kind": "blank",
+      "start_line": 160,
+      "end_line": 160,
+      "raw": "\n"
+    },
+    {
+      "id": "b000079",
+      "kind": "heading",
+      "start_line": 161,
+      "end_line": 161,
+      "raw": "## drive\n",
+      "level": 2,
+      "title": "drive"
+    },
+    {
+      "id": "b000080",
+      "kind": "blank",
+      "start_line": 162,
+      "end_line": 162,
+      "raw": "\n"
+    },
+    {
+      "id": "b000081",
+      "kind": "fenced_code",
+      "start_line": 163,
+      "end_line": 176,
+      "raw": "```cpp\n#include <SocietyDrive.h>\n\nQString error;\nauto drive = iiSocietyContainer::SocietyDrive::create(\"/data/MyLibrary.societycontainer\", &error);\nif (!drive) {\n    qWarning(\"%s\", qPrintable(error));\n    return;\n}\nconst QString id = drive->identifier();\nconst QString files = drive->sectionPath(iiSocietyContainer::StoreSection::Files);\nauto reopened = iiSocietyContainer::SocietyDrive::open(\"/data/MyLibrary.societycontainer\", &error);\n// reopened->identifier() == id\n```\n",
+      "language": "cpp",
+      "code": "#include <SocietyDrive.h>\n\nQString error;\nauto drive = iiSocietyContainer::SocietyDrive::create(\"/data/MyLibrary.societycontainer\", &error);\nif (!drive) {\n    qWarning(\"%s\", qPrintable(error));\n    return;\n}\nconst QString id = drive->identifier();\nconst QString files = drive->sectionPath(iiSocietyContainer::StoreSection::Files);\nauto reopened = iiSocietyContainer::SocietyDrive::open(\"/data/MyLibrary.societycontainer\", &error);\n// reopened->identifier() == id\n",
+      "closed": true
+    },
+    {
+      "id": "b000082",
+      "kind": "blank",
+      "start_line": 177,
+      "end_line": 177,
+      "raw": "\n"
+    },
+    {
+      "id": "b000083",
+      "kind": "paragraph",
+      "start_line": 178,
+      "end_line": 178,
+      "raw": "`create()` creates subdirectories matching the 9 section names exactly, along with `.society-drive.json`, inside an **already existing canonical `.societycontainer` directory package**. Bare directories, redirected package roots and legacy sparsebundle/disk-image markers are rejected before writes. `createAt(parent)` creates `Society.societycontainer` beneath an existing ordinary parent, without allocating an image. Existing valid section directories and their contents are preserved. A file, symbolic link, or junction with the same name, or an invalid existing manifest, returns an error without being overwritten. Initialization locking and atomic manifest saving are used. On failure, only empty directories created by this call are cleaned up. A valid existing drive is opened with the same ID. `open()` validates the manifest, version, ID, and complete section layout; an up-to-date layout creates no extra state. Supported older section layouts may be upgraded while preserving user contents and identity. `SharedStorage::runtimePath()` resolves private application paths beneath the selected package `.society-runtime` without writes; `ensureRuntimeDirectory()` explicitly creates only the requested directories after identity and redirect checks.\n"
+    },
+    {
+      "id": "b000084",
+      "kind": "blank",
+      "start_line": 179,
+      "end_line": 179,
+      "raw": "\n"
+    },
+    {
+      "id": "b000085",
+      "kind": "paragraph",
+      "start_line": 180,
+      "end_line": 180,
+      "raw": "The manifest version is `schemaVersion: 1`, its type is `type: \"SocietyDrive\"`, and its display name is `Society`. The identifier is a UUID, and section entries contain `id`, `name`, and `path`. The persistent keys returned by `storeSectionKey()` are, in order, `asset-library`, `deleted`, `files`, `forked`, `generation-history`, `models`, `published`, and `thinking-space`. Display names and directory names are as listed in the table above. The native section catalog is generated from the `catalog` output of the C++ tool rather than defined redundantly.\n"
+    },
+    {
+      "id": "b000086",
+      "kind": "blank",
+      "start_line": 181,
+      "end_line": 181,
+      "raw": "\n"
+    },
+    {
+      "id": "b000087",
+      "kind": "paragraph",
+      "start_line": 182,
+      "end_line": 182,
+      "raw": "`sectionForPath()` returns regions based on normalized targets of paths that actually exist. Root itself, root items outside regions, missing items, and external paths are `std::nullopt`. Unclassified files of the existing root are preserved and do not arbitrarily move to any region. All regions including `Deleted` are the same general folder, and business rules such as trash, publish, or creation history are not yet assigned.\n"
+    },
+    {
+      "id": "b000088",
+      "kind": "blank",
+      "start_line": 183,
+      "end_line": 183,
+      "raw": "\n"
+    },
+    {
+      "id": "b000089",
+      "kind": "paragraph",
+      "start_line": 184,
+      "end_line": 189,
+      "raw": "The CLI's `iiSocietyContainerDriveTool create <existing-absolute-parent>` uses\n`createAt()` and creates `Society.societycontainer` directly beneath that parent.\nIt requires no preliminary package directory or later rename. Selecting an\nexisting package instead reuses its UUID, as does creating again under the same\nparent. `open <existing-package>` validates an existing package without creating\none. Files already in the parent are preserved.\n"
+    },
+    {
+      "id": "b000090",
+      "kind": "blank",
+      "start_line": 190,
+      "end_line": 190,
+      "raw": "\n"
+    },
+    {
+      "id": "b000091",
+      "kind": "fenced_code",
+      "start_line": 191,
+      "end_line": 194,
+      "raw": "```sh\niiSocietyContainerDriveTool create /absolute/storage/location\niiSocietyContainerDriveTool open /absolute/storage/location/Society.societycontainer\n```\n",
+      "language": "sh",
+      "code": "iiSocietyContainerDriveTool create /absolute/storage/location\niiSocietyContainerDriveTool open /absolute/storage/location/Society.societycontainer\n",
+      "closed": true
+    },
+    {
+      "id": "b000092",
+      "kind": "blank",
+      "start_line": 195,
+      "end_line": 195,
+      "raw": "\n"
+    },
+    {
+      "id": "b000093",
+      "kind": "paragraph",
+      "start_line": 196,
+      "end_line": 196,
+      "raw": "On macOS 15 or later, the native adapter is built alongside the SDK. It is installed at `share/iiSocietyContainer/Society.app` and exposed through `iiSocietyContainer_NATIVE_APP` in the CMake package. Finder registration, signing, file reflection behavior, and scope follow the [macOS adapter documentation](platform/macos/README.md). [Windows/Linux mounting](platform/desktop/README.md)and [Android document-provider and inter-app sharing](platform/android/README.md)are defined in separate platform documentation.\n"
+    },
+    {
+      "id": "b000094",
+      "kind": "blank",
+      "start_line": 197,
+      "end_line": 197,
+      "raw": "\n"
+    },
+    {
+      "id": "b000095",
+      "kind": "paragraph",
+      "start_line": 198,
+      "end_line": 198,
+      "raw": "Opening or saving `Example.txt` from the system drive corresponds to `Files/Example.txt` of the original. A separate `Files` folder stage is not indicated. The remaining 7 regions and container metadata are excluded from the system drive's list/search working set and file ID access, and are provided via Society app's region navigation. This is the exposure scope of File Provider and does not change the operating system permissions or encryption of the original directory.\n"
+    },
+    {
+      "id": "b000096",
+      "kind": "blank",
+      "start_line": 199,
+      "end_line": 199,
+      "raw": "\n"
+    },
+    {
+      "id": "b000097",
+      "kind": "html",
+      "start_line": 200,
+      "end_line": 200,
+      "raw": "<a id=\"네이티브-디스크-이미지\"></a>\n"
+    },
+    {
+      "id": "b000098",
+      "kind": "blank",
+      "start_line": 201,
+      "end_line": 201,
+      "raw": "\n"
+    },
+    {
+      "id": "b000099",
+      "kind": "heading",
+      "start_line": 202,
+      "end_line": 202,
+      "raw": "## native disk image\n",
+      "level": 2,
+      "title": "native disk image"
+    },
+    {
+      "id": "b000100",
+      "kind": "blank",
+      "start_line": 203,
+      "end_line": 203,
+      "raw": "\n"
+    },
+    {
+      "id": "b000101",
+      "kind": "paragraph",
+      "start_line": 204,
+      "end_line": 204,
+      "raw": "Society desktop onboarding creates one `Society.societycontainer` directory package with `SocietyDrive::createAt(parent)`. The nine Storage sections are direct child directories, including `Files` and `Models`; the file manager opens the complete root. Shared settings preserve the package path and container UUID without mounting a disk image. Private runtime state stays inside the package. On macOS 27, public FSKit mounting lets the operating system create and manage the mount namespace under `/Volumes/`; the adapter creates no external backing data directory. macOS 26 and Linux use private mount directories inside the package. Bare directories and old sparsebundle images cannot be selected or restored as managed storage; the standalone disk-image API remains separate. See [directory storage and migration](docs/DirectoryStorage.md) and the [legacy disk-image API](docs/DiskImage.md).\n"
+    },
+    {
+      "id": "b000102",
+      "kind": "blank",
+      "start_line": 205,
+      "end_line": 205,
+      "raw": "\n"
+    },
+    {
+      "id": "b000103",
+      "kind": "html",
+      "start_line": 206,
+      "end_line": 206,
+      "raw": "<a id=\"iisacc-공통-스토리지\"></a>\n"
+    },
+    {
+      "id": "b000104",
+      "kind": "blank",
+      "start_line": 207,
+      "end_line": 207,
+      "raw": "\n"
+    },
+    {
+      "id": "b000105",
+      "kind": "heading",
+      "start_line": 208,
+      "end_line": 208,
+      "raw": "## iisacc Common Storage\n",
+      "level": 2,
+      "title": "iisacc Common Storage"
+    },
+    {
+      "id": "b000106",
+      "kind": "blank",
+      "start_line": 209,
+      "end_line": 209,
+      "raw": "\n"
+    },
+    {
+      "id": "b000107",
+      "kind": "paragraph",
+      "start_line": 210,
+      "end_line": 210,
+      "raw": "`SharedStorage.h/.cpp` provides repository discovery independent of app name, model list and reference interpretation, and area internal directory creation. Society registers the selected source, and Dreamscapes and consumers open the same repository. App-specific model copies or Finder's `Files/` projection are not used.\n"
+    },
+    {
+      "id": "b000108",
+      "kind": "blank",
+      "start_line": 211,
+      "end_line": 211,
+      "raw": "\n"
+    },
+    {
+      "id": "b000109",
+      "kind": "paragraph",
+      "start_line": 212,
+      "end_line": 212,
+      "raw": "Generation queue, prompt, and execution status are stored in each app instance's memory and are not saved to Society or restored upon re-execution. Temporary materials requiring file paths from the generator remain private to the application and are cleaned up when the task is finished. Completed images and self-contained `.iisc` canvases are saved immediately below `Generation History/`, without task subfolders or automatic Asset Library registration. `DashboardFiles` includes native canvases as file metadata; the consuming application owns canvas decoding and derived previews. `SharedStorage` does not own the generation queue or temporary task lifecycle.\n"
+    },
+    {
+      "id": "b000110",
+      "kind": "blank",
+      "start_line": 213,
+      "end_line": 213,
+      "raw": "\n"
+    },
+    {
+      "id": "b000111",
+      "kind": "fenced_code",
+      "start_line": 214,
+      "end_line": 229,
+      "raw": "```cpp\n#include <SharedStorage.h>\nusing namespace iiSocietyContainer;\nQString error;\nSharedStorage::setDefaultContainer(\"/data/Society.societycontainer\", &error); // Existing drive selected by Society\nauto storage = SharedStorage::open({}, &error);             // Another iisacc app\nif (storage) {\n    const auto models = storage->models(&error);\n    if (!models.isEmpty()) {\n        const auto reference = models.first().reference(storage->drive().identifier());\n        // Keep the reference in the request in app memory and resolve it again immediately before execution.\n        const auto originalWeights = storage->resolveModel(reference, &error);\n    }\n    const auto image = storage->filePath(StoreSection::GenerationHistory, \"unique-result.png\", &error);\n}\n```\n",
+      "language": "cpp",
+      "code": "#include <SharedStorage.h>\nusing namespace iiSocietyContainer;\nQString error;\nSharedStorage::setDefaultContainer(\"/data/Society.societycontainer\", &error); // Existing drive selected by Society\nauto storage = SharedStorage::open({}, &error);             // Another iisacc app\nif (storage) {\n    const auto models = storage->models(&error);\n    if (!models.isEmpty()) {\n        const auto reference = models.first().reference(storage->drive().identifier());\n        // Keep the reference in the request in app memory and resolve it again immediately before execution.\n        const auto originalWeights = storage->resolveModel(reference, &error);\n    }\n    const auto image = storage->filePath(StoreSection::GenerationHistory, \"unique-result.png\", &error);\n}\n",
+      "closed": true
+    },
+    {
+      "id": "b000112",
+      "kind": "blank",
+      "start_line": 230,
+      "end_line": 230,
+      "raw": "\n"
+    },
+    {
+      "id": "b000113",
+      "kind": "paragraph",
+      "start_line": 231,
+      "end_line": 231,
+      "raw": "On desktop, `QStandardPaths::GenericConfigLocation/iisacc/Society/storage.json` atomically stores the original path and drive UUID. `open()` priority is explicit path, `SOCIETY_CONTAINER_PATH`, and common settings. Test and isolated execution change the config file to the absolute path `SOCIETY_STORAGE_SETTINGS_PATH`. If the drive UUID of the set path changes, it returns an error without arbitrary switching, asking Society to select again. This is local repository discovery for the same user environment and does not implement account authentication, network synchronization, or remote inference.\n"
+    },
+    {
+      "id": "b000114",
+      "kind": "blank",
+      "start_line": 232,
+      "end_line": 232,
+      "raw": "\n"
+    },
+    {
+      "id": "b000115",
+      "kind": "paragraph",
+      "start_line": 233,
+      "end_line": 233,
+      "raw": "The model list enumerates `.safetensors`, legacy `.safetensor`, and `.gguf` files in `Models/` (case-insensitive) and Diffusers directories containing `model_index.json`. ONNX files are not model candidates. Individual weights inside a package are not redundantly listed. Hidden items, symbolic links, and paths going outside the boundary are excluded. The list is a candidate inventory, not validation of file contents, architecture or executability. Existing files remain in the container.\n"
+    },
+    {
+      "id": "b000116",
+      "kind": "blank",
+      "start_line": 234,
+      "end_line": 234,
+      "raw": "\n"
+    },
+    {
+      "id": "b000117",
+      "kind": "paragraph",
+      "start_line": 235,
+      "end_line": 235,
+      "raw": "A reference is `{containerId, path, format, fingerprint}`. `path` is a path relative to `Models/`, and `fingerprint` is a change-detection value based on each file's relative path, size, modification time, and first 64 KiB. It is neither a hash of all weights nor an immutable snapshot. References to another drive or to deleted, redirected, or modified models are rejected; full weight provenance is recorded by the actual generation engine. `ensureDirectory()` creates only relative paths beneath the specified section and rejects `..`, `.`, empty intermediate components, backslashes, colons, NUL, and redirection. General file-system access also supports hidden files and directories, while model discovery continues to exclude hidden entries. This is not an isolation mechanism that blocks concurrent file-system changes.\n"
+    },
+    {
+      "id": "b000118",
+      "kind": "blank",
+      "start_line": 236,
+      "end_line": 236,
+      "raw": "\n"
+    },
+    {
+      "id": "b000119",
+      "kind": "paragraph",
+      "start_line": 237,
+      "end_line": 237,
+      "raw": "iOS opens `Library/Application Support/Society.societycontainer` in the same App Group as Society instead of Documents per app. The one-time same-group directory migration preserves the manifest UUID and does not restore past disk images. The consuming app sets the bundle ID and then calls `iiSocietyContainer_configure_ios_client(Dreamscapes APP_GROUP group.com.iisacc.society DISPLAY_NAME Dreamscapes TEAM ...)`. This function configures the same `SocietyAppGroup` Info.plist key and App Group entitlement while maintaining the consuming app name and bundle ID, without adding a separate File Provider extension. Society must be opened first to initialize the original. All participating apps must be signed with a valid group entitlement from the same Apple team. [](https://developer.apple.com/documentation/xcode/configuring-app-groups)uses the shared container API.\n"
+    },
+    {
+      "id": "b000120",
+      "kind": "blank",
+      "start_line": 238,
+      "end_line": 238,
+      "raw": "\n"
+    },
+    {
+      "id": "b000121",
+      "kind": "paragraph",
+      "start_line": 239,
+      "end_line": 239,
+      "raw": "Common storage tests and install consumers verify that the same UUID is found even if the app name differs, configured drive replacement detection, original model path parsing, package duplication exclusion, model change detection, and internal output directory boundaries. iOS Package inspection checks the actual generated plist and group entitlement match between Society and Dreamscapes, without substituting device execution.\n"
+    },
+    {
+      "id": "b000122",
+      "kind": "blank",
+      "start_line": 240,
+      "end_line": 240,
+      "raw": "\n"
+    },
+    {
+      "id": "b000123",
+      "kind": "paragraph",
+      "start_line": 241,
+      "end_line": 241,
+      "raw": "0.8.0's `SharedStorage::filePath(section, relativePath, error)` returns an absolute path for regular file I/O. An empty relative path returns a new file path even if only the last name exists, and the parent is prepared first via `ensureDirectory()`. Path lookup does not create files. Each request validates the original path and UUID and path elements, rejecting symbolic links and junctions at root and subpaths, and domain exit. The feature to lock even concurrent changes after return is not provided. iiSocietyHelper 0.4.0's `fileSystem` reuses this API. Common storage tests and install consumers check 9 domains for regular read/write and boundary/original replacement.\n"
+    },
+    {
+      "id": "b000124",
+      "kind": "blank",
+      "start_line": 242,
+      "end_line": 242,
+      "raw": "\n"
+    },
+    {
+      "id": "b000125",
+      "kind": "html",
+      "start_line": 243,
+      "end_line": 243,
+      "raw": "<a id=\"의존성-검토\"></a>\n"
+    },
+    {
+      "id": "b000126",
+      "kind": "blank",
+      "start_line": 244,
+      "end_line": 244,
+      "raw": "\n"
+    },
+    {
+      "id": "b000127",
+      "kind": "heading",
+      "start_line": 245,
+      "end_line": 245,
+      "raw": "## Dependency Review\n",
+      "level": 2,
+      "title": "Dependency Review"
+    },
+    {
+      "id": "b000128",
+      "kind": "blank",
+      "start_line": 246,
+      "end_line": 246,
+      "raw": "\n"
+    },
+    {
+      "id": "b000129",
+      "kind": "paragraph",
+      "start_line": 247,
+      "end_line": 247,
+      "raw": "Path lookup and normalization use `QFileInfo` and `QDir` from the existing Qt Core. Because they use [Qt's path-normalization API](https://doc.qt.io/qt-6.8/qfileinfo.html#canonicalFilePath)and [relative-path API](https://doc.qt.io/qt-6.8/qdir.html#relativeFilePath), no separate file-system library is needed. Logical sections are a list of identifiers specific to this SDK, represented using only the C++ standard library and `QList`/`QString` from the existing Qt Core. With no additional external dependencies, runtime dependencies and licensing scope remain the same as for the existing Qt Core. Tests use Qt Test from the same Qt 6.8.3 distribution, which is not included in the SDK's public dependencies.\n"
+    },
+    {
+      "id": "b000130",
+      "kind": "blank",
+      "start_line": 248,
+      "end_line": 248,
+      "raw": "\n"
+    },
+    {
+      "id": "b000131",
+      "kind": "html",
+      "start_line": 249,
+      "end_line": 249,
+      "raw": "<a id=\"빌드-테스트-설치\"></a>\n"
+    },
+    {
+      "id": "b000132",
+      "kind": "blank",
+      "start_line": 250,
+      "end_line": 250,
+      "raw": "\n"
+    },
+    {
+      "id": "b000133",
+      "kind": "heading",
+      "start_line": 251,
+      "end_line": 251,
+      "raw": "## Build, test, install\n",
+      "level": 2,
+      "title": "Build, test, install"
+    },
+    {
+      "id": "b000134",
+      "kind": "blank",
+      "start_line": 252,
+      "end_line": 252,
+      "raw": "\n"
+    },
+    {
+      "id": "b000135",
+      "kind": "paragraph",
+      "start_line": 253,
+      "end_line": 257,
+      "raw": "CMake 3.24 or higher, a C++23 compiler, the installed `iiFileProviderTemporary`\npackage, and Qt **6.8.3** Core development files are required for a full build.\nThe `Maintenance` and `FileTree` installed components can be consumed without\nQt. When building all tests, Qt Test development files are also required. macOS\nsearches for `/Volumes/Storage/Qt/6.8.3/macos` by default.\n"
+    },
+    {
+      "id": "b000136",
+      "kind": "blank",
+      "start_line": 258,
+      "end_line": 258,
+      "raw": "\n"
+    },
+    {
+      "id": "b000137",
+      "kind": "fenced_code",
+      "start_line": 259,
+      "end_line": 261,
+      "raw": "```sh\n./install.sh\n```\n",
+      "language": "sh",
+      "code": "./install.sh\n",
+      "closed": true
+    },
+    {
+      "id": "b000138",
+      "kind": "blank",
+      "start_line": 262,
+      "end_line": 262,
+      "raw": "\n"
+    },
+    {
+      "id": "b000139",
+      "kind": "paragraph",
+      "start_line": 263,
+      "end_line": 263,
+      "raw": "In a standalone build, the default install path is applied, and when included in a parent CMake project, the parent project's install path is maintained. The script runs Release configuration, build, and CTest at `build/` and installs to `$HOME/.local/SDK/iiSocietyContainer`. Then, a separate project configured at `build/consumer/build/` consumes only the installed CMake package and runs build and CTest. The original build and install consumer each run the persona function compatibility test and directory space test. To verify within the workspace without SDK install, use `INSTALL_PREFIX=\"$PWD/build/install\" ./install.sh`.\n"
+    },
+    {
+      "id": "b000140",
+      "kind": "blank",
+      "start_line": 264,
+      "end_line": 264,
+      "raw": "\n"
+    },
+    {
+      "id": "b000141",
+      "kind": "paragraph",
+      "start_line": 265,
+      "end_line": 265,
+      "raw": "Tests verify C++20 and Qt versions, root specification, internal and external verdicts, relative path and working directory changes, independent space, invalid input, whitespace and Unicode names, folder content preservation, and root deletion. On Unix systems, symbolic link interpretation, external exit, broken links, and root replacement are also verified. On Windows, `QFile::link` creates shortcuts, so the symbolic link-only test is skipped. The temporary test directory is created and cleaned up below the test execution directory.\n"
+    },
+    {
+      "id": "b000142",
+      "kind": "blank",
+      "start_line": 266,
+      "end_line": 266,
+      "raw": "\n"
+    },
+    {
+      "id": "b000143",
+      "kind": "paragraph",
+      "start_line": 267,
+      "end_line": 267,
+      "raw": "Logical area tests verify 8 identifiers and names, order, full area provision in empty containers, independence from physical file configuration, file system preservation during query, and handling of invalid containers and incorrect area values. Install consumers also independently include area headers and run the same test.\n"
+    },
+    {
+      "id": "b000144",
+      "kind": "blank",
+      "start_line": 268,
+      "end_line": 268,
+      "raw": "\n"
+    },
+    {
+      "id": "b000145",
+      "kind": "paragraph",
+      "start_line": 269,
+      "end_line": 269,
+      "raw": "Settings are specified as environment variables instead of command-line arguments. `CMAKE_PREFIX_PATH` is an additional CMake search path separated by semicolons.\n"
+    },
+    {
+      "id": "b000146",
+      "kind": "blank",
+      "start_line": 270,
+      "end_line": 270,
+      "raw": "\n"
+    },
+    {
+      "id": "b000147",
+      "kind": "fenced_code",
+      "start_line": 271,
+      "end_line": 276,
+      "raw": "```sh\nINSTALL_PREFIX=\"$HOME/.local/SDK/iiSocietyContainer\" \\\nQT_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\nCMAKE_PREFIX_PATH=\"/additional/prefix\" \\\n./install.sh\n```\n",
+      "language": "sh",
+      "code": "INSTALL_PREFIX=\"$HOME/.local/SDK/iiSocietyContainer\" \\\nQT_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\nCMAKE_PREFIX_PATH=\"/additional/prefix\" \\\n./install.sh\n",
+      "closed": true
+    },
+    {
+      "id": "b000148",
+      "kind": "blank",
+      "start_line": 277,
+      "end_line": 277,
+      "raw": "\n"
+    },
+    {
+      "id": "b000149",
+      "kind": "paragraph",
+      "start_line": 278,
+      "end_line": 278,
+      "raw": "Manual execution is also possible. All build outputs are placed under `build/`.\n"
+    },
+    {
+      "id": "b000150",
+      "kind": "blank",
+      "start_line": 279,
+      "end_line": 279,
+      "raw": "\n"
+    },
+    {
+      "id": "b000151",
+      "kind": "fenced_code",
+      "start_line": 280,
+      "end_line": 292,
+      "raw": "```sh\ncmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \\\n  -DCMAKE_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\n  -DCMAKE_INSTALL_PREFIX=\"$HOME/.local/SDK/iiSocietyContainer\"\ncmake --build build --config Release --parallel\nctest --test-dir build -C Release --output-on-failure\ncmake --install build --config Release\ncmake -S tests/consumer -B build/consumer/build \\\n  -DCMAKE_BUILD_TYPE=Release \\\n  -DCMAKE_PREFIX_PATH=\"$HOME/.local/SDK/iiSocietyContainer;/Volumes/Storage/Qt/6.8.3/macos\"\ncmake --build build/consumer/build --config Release --parallel\nctest --test-dir build/consumer/build -C Release --output-on-failure\n```\n",
+      "language": "sh",
+      "code": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \\\n  -DCMAKE_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\n  -DCMAKE_INSTALL_PREFIX=\"$HOME/.local/SDK/iiSocietyContainer\"\ncmake --build build --config Release --parallel\nctest --test-dir build -C Release --output-on-failure\ncmake --install build --config Release\ncmake -S tests/consumer -B build/consumer/build \\\n  -DCMAKE_BUILD_TYPE=Release \\\n  -DCMAKE_PREFIX_PATH=\"$HOME/.local/SDK/iiSocietyContainer;/Volumes/Storage/Qt/6.8.3/macos\"\ncmake --build build/consumer/build --config Release --parallel\nctest --test-dir build/consumer/build -C Release --output-on-failure\n",
+      "closed": true
+    },
+    {
+      "id": "b000152",
+      "kind": "blank",
+      "start_line": 293,
+      "end_line": 293,
+      "raw": "\n"
+    },
+    {
+      "id": "b000153",
+      "kind": "html",
+      "start_line": 294,
+      "end_line": 294,
+      "raw": "<a id=\"설치-패키지-사용\"></a>\n"
+    },
+    {
+      "id": "b000154",
+      "kind": "blank",
+      "start_line": 295,
+      "end_line": 295,
+      "raw": "\n"
+    },
+    {
+      "id": "b000155",
+      "kind": "heading",
+      "start_line": 296,
+      "end_line": 296,
+      "raw": "## Use install package\n",
+      "level": 2,
+      "title": "Use install package"
+    },
+    {
+      "id": "b000156",
+      "kind": "blank",
+      "start_line": 297,
+      "end_line": 297,
+      "raw": "\n"
+    },
+    {
+      "id": "b000157",
+      "kind": "fenced_code",
+      "start_line": 298,
+      "end_line": 301,
+      "raw": "```cmake\nfind_package(iiSocietyContainer 0.6.0 CONFIG REQUIRED)\ntarget_link_libraries(your_app PRIVATE iiSocietyContainer::iiSocietyContainer)\n```\n",
+      "language": "cmake",
+      "code": "find_package(iiSocietyContainer 0.6.0 CONFIG REQUIRED)\ntarget_link_libraries(your_app PRIVATE iiSocietyContainer::iiSocietyContainer)\n",
+      "closed": true
+    },
+    {
+      "id": "b000158",
+      "kind": "blank",
+      "start_line": 302,
+      "end_line": 302,
+      "raw": "\n"
+    },
+    {
+      "id": "b000159",
+      "kind": "paragraph",
+      "start_line": 303,
+      "end_line": 303,
+      "raw": "When configuring consumers, add SDK install path and Qt path to `CMAKE_PREFIX_PATH`. The default install configuration is as follows.\n"
+    },
+    {
+      "id": "b000160",
+      "kind": "blank",
+      "start_line": 304,
+      "end_line": 304,
+      "raw": "\n"
+    },
+    {
+      "id": "b000161",
+      "kind": "list",
+      "start_line": 305,
+      "end_line": 313,
+      "raw": "- `include/iiSocietyContainer.h`: Public header\n- `include/iiSocietyContainerExport.h`: Common export/import macro\n- `include/SocietyDrive.h`: Persistent drive API\n- `include/src/Store/StoreSection.h`: Public header of logical area that can be included independently\n- `lib/`: Shared library with version; Windows runtime DLL is `bin/`\n- `lib/cmake/iiSocietyContainer/`: Config, ConfigVersion, and Targets package\n- `share/iiSocietyContainer/README.md`: This document\n- `bin/iiSocietyContainerDriveTool`: Drive initialization, query, and area catalog CLI\n- macOS's `share/iiSocietyContainer/Society.app`: Native host and File Provider extension\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "`include/iiSocietyContainer.h`: Public header",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`include/iiSocietyContainerExport.h`: Common export/import macro",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`include/SocietyDrive.h`: Persistent drive API",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`include/src/Store/StoreSection.h`: Public header of logical area that can be included independently",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`lib/`: Shared library with version; Windows runtime DLL is `bin/`",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`lib/cmake/iiSocietyContainer/`: Config, ConfigVersion, and Targets package",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`share/iiSocietyContainer/README.md`: This document",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`bin/iiSocietyContainerDriveTool`: Drive initialization, query, and area catalog CLI",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "macOS's `share/iiSocietyContainer/Society.app`: Native host and File Provider extension",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000162",
+      "kind": "blank",
+      "start_line": 314,
+      "end_line": 314,
+      "raw": "\n"
+    },
+    {
+      "id": "b000163",
+      "kind": "paragraph",
+      "start_line": 315,
+      "end_line": 315,
+      "raw": "Drive tests verify initialization, re-open, ID preservation, 8 folder count, original preservation on conflict, manifest errors, and area boundaries from the original and install consumer. macOS Native tests verify file operations on the entire original separately, `Files/` root exposure, non-public ID access denial, root file CRUD, version conflicts, app access hold, restart, and removal of existing 9 area exposures.\n"
+    },
+    {
+      "id": "b000164",
+      "kind": "blank",
+      "start_line": 316,
+      "end_line": 316,
+      "raw": "\n"
+    },
+    {
+      "id": "b000165",
+      "kind": "paragraph",
+      "start_line": 317,
+      "end_line": 317,
+      "raw": "Actual Finder connection tests are performed on explicitly registered verification drives, separated from general CTest. Qt itself is not reinstalled or bundled. The execution environment must also have Qt 6.8.3 Core. Linked dependency paths reflect the install RPATH. Qt usage conditions follow the license of the existing Qt install.\n"
+    },
+    {
+      "id": "b000166",
+      "kind": "blank",
+      "start_line": 318,
+      "end_line": 318,
+      "raw": "\n"
+    },
+    {
+      "id": "b000167",
+      "kind": "heading",
+      "start_line": 319,
+      "end_line": 319,
+      "raw": "## License\n",
+      "level": 2,
+      "title": "License"
+    },
+    {
+      "id": "b000168",
+      "kind": "blank",
+      "start_line": 320,
+      "end_line": 320,
+      "raw": "\n"
+    },
+    {
+      "id": "b000169",
+      "kind": "paragraph",
+      "start_line": 321,
+      "end_line": 321,
+      "raw": "SPDX-License-Identifier: MIT\n"
+    },
+    {
+      "id": "b000170",
+      "kind": "blank",
+      "start_line": 322,
+      "end_line": 322,
+      "raw": "\n"
+    },
+    {
+      "id": "b000171",
+      "kind": "paragraph",
+      "start_line": 323,
+      "end_line": 323,
+      "raw": "Self-written code and documents of iiSocietyContainer are distributed under the MIT License. The full terms follow [LICENSE](LICENSE).\n"
+    },
+    {
+      "id": "b000172",
+      "kind": "blank",
+      "start_line": 324,
+      "end_line": 324,
+      "raw": "\n"
+    },
+    {
+      "id": "b000173",
+      "kind": "paragraph",
+      "start_line": 325,
+      "end_line": 325,
+      "raw": "External libraries including Qt and third-party code with separate notices maintain their own licenses. This project's license declaration does not replace the corresponding third-party license.\n"
+    },
+    {
+      "id": "b000174",
+      "kind": "blank",
+      "start_line": 326,
+      "end_line": 326,
+      "raw": "\n"
+    },
+    {
+      "id": "b000175",
+      "kind": "html",
+      "start_line": 327,
+      "end_line": 327,
+      "raw": "<a id=\"ios--ipados-통합\"></a>\n"
+    },
+    {
+      "id": "b000176",
+      "kind": "blank",
+      "start_line": 328,
+      "end_line": 328,
+      "raw": "\n"
+    },
+    {
+      "id": "b000177",
+      "kind": "heading",
+      "start_line": 329,
+      "end_line": 329,
+      "raw": "## iOS / iPadOS integration\n",
+      "level": 2,
+      "title": "iOS / iPadOS integration"
+    },
+    {
+      "id": "b000178",
+      "kind": "blank",
+      "start_line": 330,
+      "end_line": 330,
+      "raw": "\n"
+    },
+    {
+      "id": "b000179",
+      "kind": "paragraph",
+      "start_line": 331,
+      "end_line": 331,
+      "raw": "iOS 16 and above use the same App Group original for Society app and built-in File Provider extension. The app explores 9 areas, and the Files app directly exposes only Files content. Common Swift repository and public boundary are at `platform/apple/`, and iOS domain registration, bundle, permission, and install configuration are defined in [iOS document](platform/ios/README.md). iOS device and simulator-specific build presets are provided by Society app.\n"
+    },
+    {
+      "id": "b000180",
+      "kind": "blank",
+      "start_line": 332,
+      "end_line": 332,
+      "raw": "\n"
+    },
+    {
+      "id": "b000181",
+      "kind": "heading",
+      "start_line": 333,
+      "end_line": 333,
+      "raw": "### Shared logical drive identity (0.10)\n",
+      "level": 3,
+      "title": "Shared logical drive identity (0.10)"
+    },
+    {
+      "id": "b000182",
+      "kind": "blank",
+      "start_line": 334,
+      "end_line": 334,
+      "raw": "\n"
+    },
+    {
+      "id": "b000183",
+      "kind": "paragraph",
+      "start_line": 335,
+      "end_line": 340,
+      "raw": "`SocietyDrive::adoptReplicaIdentity(root, expectedId, hostId)` atomically adopts\nan authenticated host's UUID under the drive lock. The existing nine section\npaths remain unchanged; stale drive objects become invalid and must be reopened.\niiSocietyHelper Sync owns host selection, private recovery of a former independent\ncontainer, and initial mirroring before uploads. A device's replica journal and\ncredentials remain local. This API alone does not copy or merge files.\n"
+    },
+    {
+      "id": "b000184",
+      "kind": "blank",
+      "start_line": 341,
+      "end_line": 341,
+      "raw": "\n"
+    },
+    {
+      "id": "b000185",
+      "kind": "paragraph",
+      "start_line": 342,
+      "end_line": 350,
+      "raw": "`completeReplica(root, hostId)` marks the host metadata snapshot ready. `isValid()`\nchecks structure and identity; `isReady()` additionally checks publication state.\nThe manifest retains `localIdentifier` for a stable native registration and\n`previousIdentifier` for recovering the selected drive across another host-drive\nchange. Apple retains provider history and reopens the adopted identity; Android\nreopens its cached store. Consumer `SharedStorage::open()` and file/model access\nreject incomplete mirrors. The storage owner can resolve their location through\n`open(path, error, true)` to resume initialization, while consumer operations on\nthat handle remain gated. No credentials or account models enter this manifest.\n"
+    },
+    {
+      "id": "b000186",
+      "kind": "blank",
+      "start_line": 351,
+      "end_line": 351,
+      "raw": "\n"
+    },
+    {
+      "id": "b000187",
+      "kind": "paragraph",
+      "start_line": 352,
+      "end_line": 352,
+      "raw": "Photos path and manifest migration contract follows [Photos.md](docs/Photos.md). `FileDirectoryKind::Photos` maintains only value compatibility and does not return at FilesView. `StoreSection::Photos` is used.\n"
+    },
+    {
+      "id": "b000188",
+      "kind": "blank",
+      "start_line": 353,
+      "end_line": 353,
+      "raw": "\n"
+    },
+    {
+      "id": "b000189",
+      "kind": "html",
+      "start_line": 354,
+      "end_line": 354,
+      "raw": "<a id=\"공유-대시보드와-society-앱-연결\"></a>\n"
+    },
+    {
+      "id": "b000190",
+      "kind": "blank",
+      "start_line": 355,
+      "end_line": 355,
+      "raw": "\n"
+    },
+    {
+      "id": "b000191",
+      "kind": "heading",
+      "start_line": 356,
+      "end_line": 356,
+      "raw": "## Shared dashboard and Society app connection\n",
+      "level": 2,
+      "title": "Shared dashboard and Society app connection"
+    },
+    {
+      "id": "b000192",
+      "kind": "blank",
+      "start_line": 357,
+      "end_line": 357,
+      "raw": "\n"
+    },
+    {
+      "id": "b000193",
+      "kind": "paragraph",
+      "start_line": 358,
+      "end_line": 358,
+      "raw": "`Gui` component's `DashboardFiles` is a read-only asynchronous list shared by Society and Dreamscapes. Specify a valid local Society drive at `containerPath` and use `recentFiles`, `recentPublished`, `generationHistory`. Files and Generation History are limited to the latest 20, and Published is limited to the latest 4 for the mobile dashboard. It provides full snapshot search, atomic image replacement monitoring, and list preservation on cancelled repository query abandonment and refresh without changes. The app is responsible only for QML registration and expression.\n"
+    },
+    {
+      "id": "b000194",
+      "kind": "blank",
+      "start_line": 359,
+      "end_line": 359,
+      "raw": "\n"
+    },
+    {
+      "id": "b000195",
+      "kind": "paragraph",
+      "start_line": 360,
+      "end_line": 360,
+      "raw": "`SocietyApplication::openGenerationHistory()` delivers `society://generation-history` as the operating system and returns whether the execution request was accepted. Only Society hosts call `listen()` and connect `generationHistoryRequested` to the Storage screen. URLs do not accept file paths or account information, and other host·path·query parameters are not accepted. macOS / iOS support URL events, Android's Qt URL handling, and desktop execution arguments. URL registration is handled in the Society app package, and Windows registers it for the current user upon Society execution. Unit tests verify inclusion, exclusion, sorting, monitoring of the list, and URL delivery.\n"
+    },
+    {
+      "id": "b000196",
+      "kind": "blank",
+      "start_line": 361,
+      "end_line": 361,
+      "raw": "\n"
+    },
+    {
+      "id": "b000197",
+      "kind": "heading",
+      "start_line": 362,
+      "end_line": 362,
+      "raw": "### Generation inventory reconciliation\n",
+      "level": 3,
+      "title": "Generation inventory reconciliation"
+    },
+    {
+      "id": "b000198",
+      "kind": "blank",
+      "start_line": 363,
+      "end_line": 363,
+      "raw": "\n"
+    },
+    {
+      "id": "b000199",
+      "kind": "paragraph",
+      "start_line": 364,
+      "end_line": 370,
+      "raw": "Generated images are published as PNG originals directly in `Generation History/`.\n`SharedStorage::publishGeneratedImage()` preserves bytes and atomically rejects\ncollisions through iiFileProvider. Native `.iisc` wrapping belongs to editor use\nand persists the document in Society `Files/`;\ncanvas documents do not duplicate images in the History gallery. See\n[Generation History publication](docs/GenerationHistory.md) for API boundaries\nand verification.\n"
+    },
+    {
+      "id": "b000200",
+      "kind": "blank",
+      "start_line": 371,
+      "end_line": 371,
+      "raw": "\n"
+    },
+    {
+      "id": "b000201",
+      "kind": "paragraph",
+      "start_line": 372,
+      "end_line": 372,
+      "raw": "`SharedStorage::models()` reconciles a local authority catalog with native Models files before returning generation models: Deleted moves disappear and new files/packages appear before background hashing finishes. Existing indexed version references remain compatible with remote generation. Discovery reads file metadata, not tensor payloads; hidden runtime directories and redirected paths are excluded. A replica with an empty catalog stays empty instead of exposing leftover local files. `resolveModel()` uses the same inventory. Regression coverage: `generationInventoryReconcilesAuthorityAndPreservesReplicas`.\n"
+    },
+    {
+      "id": "b000202",
+      "kind": "heading",
+      "start_line": 373,
+      "end_line": 373,
+      "raw": "# File loading performance\n",
+      "level": 1,
+      "title": "File loading performance"
+    },
+    {
+      "id": "b000203",
+      "kind": "blank",
+      "start_line": 374,
+      "end_line": 374,
+      "raw": "\n"
+    },
+    {
+      "id": "b000204",
+      "kind": "paragraph",
+      "start_line": 375,
+      "end_line": 377,
+      "raw": "Application-local directory snapshots, SHA-256/preview caching and bounded parallel\nloading are documented in [FileLoading.md](FileLoading.md). GUI consumers register\n`iiSocietyContainer::PreviewProvider` under `society-preview` before loading QML.\n"
+    },
+    {
+      "id": "b000205",
+      "kind": "blank",
+      "start_line": 378,
+      "end_line": 378,
+      "raw": "\n"
+    },
+    {
+      "id": "b000206",
+      "kind": "paragraph",
+      "start_line": 379,
+      "end_line": 379,
+      "raw": "Directory and preview caches are written lazily beneath the source package’s `.society-runtime/cache/files/`. No selected package means no cache creation. Explicit cache overrides must stay within that package’s verified private runtime; external or redirected destinations are rejected before writing.\n"
+    },
+    {
+      "id": "b000207",
+      "kind": "blank",
+      "start_line": 380,
+      "end_line": 380,
+      "raw": "\n"
+    },
+    {
+      "id": "b000208",
+      "kind": "paragraph",
+      "start_line": 381,
+      "end_line": 384,
+      "raw": "The QML-facing Container builds a private Alias index on snapshot publication.\nRepeated key lookup reads accepted metadata directly without rescanning every\nrow, touching files or changing revision/notification state. Its exported object\nlayout is preserved; see [Container Aliases](docs/ContainerAliases.md).\n"
+    },
+    {
+      "id": "b000209",
+      "kind": "blank",
+      "start_line": 385,
+      "end_line": 385,
+      "raw": "\n"
+    },
+    {
+      "id": "b000210",
+      "kind": "html",
+      "start_line": 386,
+      "end_line": 386,
+      "raw": "<!-- workspace-docs:readme:start -->\n"
+    },
+    {
+      "id": "b000211",
+      "kind": "heading",
+      "start_line": 387,
+      "end_line": 387,
+      "raw": "## Documentation entry points\n",
+      "level": 2,
+      "title": "Documentation entry points"
+    },
+    {
+      "id": "b000212",
+      "kind": "blank",
+      "start_line": 388,
+      "end_line": 388,
+      "raw": "\n"
+    },
+    {
+      "id": "b000213",
+      "kind": "list",
+      "start_line": 389,
+      "end_line": 392,
+      "raw": "- Human overview: this English `README.md`.\n- Agent instructions: [AGENT.md](AGENT.md).\n- Human documentation: [documentation index](docs/README.md).\n- Structured agent documentation: [agent index](docs/agent-index.json).\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Human overview: this English `README.md`.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Agent instructions: [AGENT.md](AGENT.md).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Human documentation: [documentation index](docs/README.md).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Structured agent documentation: [agent index](docs/agent-index.json).",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000214",
+      "kind": "html",
+      "start_line": 393,
+      "end_line": 393,
+      "raw": "<!-- workspace-docs:readme:end -->\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "iiSocietyContainer",
+      "anchor": "iisocietycontainer",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000041",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Public API",
+      "anchor": "public-api",
+      "start_line": 81
+    },
+    {
+      "block_id": "b000063",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Logical Domain",
+      "anchor": "logical-domain",
+      "start_line": 125
+    },
+    {
+      "block_id": "b000079",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "drive",
+      "anchor": "drive",
+      "start_line": 161
+    },
+    {
+      "block_id": "b000099",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "native disk image",
+      "anchor": "native-disk-image",
+      "start_line": 202
+    },
+    {
+      "block_id": "b000105",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "iisacc Common Storage",
+      "anchor": "iisacc-common-storage",
+      "start_line": 208
+    },
+    {
+      "block_id": "b000127",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Dependency Review",
+      "anchor": "dependency-review",
+      "start_line": 245
+    },
+    {
+      "block_id": "b000133",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Build, test, install",
+      "anchor": "build-test-install",
+      "start_line": 251
+    },
+    {
+      "block_id": "b000155",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Use install package",
+      "anchor": "use-install-package",
+      "start_line": 296
+    },
+    {
+      "block_id": "b000167",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "License",
+      "anchor": "license",
+      "start_line": 319
+    },
+    {
+      "block_id": "b000177",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "iOS / iPadOS integration",
+      "anchor": "ios--ipados-integration",
+      "start_line": 329
+    },
+    {
+      "block_id": "b000181",
+      "parent_id": "b000177",
+      "level": 3,
+      "title": "Shared logical drive identity (0.10)",
+      "anchor": "shared-logical-drive-identity-010",
+      "start_line": 333
+    },
+    {
+      "block_id": "b000191",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Shared dashboard and Society app connection",
+      "anchor": "shared-dashboard-and-society-app-connection",
+      "start_line": 356
+    },
+    {
+      "block_id": "b000197",
+      "parent_id": "b000191",
+      "level": 3,
+      "title": "Generation inventory reconciliation",
+      "anchor": "generation-inventory-reconciliation",
+      "start_line": 362
+    },
+    {
+      "block_id": "b000202",
+      "parent_id": null,
+      "level": 1,
+      "title": "File loading performance",
+      "anchor": "file-loading-performance",
+      "start_line": 373
+    },
+    {
+      "block_id": "b000211",
+      "parent_id": "b000202",
+      "level": 2,
+      "title": "Documentation entry points",
+      "anchor": "documentation-entry-points",
+      "start_line": 387
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000013",
+        "line": 28,
+        "text": "`IISACC_SHARED_STORAGE_ROOT`. Read-only discovery never creates a disk. See",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 51,
+        "text": "0.14.0 separates the original file and the host's repository list. `StorageMap` reads the logical key, version, size, hash, and local hold status of `.society-sync/catalog.json`, and atomically records a download request to fix a specific version at `.society-sync/requests/`. It does not create an empty original file for empty items. `available(keys)` must be true and the request status must be `ready` before using the file. It rejects path escapes, redirects, and lists from other containers.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 53,
+        "text": "`StorageDirectoryModel` merges the actual directory and the host list in the worker thread to provide name, size, preview, and hold status. It selects only the immediate children of the current folder to validate the path, and reuses the parsing result for unchanged repository maps. `setFolder()` and `refresh()` do not wait for the GUI call and discard the late results of the previous folder. Empty folder URLs stop the lookup timer. `activate` requests the non-held file and sends `activated` after the verified download completes. `StorageModelCatalog` constructs the model card with name, path, format, size, and hold status without reading the original header or package if the host catalog exists. Catalog monitoring is limited to two directories, and local-only fallback monitoring is limited to a maximum of 64 items. `activatePath()` passes only the selected file or package as a version-fixed download request to the SDK and may send `objectReady` after completion. It maintains the structural judgment and import validation for local-only repositories. `SharedStorage::models()` also displays non-held models, and `resolveModel()` succeeds only when all required files are ready. The model reference of a package is fixed to the version of the entire configuration file. `shared_storage` tests check only-list models, request cancellation, opening after navigation and download completion without file creation.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000045",
+        "line": 85,
+        "text": "`SocietyDrive::create()` and `open()` do not accept a location inside another Society container as the source. On macOS, Finder replicas under `~/Library/CloudStorage/` are also rejected. Paths are resolved to their actual locations and validated before file creation, preventing 8 app areas from being recreated inside `Files/`. Shared storage settings and Helper file-system access apply the same boundary. The source retains 9 areas, while the system drive exposes only the contents of the source `Files/`. Recovery procedures are described in the [macOS file contract](platform/macos/README.md#파일-계약).",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000057",
+        "line": 119,
+        "text": "Space specification is stored in the object. It does not create directories, rename names, or record marker files, nor does it modify existing content. To use in a separate execution, the object must be reconstructed with the same path. Since `isValid()` and path validation check the current file system, they become invalid if the specified root disappears or is replaced by a link pointing to a different location. Since it is based on the path, it becomes valid again if an actual directory is recreated at the same location. This is a path classification API, and it does not provide access control or file system isolation features that block concurrent file system changes.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000087",
+        "line": 182,
+        "text": "`sectionForPath()` returns regions based on normalized targets of paths that actually exist. Root itself, root items outside regions, missing items, and external paths are `std::nullopt`. Unclassified files of the existing root are preserved and do not arbitrarily move to any region. All regions including `Deleted` are the same general folder, and business rules such as trash, publish, or creation history are not yet assigned.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000119",
+        "line": 237,
+        "text": "iOS opens `Library/Application Support/Society.societycontainer` in the same App Group as Society instead of Documents per app. The one-time same-group directory migration preserves the manifest UUID and does not restore past disk images. The consuming app sets the bundle ID and then calls `iiSocietyContainer_configure_ios_client(Dreamscapes APP_GROUP group.com.iisacc.society DISPLAY_NAME Dreamscapes TEAM ...)`. This function configures the same `SocietyAppGroup` Info.plist key and App Group entitlement while maintaining the consuming app name and bundle ID, without adding a separate File Provider extension. Society must be opened first to initialize the original. All participating apps must be signed with a valid group entitlement from the same Apple team. [](https://developer.apple.com/documentation/xcode/configuring-app-groups)uses the shared container API.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000135",
+        "line": 254,
+        "text": "package, and Qt **6.8.3** Core development files are required for a full build.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000135",
+        "line": 256,
+        "text": "Qt. When building all tests, Qt Test development files are also required. macOS",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000165",
+        "line": 317,
+        "text": "Actual Finder connection tests are performed on explicitly registered verification drives, separated from general CTest. Qt itself is not reinstalled or bundled. The execution environment must also have Qt 6.8.3 Core. Linked dependency paths reflect the install RPATH. Qt usage conditions follow the license of the existing Qt install.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000183",
+        "line": 337,
+        "text": "paths remain unchanged; stale drive objects become invalid and must be reopened.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000195",
+        "line": 360,
+        "text": "`SocietyApplication::openGenerationHistory()` delivers `society://generation-history` as the operating system and returns whether the execution request was accepted. Only Society hosts call `listen()` and connect `generationHistoryRequested` to the Storage screen. URLs do not accept file paths or account information, and other host·path·query parameters are not accepted. macOS / iOS support URL events, Android's Qt URL handling, and desktop execution arguments. URL registration is handled in the Society app package, and Windows registers it for the current user upon Society execution. Unit tests verify inclusion, exclusion, sorting, monitoring of the list, and URL delivery.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000199",
+        "line": 368,
+        "text": "canvas documents do not duplicate images in the History gallery. See",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000206",
+        "line": 379,
+        "text": "Directory and preview caches are written lazily beneath the source package’s `.society-runtime/cache/files/`. No selected package means no cache creation. Explicit cache overrides must stay within that package’s verified private runtime; external or redirected destinations are rejected before writing.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000091",
+        "language": "sh",
+        "code": "iiSocietyContainerDriveTool create /absolute/storage/location\niiSocietyContainerDriveTool open /absolute/storage/location/Society.societycontainer\n"
+      },
+      {
+        "block_id": "b000137",
+        "language": "sh",
+        "code": "./install.sh\n"
+      },
+      {
+        "block_id": "b000147",
+        "language": "sh",
+        "code": "INSTALL_PREFIX=\"$HOME/.local/SDK/iiSocietyContainer\" \\\nQT_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\nCMAKE_PREFIX_PATH=\"/additional/prefix\" \\\n./install.sh\n"
+      },
+      {
+        "block_id": "b000151",
+        "language": "sh",
+        "code": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \\\n  -DCMAKE_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\n  -DCMAKE_INSTALL_PREFIX=\"$HOME/.local/SDK/iiSocietyContainer\"\ncmake --build build --config Release --parallel\nctest --test-dir build -C Release --output-on-failure\ncmake --install build --config Release\ncmake -S tests/consumer -B build/consumer/build \\\n  -DCMAKE_BUILD_TYPE=Release \\\n  -DCMAKE_PREFIX_PATH=\"$HOME/.local/SDK/iiSocietyContainer;/Volumes/Storage/Qt/6.8.3/macos\"\ncmake --build build/consumer/build --config Release --parallel\nctest --test-dir build/consumer/build -C Release --output-on-failure\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000005",
+        "label": "logical storage and ownership",
+        "target": "docs/LogicalStorage.md",
+        "kind": "relative",
+        "line": 9
+      },
+      {
+        "block_id": "b000007",
+        "label": "managed storage and search",
+        "target": "docs/ManagedFiles.md",
+        "kind": "relative",
+        "line": 14
+      },
+      {
+        "block_id": "b000009",
+        "label": "Windows build and execution",
+        "target": "docs/WindowsBuildAndRun.md",
+        "kind": "relative",
+        "line": 16
+      },
+      {
+        "block_id": "b000013",
+        "label": "shared storage and bootstrap",
+        "target": "docs/LogicalStorage.md",
+        "kind": "relative",
+        "line": 29
+      },
+      {
+        "block_id": "b000015",
+        "label": "Container Aliases",
+        "target": "docs/ContainerAliases.md",
+        "kind": "relative",
+        "line": 33
+      },
+      {
+        "block_id": "b000017",
+        "label": "StorageMaintenance.md",
+        "target": "docs/StorageMaintenance.md",
+        "kind": "relative",
+        "line": 44
+      },
+      {
+        "block_id": "b000019",
+        "label": "directory storage and Finder mounting",
+        "target": "docs/DirectoryStorage.md",
+        "kind": "relative",
+        "line": 47
+      },
+      {
+        "block_id": "b000021",
+        "label": "desktop mounting",
+        "target": "platform/desktop/README.md",
+        "kind": "relative",
+        "line": 49
+      },
+      {
+        "block_id": "b000021",
+        "label": "Android integration",
+        "target": "platform/android/README.md",
+        "kind": "relative",
+        "line": 49
+      },
+      {
+        "block_id": "b000027",
+        "label": "Files contract",
+        "target": "docs/Files.md",
+        "kind": "relative",
+        "line": 55
+      },
+      {
+        "block_id": "b000031",
+        "label": "Apple domain API",
+        "target": "https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/add(_:completionhandler:)",
+        "kind": "external",
+        "line": 59
+      },
+      {
+        "block_id": "b000037",
+        "label": "Models management document",
+        "target": "docs/Models.md",
+        "kind": "relative",
+        "line": 77
+      },
+      {
+        "block_id": "b000043",
+        "label": "file tree API and examples",
+        "target": "docs/FileTree.md",
+        "kind": "relative",
+        "line": 83
+      },
+      {
+        "block_id": "b000045",
+        "label": "macOS file contract",
+        "target": "platform/macos/README.md#파일-계약",
+        "kind": "relative",
+        "line": 85
+      },
+      {
+        "block_id": "b000093",
+        "label": "macOS adapter documentation",
+        "target": "platform/macos/README.md",
+        "kind": "relative",
+        "line": 196
+      },
+      {
+        "block_id": "b000093",
+        "label": "Windows/Linux mounting",
+        "target": "platform/desktop/README.md",
+        "kind": "relative",
+        "line": 196
+      },
+      {
+        "block_id": "b000093",
+        "label": "Android document-provider and inter-app sharing",
+        "target": "platform/android/README.md",
+        "kind": "relative",
+        "line": 196
+      },
+      {
+        "block_id": "b000101",
+        "label": "directory storage and migration",
+        "target": "docs/DirectoryStorage.md",
+        "kind": "relative",
+        "line": 204
+      },
+      {
+        "block_id": "b000101",
+        "label": "legacy disk-image API",
+        "target": "docs/DiskImage.md",
+        "kind": "relative",
+        "line": 204
+      },
+      {
+        "block_id": "b000119",
+        "label": "",
+        "target": "https://developer.apple.com/documentation/xcode/configuring-app-groups",
+        "kind": "external",
+        "line": 237
+      },
+      {
+        "block_id": "b000129",
+        "label": "Qt's path-normalization API",
+        "target": "https://doc.qt.io/qt-6.8/qfileinfo.html#canonicalFilePath",
+        "kind": "external",
+        "line": 247
+      },
+      {
+        "block_id": "b000129",
+        "label": "relative-path API",
+        "target": "https://doc.qt.io/qt-6.8/qdir.html#relativeFilePath",
+        "kind": "external",
+        "line": 247
+      },
+      {
+        "block_id": "b000171",
+        "label": "LICENSE",
+        "target": "LICENSE",
+        "kind": "relative",
+        "line": 323
+      },
+      {
+        "block_id": "b000179",
+        "label": "iOS document",
+        "target": "platform/ios/README.md",
+        "kind": "relative",
+        "line": 331
+      },
+      {
+        "block_id": "b000187",
+        "label": "Photos.md",
+        "target": "docs/Photos.md",
+        "kind": "relative",
+        "line": 352
+      },
+      {
+        "block_id": "b000199",
+        "label": "Generation History publication",
+        "target": "docs/GenerationHistory.md",
+        "kind": "relative",
+        "line": 369
+      },
+      {
+        "block_id": "b000204",
+        "label": "FileLoading.md",
+        "target": "FileLoading.md",
+        "kind": "relative",
+        "line": 376
+      },
+      {
+        "block_id": "b000208",
+        "label": "Container Aliases",
+        "target": "docs/ContainerAliases.md",
+        "kind": "relative",
+        "line": 384
+      },
+      {
+        "block_id": "b000213",
+        "label": "AGENT.md",
+        "target": "AGENT.md",
+        "kind": "relative",
+        "line": 390
+      },
+      {
+        "block_id": "b000213",
+        "label": "documentation index",
+        "target": "docs/README.md",
+        "kind": "relative",
+        "line": 391
+      },
+      {
+        "block_id": "b000213",
+        "label": "agent index",
+        "target": "docs/agent-index.json",
+        "kind": "relative",
+        "line": 392
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000053",
+        "columns": [
+          "Result",
+          "Meaning"
+        ],
+        "rows": [
+          [
+            "`PathKind::Root`",
+            "The specified SocietyContainer directory itself"
+          ],
+          [
+            "`PathKind::Entry`",
+            "A file or directory that actually exists under the root"
+          ],
+          [
+            "`PathKind::Outside`",
+            "External paths, non-existent items, invalid input, or invalid containers"
+          ]
+        ]
+      },
+      {
+        "block_id": "b000067",
+        "columns": [
+          "identifier",
+          "display name"
+        ],
+        "rows": [
+          [
+            "`StoreSection::AssetLibrary`",
+            "Asset Library"
+          ],
+          [
+            "`StoreSection::Deleted`",
+            "Deleted"
+          ],
+          [
+            "`StoreSection::Files`",
+            "Files"
+          ],
+          [
+            "`StoreSection::Forked`",
+            "Forked"
+          ],
+          [
+            "`StoreSection::GenerationHistory`",
+            "Generation History"
+          ],
+          [
+            "`StoreSection::Models`",
+            "Models"
+          ],
+          [
+            "`StoreSection::Published`",
+            "Published"
+          ],
+          [
+            "`StoreSection::ThinkingSpace`",
+            "Thinking Space"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

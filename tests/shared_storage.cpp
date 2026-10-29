@@ -15,6 +15,7 @@
 #include <QJsonArray>
 #include <algorithm>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
@@ -52,6 +53,52 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void modelInventoryExcludesOnnxAndKeepsGguf() {
+        QTemporaryDir fixture(QDir::current().filePath("model-extension-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        const auto base = std::filesystem::path(fixture.filePath("Models").toStdU16String());
+        const std::string header = R"({"weight":{"dtype":"F32","shape":[1],"data_offsets":[0,4]}})";
+        std::string checkpoint(8, '\0');
+        for (unsigned i = 0; i < 8; ++i) checkpoint[i] = static_cast<char>((header.size() >> (8 * i)) & 255);
+        checkpoint += header; checkpoint.append(4, '\0');
+        iiFileProvider::native::File::create(base / "model.safetensors", checkpoint);
+        iiFileProvider::native::File::create(base / "legacy.safetensor", checkpoint);
+        iiFileProvider::native::File::create(base / "legacy.onnx", "untouched ONNX bytes");
+        iiFileProvider::native::File::create(base / "legacy.gguf", "untouched GGUF bytes");
+        auto models = storage->models();
+        QCOMPARE(models.size(), 3);
+        const auto gguf = std::find_if(models.begin(), models.end(), [](const auto &m) { return m.id == "legacy.gguf"; });
+        QVERIFY(gguf != models.end()); QCOMPARE(gguf->format, "gguf");
+        const QFileInfo legacy(fixture.filePath("Models/legacy.safetensor"));
+        QCryptographicHash fingerprint(QCryptographicHash::Sha256);
+        fingerprint.addData(QByteArray("legacy.safetensor"));
+        fingerprint.addData(QByteArray::number(legacy.size()));
+        fingerprint.addData(QByteArray::number(legacy.lastModified().toMSecsSinceEpoch()));
+        fingerprint.addData(QByteArray(checkpoint.data(), static_cast<qsizetype>(checkpoint.size())));
+        const QJsonObject oldReference{{"containerId", drive->identifier()}, {"path", "legacy.safetensor"},
+            {"format", "safetensors"}, {"fingerprint", QString::fromLatin1(fingerprint.result().toHex())}};
+        QCOMPARE(storage->resolveModel(oldReference), legacy.absoluteFilePath());
+
+        StorageMap map(*drive);
+        QJsonArray entries;
+        for (const auto &name : {QStringLiteral("model.safetensors"), QStringLiteral("legacy.safetensor"),
+                                 QStringLiteral("legacy.onnx"), QStringLiteral("legacy.gguf")}) {
+            entries.append(QJsonObject{{"path", "models/" + name}, {"kind", "file"},
+                {"size", QString::number(QFileInfo(fixture.filePath("Models/" + name)).size())},
+                {"resident", true}, {"version", QString(64, 'a')}});
+        }
+        QVERIFY(map.publish(entries));
+        models = storage->models();
+        QCOMPARE(models.size(), 3);
+        const auto syncedGguf = std::find_if(models.begin(), models.end(), [](const auto &m) { return m.id == "legacy.gguf"; });
+        QVERIFY(syncedGguf != models.end()); QCOMPARE(syncedGguf->format, "gguf");
+        QVERIFY(std::none_of(models.begin(), models.end(), [](const auto &m) { return m.id.endsWith(".onnx", Qt::CaseInsensitive); }));
+        QCOMPARE(iiFileProvider::native::File::read(base / "legacy.safetensor"), checkpoint);
+        QCOMPARE(iiFileProvider::native::File::read(base / "legacy.onnx"), std::string("untouched ONNX bytes"));
+        QCOMPARE(iiFileProvider::native::File::read(base / "legacy.gguf"), std::string("untouched GGUF bytes"));
+    }
     void fileInformationExposesProviderPresentationAndClassification() {
         QTemporaryDir fixture(QDir::current().filePath("rich-information-XXXXXX.societycontainer")); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
@@ -486,6 +533,8 @@ private slots:
         add("Checkpoint/pipeline/model_index.json", "{}");
         add("Checkpoint/pipeline/unet/model.bin", "weights"); ++expected;
         add("legacy/unassigned.gguf", "unreadable"); ++expected;
+        add("Checkpoint/unsupported.onnx", "preserved");
+        add("Other/unsupported.ONNX", "preserved");
         add("Other/.hidden.bin", "hidden");
         StorageModelCatalog local; local.setDirectory(fixture.filePath("Models"));
         QTRY_VERIFY(!local.loading());
@@ -493,6 +542,8 @@ private slots:
         QCOMPARE(local.categories().size(), 23);
         QCOMPARE(local.groups().size(), 23);
         QCOMPARE(local.uncategorizedCount(), 2);
+        QCOMPARE(iiFileProvider::native::File::read(std::filesystem::path(fixture.filePath("Models/Checkpoint/unsupported.onnx").toStdU16String())), std::string("preserved"));
+        QCOMPARE(iiFileProvider::native::File::read(std::filesystem::path(fixture.filePath("Models/Other/unsupported.ONNX").toStdU16String())), std::string("preserved"));
         for (const auto type : allModelTypes()) {
             const auto name = modelTypeName(type);
             QCOMPARE(local.groups().value(name).toList().size(),
@@ -906,7 +957,7 @@ private slots:
         QTemporaryDir fixture(QDir::current().filePath("shared-models-XXXXXX.societycontainer"));
         const auto drive = SocietyDrive::create(fixture.path());
         QVERIFY(drive);
-        write(fixture.filePath("Models/weights.safetensor"), "one");
+        write(fixture.filePath("Models/weights.safetensors"), "one");
         write(fixture.filePath("Files/public.safetensors"), "public");
         write(fixture.filePath("Models/.partial.safetensors"), "partial");
         QVERIFY(QDir().mkdir(fixture.filePath("Models/pipeline")));
@@ -933,7 +984,7 @@ private slots:
         auto reference = file.reference(drive->identifier());
         reference["path"] = "../Files/public.safetensors";
         QVERIFY(client->resolveModel(reference).isEmpty());
-        write(fixture.filePath("Models/weights.safetensor"), "changed model");
+        write(fixture.filePath("Models/weights.safetensors"), "changed model");
         QVERIFY(client->resolveModel(file.reference(drive->identifier())).isEmpty());
         write(fixture.filePath("Models/cascade.iildmodel/members/model.safetensors"), "changed member");
         QVERIFY(client->resolveModel(unified->reference(drive->identifier())).isEmpty());

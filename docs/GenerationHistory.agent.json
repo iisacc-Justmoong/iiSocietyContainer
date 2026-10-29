@@ -1,0 +1,149 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:43b015579f9169200515bfaec5d9cc4a87a971d16fdcfda75f9205fca299e811",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/GenerationHistory.md",
+    "sha256": "c6df0b42a4cbe1e9aa1c5c7755378e34f4e840687442f1e9cdbedffaf9dc689d",
+    "bytes": 2086,
+    "line_count": 33,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Generation History publication",
+    "role": "history",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Generation History publication\n",
+      "level": 1,
+      "title": "Generation History publication"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 8,
+      "raw": "Generated image originals are PNG files directly below `Generation History/`.\nDreamscapes names them `<job UUID>-0001.png`. Generation does not create an\niiSharedCanvas document. Opening a PNG for editing creates a separate `.iisc`\ndocument in Society `Files/` while retaining the PNG in History. Image attachments\nand generation input canvases also belong to Files. Society-local native document\nsaves and exports must use Files; the editor defaults its save dialog there.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 10,
+      "end_line": 18,
+      "raw": "`SharedStorage::publishGeneratedImage(source, fileName, error)` publishes an\nalready decoded and validated PNG into the pinned Society drive. It accepts one\nvisible `.png` leaf, checks the PNG signature and direct source path, and reuses\niiFileProvider's no-replacement atomic commit. Decoding, dimensions and image\nmetadata validation belong to the caller. The source bytes are copied unchanged.\nTemporary files and their maintenance lease live in\n`.society-runtime/generation-history/`; History observers only see the committed\nfile. A collision, redirected source/section, invalid filename or unavailable\ndrive returns an empty path with an error. Existing output is never overwritten.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 20,
+      "end_line": 23,
+      "raw": "`iiSocietyHelper::FileSystem::publishGeneratedImage()` delegates to this contract\nand reports failures through `errorString`. Presence, delivery and a running\nSociety daemon are unnecessary. Its selected drive remains pinned until\n`open()`/`refresh()`, even when another app changes the shared default.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 28,
+      "raw": "Society's image gallery and `DashboardFiles::generationHistory` show generated\nimage originals. `.iisc` documents and editor wrappers do not duplicate PNGs in\nthe gallery. JSON metadata, hidden files, redirected entries and app subfolders\nare excluded. Existing canvases are preserved on disk.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 33,
+      "raw": "Regression coverage is in `iiSocietyContainer.shared_storage`,\n`iiSocietyContainer.dashboard` and `iiSocietyHelper.filesystem`. Dreamscapes\ngeneration tests additionally verify PNG publication, observed History entries,\neditor wrapping, native inference and host/replica synchronization.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Generation History publication",
+      "anchor": "generation-history-publication",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 8,
+        "text": "saves and exports must use Files; the editor defaults its save dialog there.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 18,
+        "text": "drive returns an empty path with an error. Existing output is never overwritten.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 26,
+        "text": "image originals. `.iisc` documents and editor wrappers do not duplicate PNGs in",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

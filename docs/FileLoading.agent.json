@@ -1,0 +1,471 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:56322d185cc4d79066ddd56bb259e448a65695555d12219f2a3d962a4b178dfd",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/FileLoading.md",
+    "sha256": "28f46bf017d0f6000ab5e535a9b4833e7368ada26eaca108f4112f6d834e48d6",
+    "bytes": 7192,
+    "line_count": 52,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "파일 로딩 및 앱 로컬 캐시",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "html",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "<a id=\"file-loading-and-app-local-caches\"></a>\n"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "heading",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "# 파일 로딩 및 앱 로컬 캐시\n",
+      "level": 1,
+      "title": "파일 로딩 및 앱 로컬 캐시"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "`StorageDirectoryModel`과 `DashboardFiles`는 파일 시스템 메타데이터를 비동기로 조회한다. 로컬 호스트는 실제 디렉터리를 기준으로 목록을 만들며 전체 동기화 카탈로그를 파싱하지 않는다. 복제본은 카탈로그 기반 메타데이터와 주문형 다운로드 계약을 유지한다. 목록 열거는 원본 전체 해시나 이미지 디코딩을 실행하지 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "html",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "<a id=\"listing-cache\"></a>\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "heading",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "## 목록 캐시\n",
+      "level": 2,
+      "title": "목록 캐시"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "디렉터리 스냅샷은 원본 컨테이너의 `.society-runtime/cache/files/directories-v1`에 저장한다. 키에는 절대 폴더와 필터·정렬 옵션이 포함되며, 레코드는 컨테이너 ID에 바인딩된다. 최대 128개, 개별 16 MiB, 총 128 MiB로 제한한다. 쓰기는 원자적이며 변경되지 않은 행은 다시 저장하지 않는다. `entry(index)`는 한 행의 역할 맵을 한 번에 반환하여 QML의 역할별 왕복 호출을 줄인다. 잘못된 인덱스는 빈 맵이다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "스냅샷으로 이름을 먼저 표시하되 `Ready`는 새 스캔 완료를 의미한다. `activate()`는 로딩 중 항목을 열지 않는다. `snapshotRestored()`는 임시 행 표시를 식별하며, 새 스캔은 행 차이로 변경·삭제·순서를 조정한다. 누락되거나 손상된 스냅샷은 정상 스캔으로 대체한다. 선택과 스크롤 보존은 앱의 책임이다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "파일 시스템 알림은 100ms 동안 병합하며 최대 64개 감시 핸들을 사용한다. 감시가 불가능한 환경에는 10초 폴백을 둔다. 감시 핸들은 프레임 사이에 8개씩 설치한다. 큰 디렉터리는 256개 항목당 하나의 메타데이터 작업자를 사용하되 하드웨어 스레드 수로 제한한다. 대시보드의 Files·Published·Generation History는 섹션 경계와 취소를 유지하며 병렬 조회한다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "html",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "<a id=\"hash-and-preview-cache\"></a>\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "heading",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "## 해시 및 미리보기 캐시\n",
+      "level": 2,
+      "title": "해시 및 미리보기 캐시"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "QML 엔진에 `PreviewProvider`를 `society-preview`로 등록하고 `fileThumbnailUrl` 또는 대시보드의 `thumbnailSource`를 렌더링한다. 원본 열기·다운로드용 `fileUrl`과 `filePreviewUrl`은 유지한다. 캐시 URL은 정규 절대 경로, 크기, 고해상도 수정 시각과 메타데이터 변경 토큰을 포함한다. 일반 파일은 확장자와 관계없이 iiFileProvider의 프리뷰를 사용한다. 디렉터리·누락·링크·내부 제어 파일은 제외한다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "캐시를 먼저 확인하여 적중하면 프리뷰 준비와 원본 재해시를 생략한다. 누락 시 iiFileProvider의 이미지·문서·오디오·등록된 캔버스 렌더러를 사용하여 최대 512픽셀 PNG를 저장한다. 네이티브 제공자가 정보 카드만 반환해도 기존 이미지 디코더는 256 MiB·32 Mi 픽셀 한도 안에서 실제 이미지를 시도한다. 그 경로에서도 디코딩할 수 없는 형식과 한도 초과 파일은 정보 카드로 표시할 수 있다. UI 요청은 `PreviewCache::HashPolicy::PreviewOnly`를 사용하므로 원본 전체 SHA-256 계산을 기다리지 않는다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "v2 매니페스트의 `previewSha256`은 작은 PNG의 무결성을 검사한다. `sha256`이 비어 있으면 원본 전체 해시를 아직 요청하지 않았다는 뜻이다. 기존 `PreviewCache::load(path)`는 원본 전체 SHA-256을 요구하는 계약을 유지한다. 프리뷰만 저장된 항목을 이 API로 조회하면 이미지를 재생성하지 않고 원본 해시를 추가한다. 이 해시는 동기화·인증 해시를 대신하지 않는다. v1 캐시도 읽는다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "매니페스트와 PNG는 `.society-runtime/cache/files/previews-v1`에 원자적으로 저장한다. 손상된 프리뷰는 재생성하며, 처리 중 원본 리비전이 바뀌면 결과를 폐기한다. 같은 키의 동시 요청은 스트라이프 잠금으로 병합한다. 캐시는 약 512 MiB를 목표로 32회 쓰기마다 오래된 항목을 정리하므로 일시적으로 초과할 수 있다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "이미지 제공자는 전용 표준 C++23 작업자 큐를 사용한다. 작업자 수는 데스크톱 최대 8개, 모바일 최대 2개이다. 취소된 대기 작업은 건너뛰며 종료 시 작업자를 회수한다. 원본 내용은 다시 저장하지 않지만 iiFileProvider는 지원되는 플랫폼에서 프리뷰 메타데이터를 파일 속성으로 게시할 수 있다. 타일 표시를 위해 원격 원본을 다운로드하지 않는다. 기존에 내려받은 원격 프리뷰는 같은 캐시를 사용할 수 있다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "`IISOCIETY_FILE_CACHE_DIRECTORY`와 명시적 프리뷰 디렉터리도 해당 컨테이너의 검증된 비공개 런타임 내부여야 한다. 외부·리디렉션 경로는 쓰기 전에 거부한다. 선택된 컨테이너가 없으면 영속 캐시를 생성하지 않는다. 일반 폴더의 이미지는 `PreviewOnly`에서 크기 한도를 적용해 읽기만 하며 파일 속성도 게시하지 않는다. 명시적 캐시 설정이 있는 외부 경로와 원본 해시 요청은 이 폴백을 사용하지 않는다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "heading",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "## 검증과 측정\n",
+      "level": 2,
+      "title": "검증과 측정"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 38,
+      "raw": "디렉터리 스냅샷은 16 MiB 상한 안에서 메모리로 읽고 역직렬화하여 필드마다\n제공자 읽기를 요청하지 않는다. 컨테이너 GUI 미러는 동일한 입력을 재정렬하지 않고,\n변경된 입력은 키·수정 시각을 한 번 계산하여 정렬한다. 입력이 같으면 상태 리비전과\n신호도 유지하며, 컨테이너 변경과 잘못된 키의 검증은 계속 적용한다.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "픽스처와 캐시는 `build/` 아래에 둔다. `iiSocietyContainerLoadingBenchmark [folder]`는 3회에 걸쳐 최초 행·Ready 시각·스냅샷 복원 여부·행 맵 조회 비용을 출력한다. 인자가 없으면 유효한 테스트 컨테이너에 2,000개 파일을 생성하여 캐시 재사용을 측정한다. 폴더를 전달하면 캐시 쓰기를 비활성화하고 원본을 읽기만 한다. OS 페이지 캐시와 영속 스냅샷의 효과는 구분해야 한다.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "fenced_code",
+      "start_line": 42,
+      "end_line": 45,
+      "raw": "```sh\ncmake --build build --parallel 4 --target iiSocietyContainerPreviewCacheTests iiSocietyContainerSharedStorageTests iiSocietyContainerFileTreeTests iiSocietyContainerLoadingBenchmark\nctest --test-dir build -R '^iiSocietyContainer[.](preview_cache|shared_storage|file_tree)$' --output-on-failure\n```\n",
+      "language": "sh",
+      "code": "cmake --build build --parallel 4 --target iiSocietyContainerPreviewCacheTests iiSocietyContainerSharedStorageTests iiSocietyContainerFileTreeTests iiSocietyContainerLoadingBenchmark\nctest --test-dir build -R '^iiSocietyContainer[.](preview_cache|shared_storage|file_tree)$' --output-on-failure\n",
+      "closed": true
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "회귀 검증은 프리뷰 우선 표시·원본 해시 추가·이미지/캔버스 렌더러·동시 요청·취소·손상 복구·리비전 무효화·캐시 경계·스냅샷 조정·파일 트리 링크 거부를 포함한다. GUI 클래스 변경 후에는 SDK와 소비자 테스트를 함께 다시 빌드해야 한다.\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 49,
+      "raw": "\n\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "heading",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "## 문서 설치 경로\n",
+      "level": 2,
+      "title": "문서 설치 경로"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "유지하는 원본은 `docs/FileLoading.md`이다. 루트 `FileLoading.md`는 기존 경로를 위한 이동 안내이다. CMake의 Documentation 구성요소는 하위 원본 전체를 기존 설치 파일명 `share/iiSocietyContainer/FileLoading.md`로 배포한다. `iiSocietyContainer.documentation_install` 검사는 `build/documentation-install-test/`에 문서를 스테이징하고 원본과 설치 파일의 SHA-256을 비교한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000003",
+      "parent_id": null,
+      "level": 1,
+      "title": "파일 로딩 및 앱 로컬 캐시",
+      "anchor": "파일-로딩-및-앱-로컬-캐시",
+      "start_line": 3
+    },
+    {
+      "block_id": "b000009",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "목록 캐시",
+      "anchor": "목록-캐시",
+      "start_line": 9
+    },
+    {
+      "block_id": "b000019",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "해시 및 미리보기 캐시",
+      "anchor": "해시-및-미리보기-캐시",
+      "start_line": 19
+    },
+    {
+      "block_id": "b000033",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "검증과 측정",
+      "anchor": "검증과-측정",
+      "start_line": 33
+    },
+    {
+      "block_id": "b000043",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "문서 설치 경로",
+      "anchor": "문서-설치-경로",
+      "start_line": 50
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 5,
+        "text": "`StorageDirectoryModel`과 `DashboardFiles`는 파일 시스템 메타데이터를 비동기로 조회한다. 로컬 호스트는 실제 디렉터리를 기준으로 목록을 만들며 전체 동기화 카탈로그를 파싱하지 않는다. 복제본은 카탈로그 기반 메타데이터와 주문형 다운로드 계약을 유지한다. 목록 열거는 원본 전체 해시나 이미지 디코딩을 실행하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 11,
+        "text": "디렉터리 스냅샷은 원본 컨테이너의 `.society-runtime/cache/files/directories-v1`에 저장한다. 키에는 절대 폴더와 필터·정렬 옵션이 포함되며, 레코드는 컨테이너 ID에 바인딩된다. 최대 128개, 개별 16 MiB, 총 128 MiB로 제한한다. 쓰기는 원자적이며 변경되지 않은 행은 다시 저장하지 않는다. `entry(index)`는 한 행의 역할 맵을 한 번에 반환하여 QML의 역할별 왕복 호출을 줄인다. 잘못된 인덱스는 빈 맵이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 25,
+        "text": "v2 매니페스트의 `previewSha256`은 작은 PNG의 무결성을 검사한다. `sha256`이 비어 있으면 원본 전체 해시를 아직 요청하지 않았다는 뜻이다. 기존 `PreviewCache::load(path)`는 원본 전체 SHA-256을 요구하는 계약을 유지한다. 프리뷰만 저장된 항목을 이 API로 조회하면 이미지를 재생성하지 않고 원본 해시를 추가한다. 이 해시는 동기화·인증 해시를 대신하지 않는다. v1 캐시도 읽는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 29,
+        "text": "이미지 제공자는 전용 표준 C++23 작업자 큐를 사용한다. 작업자 수는 데스크톱 최대 8개, 모바일 최대 2개이다. 취소된 대기 작업은 건너뛰며 종료 시 작업자를 회수한다. 원본 내용은 다시 저장하지 않지만 iiFileProvider는 지원되는 플랫폼에서 프리뷰 메타데이터를 파일 속성으로 게시할 수 있다. 타일 표시를 위해 원격 원본을 다운로드하지 않는다. 기존에 내려받은 원격 프리뷰는 같은 캐시를 사용할 수 있다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000031",
+        "line": 31,
+        "text": "`IISOCIETY_FILE_CACHE_DIRECTORY`와 명시적 프리뷰 디렉터리도 해당 컨테이너의 검증된 비공개 런타임 내부여야 한다. 외부·리디렉션 경로는 쓰기 전에 거부한다. 선택된 컨테이너가 없으면 영속 캐시를 생성하지 않는다. 일반 폴더의 이미지는 `PreviewOnly`에서 크기 한도를 적용해 읽기만 하며 파일 속성도 게시하지 않는다. 명시적 캐시 설정이 있는 외부 경로와 원본 해시 요청은 이 폴백을 사용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 36,
+        "text": "제공자 읽기를 요청하지 않는다. 컨테이너 GUI 미러는 동일한 입력을 재정렬하지 않고,",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000037",
+        "line": 40,
+        "text": "픽스처와 캐시는 `build/` 아래에 둔다. `iiSocietyContainerLoadingBenchmark [folder]`는 3회에 걸쳐 최초 행·Ready 시각·스냅샷 복원 여부·행 맵 조회 비용을 출력한다. 인자가 없으면 유효한 테스트 컨테이너에 2,000개 파일을 생성하여 캐시 재사용을 측정한다. 폴더를 전달하면 캐시 쓰기를 비활성화하고 원본을 읽기만 한다. OS 페이지 캐시와 영속 스냅샷의 효과는 구분해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000041",
+        "line": 47,
+        "text": "회귀 검증은 프리뷰 우선 표시·원본 해시 추가·이미지/캔버스 렌더러·동시 요청·취소·손상 복구·리비전 무효화·캐시 경계·스냅샷 조정·파일 트리 링크 거부를 포함한다. GUI 클래스 변경 후에는 SDK와 소비자 테스트를 함께 다시 빌드해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000039",
+        "language": "sh",
+        "code": "cmake --build build --parallel 4 --target iiSocietyContainerPreviewCacheTests iiSocietyContainerSharedStorageTests iiSocietyContainerFileTreeTests iiSocietyContainerLoadingBenchmark\nctest --test-dir build -R '^iiSocietyContainer[.](preview_cache|shared_storage|file_tree)$' --output-on-failure\n"
+      }
+    ],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

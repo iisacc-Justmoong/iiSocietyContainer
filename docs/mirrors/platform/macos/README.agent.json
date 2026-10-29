@@ -1,0 +1,743 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:1b2d8fa0f23a5ff65038a17c46236bc738845031063c9dfd16b01a08e6c7934e",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "platform/macos/README.md",
+    "sha256": "f34c5b8257b564b9f50f8be4294015cfd1fd172f8449e31a666711d59c34efbb",
+    "bytes": 19670,
+    "line_count": 210,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "macOS Society",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "quote",
+      "start_line": 1,
+      "end_line": 3,
+      "raw": "> New Society storage is one schema-1 `.societycontainer` directory package.\n> FSKit mounts its existing `Files/` section without copying or preallocating data.\n> Legacy APFS disk images are not automatically opened or restored.\n"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "heading",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "# macOS Society\n",
+      "level": 1,
+      "title": "macOS Society"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 12,
+      "raw": "The native host accepts only `.societycontainer` sources with the Society UUID\nmanifest and nine native section directories. Ordinary directories, nested\ncontainers, Finder replicas, and sources containing `Info.plist`, `bands`, or\n`.society-disk.plist` disk-image markers are rejected before registration.\nThe FSKit resource probe also requires the package extension and refuses those\nlegacy markers and redirected manifests.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 20,
+      "raw": "On macOS 27, the signed host uses Apple's public\n[`FSClient.mountSingleVolume`](https://developer.apple.com/documentation/fskit/fsclient/mountsinglevolume%28resource%3Abundleid%3Aoptions%3Acompletionhandler%3A%29)\nwith the `com.apple.developer.fskit.mount` capability and a security-scoped\nresource URL. macOS creates and owns the mount point under `/Volumes/`.\nSociety never creates or removes an external mount directory. Stored data,\napplication state, logs and temporary files stay inside the selected package;\nthe OS volume is a direct projection of `Files/` and does not copy that data.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 22,
+      "end_line": 27,
+      "raw": "The macOS 26 command-line path prepares only an empty\n`<container>/.society-runtime/mounts/<uuid>/Society` backing directory. It rejects\nredirected ancestors, foreign mounted ancestors and nonempty directories.\nThat older path requires an ownership-enabled host filesystem and can be\nlimited by OS file-mount policy. macOS 27 does not fall back to it when its\npublic API or provisioning fails.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 29,
+      "end_line": 35,
+      "raw": "Reconnect examines actual `societyfs` mount records and the filesystem's volume\nUUID. A renamed source renews its security-scoped resource through public unmount and\nmount while retaining the same UUID; a different still-existing\nsource inode with the same UUID, or duplicate mounted UUIDs, is rejected.\nDiscovery creates no files. Unmount uses public Disk Arbitration and targets\nonly the matching filesystem source and UUID. OS authorization errors leave the\nvolume and its source intact and are reported to the caller.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 37,
+      "end_line": 43,
+      "raw": "`DirectoryMountTests.swift` checks legacy package preparation, UUID discovery,\nrename reconnect and collision rejection. `tests/native_directory_mount.py`\nchecks the actual device, OS-managed macOS 27 mount point, Files-only CRUD,\nrename reconnect and unchanged manifest UUID. It retains its backing fixture\nwhen unmount fails. The standard test suite does not register or activate an OS\nextension. File Provider materialization, extension registration, access grants\nand the `/Volumes` namespace remain under macOS control.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 45,
+      "end_line": 49,
+      "raw": "`LocalDriveStore` protects `.society-write-*` copies with the same zero-byte\n`.iisacc-temporary.lock` shared lease used by the C++ SDK. The lease begins before\ncopying and ends after publication or removal, so periodic maintenance skips\nactive writes. A redirected or nonregular lease is rejected without replacing\nthe destination. `LocalDriveStoreTests.swift` covers redirected-lease rejection.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 51,
+      "end_line": 58,
+      "raw": "The public File Provider and FSKit views hide `.iisacc-temporary.lock` and reject\ndirect item operations on this internal coordination metadata. An explicit\nFSKit deletion of an otherwise empty folder may remove its idle zero-byte\nsentinel while holding a nonblocking exclusive lease. An active writer returns\n`EBUSY`, and other folder contents remain subject to ordinary `ENOTEMPTY`.\nBackground maintenance always preserves the sentinel. The real\n`tests/native_directory_mount.py` regression covers listing, direct write\nrejection, active-writer exclusion, and idle sentinel-only folder deletion.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 68,
+      "raw": "FSKit reads and writes own a descriptor with the requested access mode for\nthe operation's lifetime. Reading a source-preloaded file before writing it,\nor closing its cached item during I/O, preserves the user inode and does not\ninvalidate the operation descriptor. `native_io` exercises the read-only cache,\nwrite reopening, cached-close overlap and descriptor cleanup. Attribute reads\nand parent lookups likewise own their descriptor, including simultaneous\nattribute requests after a cached close. Attribute snapshot creation and field population are serialized per item to preserve FSKit attribute sequence ordering. Concurrent cache misses share the\nfirst published item for the same inode; reclaiming an older object does not\nremove a later cached object.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 70,
+      "end_line": 79,
+      "raw": "Directory callbacks own independent `openat(\".\")` streams and close them on\ncompletion, error and early return. Cookies count raw directory entries across\nrequests rather than reusing a `telldir` token from a different stream.\nIf requested enumeration attributes cannot be obtained, the callback returns\nthe actual error instead of packing missing attributes as a successful listing.\n`native_directory` covers repeated and interleaved complete listings,\npagination and stream lifetime with 1,024 long filenames. The real mount\nregression also checks concurrent listing, repeated read/write of preloaded\nordinary files, and read-only mutation rejection for metadata-name user data. Directory mutation\nbetween paginated requests remains outside the unchanged verifier policy.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 81,
+      "end_line": 99,
+      "raw": "FSKit rejects new exact volume-root index names `.fseventsd` and\n`.Spotlight-V100`, and new `.DS_Store` entries in every folder, before creating\nsource bytes.\nCreation reports `EEXIST` for an existing matching entry and `EPERM` for a\nmissing matching entry. Renaming to a missing matching entry also reports\n`EPERM`. Existing matching entries and descendants of matching folders remain\nlisted and available to lookup and reads. Mounted writes, removal, rename,\nattribute mutation and preallocation report `EPERM`; replacement of a reserved\ndestination and creation inside a protected folder are also rejected. Users\ncan edit and move this data through the authoritative source `Files/` path.\nVolume-management names in unprotected nested folders and other dotfiles\nremain ordinary names.\nThe policy limits new Finder view, event-history and indexing metadata storage.\n`.Trashes`, `.TemporaryItems`, and `.DocumentRevisions-V100` remain ordinary\nnames at the root as well, preserving user recovery, save transactions and\ndocument versions. `FSKitMetadataTests.swift` checks the native policy without\nactivation, and the real mount regression checks the installed FSKit callbacks\nand existing user-file fidelity. The manifest UUID and file UID/GID attributes\nremain independent of these management names.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 100,
+      "end_line": 100,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 101,
+      "end_line": 110,
+      "raw": "The SDK's name policy does not override macOS System Policy. On the observed\nmacOS 27 mount, the kernel denied the ordinary Python caller's\n`file-write-create` at the volume-root `.DocumentRevisions-V100`, while an\nordinary APFS control directory allowed the same name and inner file writes.\nThis policy does not change document-version service permissions. The real\nmount regression reports `EPERM` only for that new root `mkdir` as a separate\nOS limitation after verifying that no source entry remains. Other errors,\nincluding `.Trashes`/`.TemporaryItems` CRUD and writes inside a successfully\ncreated revision folder, still fail the test. The native unit test continues\nto require that `.DocumentRevisions-V100` is allowed by the SDK name policy.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 111,
+      "end_line": 111,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 112,
+      "end_line": 127,
+      "raw": "On the same observed macOS 27 mount, source-preloaded user files at root\n`.Spotlight-V100` and `.TemporaryItems/user.txt` remained listed or available\nto lookup, but the kernel denied the ordinary Python caller's `file-read-data`\nfor those exact paths. The SDK adds no existing-item hiding or read-name\nrestriction. The real regression reports only `EPERM` from these two exact\nexisting root reads as separate OS limitations, asserting unchanged source\nbytes and device/inode and explicitly leaving projection writes unverified\nfor those cases. New volume-root `.Trashes` and `.TemporaryItems` file creation,\nwrite, readback and deletion passed before the preloaded-file check; these\nremain strict checks with an explicit success record. Other ordinary existing\nuser items and writes after a successful read of the unreserved\n`.TemporaryItems` path remain strict checks.\nReserved root and nested metadata-name entries instead require mutation\nrejection and unchanged source bytes and device/inode. No recovery,\nsave, document-version or indexing-service permissions or native entitlements\nare changed to bypass the observed OS protection.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 128,
+      "end_line": 128,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 129,
+      "end_line": 136,
+      "raw": "In an earlier real fixture with creation rejection alone, a preloaded root\n`.fseventsd` appeared in baseline and concurrent listings, then disappeared\nfrom the source itself. No successful-delete caller record was obtained, so\nthis observation does not identify an OS service as the deleting actor.\nCallbacks that allowed existing reserved-name mutations could not guarantee\nsource preservation. The read-only mounted protection now addresses that\nboundary without deleting or hiding existing user data or limiting ordinary\nuser-document CRUD.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 137,
+      "end_line": 137,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 138,
+      "end_line": 138,
+      "raw": "Apple's [replicated File Provider](https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension)provides Society drive to Finder and file dialogs. Minimum macOS 15. Foundation, FileProvider, UniformTypeIdentifiers, CryptoKit, CoreServices are frameworks included in the operating system, adding no FUSE, external drivers, or paid cloud services. The Swift compiler uses the Apple SDK, bundle creation uses Python 3, and restricted FSKit capabilities use Xcode automatic provisioning with the configured developer team. Apple framework usage conditions follow Apple SDK license.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 139,
+      "end_line": 139,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "html",
+      "start_line": 140,
+      "end_line": 140,
+      "raw": "<a id=\"빌드와-연결\"></a>\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 141,
+      "end_line": 141,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "heading",
+      "start_line": 142,
+      "end_line": 142,
+      "raw": "## Build and Link\n",
+      "level": 2,
+      "title": "Build and Link"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 143,
+      "end_line": 143,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 144,
+      "end_line": 144,
+      "raw": "Execute from SDK root. The default signature is ad hoc, and the build for actual Finder use is configured with the developer's valid code signing ID. The signing ID is not pinned to the repository.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 145,
+      "end_line": 145,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "fenced_code",
+      "start_line": 146,
+      "end_line": 154,
+      "raw": "```sh\ncmake -S . -B build \\\n  -DCMAKE_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\n  -DCMAKE_INSTALL_PREFIX=\"$PWD/build/install\" \\\n  -DIISOCIETYCONTAINER_SIGNING_IDENTITY=\"<your code signing identity>\"\ncmake --build build --parallel\nctest --test-dir build --output-on-failure\ncmake --install build\n```\n",
+      "language": "sh",
+      "code": "cmake -S . -B build \\\n  -DCMAKE_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\n  -DCMAKE_INSTALL_PREFIX=\"$PWD/build/install\" \\\n  -DIISOCIETYCONTAINER_SIGNING_IDENTITY=\"<your code signing identity>\"\ncmake --build build --parallel\nctest --test-dir build --output-on-failure\ncmake --install build\n",
+      "closed": true
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 155,
+      "end_line": 155,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "paragraph",
+      "start_line": 156,
+      "end_line": 156,
+      "raw": "Society The app's `Connect to Finder` registers installed adapters and connects the File Provider domain to the SDK drive ID. For the first connection, Finder's standard `Enable` behavior may be required. The path of the original folder and the path managed by the system are different. CLI connection is as follows.\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 157,
+      "end_line": 157,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "fenced_code",
+      "start_line": 158,
+      "end_line": 169,
+      "raw": "```sh\nbuild/iiSocietyContainerDriveTool create \"/path/to\"\n/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \\\n  -f \"$PWD/build/native/Society.app\"\npluginkit -a \"$PWD/build/native/Society.app/Contents/PlugIns/SocietyContainerProvider.appex\"\nopen -W -g -a \"$PWD/build/native/Society.app\" --args list\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" register \"/path/to/Society.societycontainer\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" list\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" path \"<drive-id>\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" refresh \"<drive-id>\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" unregister \"<drive-id>\"\n```\n",
+      "language": "sh",
+      "code": "build/iiSocietyContainerDriveTool create \"/path/to\"\n/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \\\n  -f \"$PWD/build/native/Society.app\"\npluginkit -a \"$PWD/build/native/Society.app/Contents/PlugIns/SocietyContainerProvider.appex\"\nopen -W -g -a \"$PWD/build/native/Society.app\" --args list\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" register \"/path/to/Society.societycontainer\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" list\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" path \"<drive-id>\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" refresh \"<drive-id>\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" unregister \"<drive-id>\"\n",
+      "closed": true
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 170,
+      "end_line": 170,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 171,
+      "end_line": 171,
+      "raw": "The host returns a termination code instead of 0 on failure. Repeated registration uses the same domain and updates the display name. The `enabled` in the response indicates the domain registered by the system again. Duplicate connections with the same ID but different original paths are rejected. Connection cancellation preserves downloaded data with `preserveDownloadedUserData` and returns the preservation path. The original is not deleted. The local development bundle does not include timestamps, notarization, or deployment packages for other computers.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 172,
+      "end_line": 172,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "html",
+      "start_line": 173,
+      "end_line": 173,
+      "raw": "<a id=\"파일-계약\"></a>\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 174,
+      "end_line": 174,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "heading",
+      "start_line": 175,
+      "end_line": 175,
+      "raw": "## File Contract\n",
+      "level": 2,
+      "title": "File Contract"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 176,
+      "end_line": 176,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 177,
+      "end_line": 177,
+      "raw": "Original selection is validated by `SocietyDrive` and native `LocalDriveStore`. `~/Library/CloudStorage/` Finder copies and their subfolders, and the interior of other Society containers cannot be created, opened, or registered as originals. Symbolic links are resolved to actual paths and do not create sections, manifests, or lock files before rejection. `SharedStorage` and Helper also use the same validation, so incorrect originals cannot be registered as common storage paths. If a copy is designated as the original and `Society/Files/` contains 8 nested areas, the file is preserved and moved to the corresponding area of the original, and the original path must be reselected in Society.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 178,
+      "end_line": 178,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 179,
+      "end_line": 179,
+      "raw": "Folders and files of 8 areas are stored in the original directory. System copies provide only `Society/Files/`. The drive's `/Example.txt` is the original's `Society/Files/Example.txt`, and files and folders can be created directly at the drive root. Within this scope, read, create, content modification, name change, move, and delete operations are reflected in the original, and external changes from `Files/` are notified to the working set via recursive FSEvents monitoring. Both the original and system cache can use disk space. If the original disk is disconnected, an access error is returned.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 180,
+      "end_line": 180,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "paragraph",
+      "start_line": 181,
+      "end_line": 181,
+      "raw": "Asset Library, Deleted, Forked, Generation History, Models, Published, and Thinking Space are navigated in the Society app. The system drive does not list folders and files of these areas, and lookup, download, creation, move, modification, and deletion using IDs of previous versions are also rejected. Internal `section:files` IDs are not disclosed. Name change, move, and deletion of the drive root itself are not allowed, while root metadata notifications due to child changes are accepted. If a user creates a general folder named `Models` inside the drive, it becomes `Society/Files/Models`, and thus is distinguished from the app's `Society/Models` area.\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 182,
+      "end_line": 182,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 183,
+      "end_line": 183,
+      "raw": "This boundary applies to access via File Provider. It is not an encryption or isolation feature that changes file permissions of the original folder or blocks access to the original path of the same OS user. The Society app provides all 8 areas from the original. `Deleted` is not connected to the system trash. Unsorted files, symbolic links, and special files in the existing root are not exposed to the system drive. Separate metadata synchronization such as Finder tags, extended attributes, and resource forks, as well as remote cloud synchronization, are not implemented.\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 184,
+      "end_line": 184,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 185,
+      "end_line": 185,
+      "raw": "File ID and change anchor are stored in the original's `.society-drive-provider.json`. Track moves with inode and creation time, and maintain path ID for atomic content replacement. If the moved original remains, a new file created in the old path receives a new ID. For anchors outside the recent 8 snapshots, request a full re-enum. If directory enumeration fails, do not process the partial result as a delete list. Since the current index scans the entire area, performance validation for large file sets is separate.\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 186,
+      "end_line": 186,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "paragraph",
+      "start_line": 187,
+      "end_line": 187,
+      "raw": "Public anchors use the `files-v5:` prefix. Protection of the default Files folder has been removed, so connections using an earlier prefix refresh their capability lists through full re-enumeration. Updating from a 0.4.0 anchor preserves existing Files children's IDs and moves them to the public root; the former 8 section folders and private items are placed in the system replica's deletion list. The previous full snapshot is used only for change comparison, and not for current item enumeration or downloads. Unsupported anchor formats request full re-enumeration. Items moved out of Files in the Society app disappear from the system, while items moved into Files become public. Previously copied data elsewhere, or data preserved when disconnecting, is not reclaimed.\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 188,
+      "end_line": 188,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "paragraph",
+      "start_line": 189,
+      "end_line": 189,
+      "raw": "The working set also includes the public root's metadata and delivers it together when the root changes. This also removes root-write restrictions left in existing connections, allowing Finder's `New Folder`. Visible enumeration of the root directory returns only its children. Content versions track file-content changes, while metadata versions track only the name and parent. A move requested immediately after editing content is not treated as a conflict because of a modification-time change. A directory's content version is fixed to the directory's own identifier, and children are tracked by each item's version, so creating or deleting children does not cause folder deletion to be rejected. Change notifications follow [Apple's File Provider change-tracking contract](https://developer.apple.com/documentation/fileprovider/tracking-your-file-provider-s-changes).\n"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 190,
+      "end_line": 190,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 191,
+      "end_line": 191,
+      "raw": "The host passes bookmarks including temporary permissions to the extension. The extension re-saves them as a security-scoped bookmark in its own process for use in the next execution. It does not reuse app-scoped bookmarks from other apps as-is. [Refer to Apple's inter-process bookmark passing method](https://developer.apple.com/documentation/browserenginekit/accessing-files-in-browser-extensions). It does not require sandbox exceptions or full disk access permissions.\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 192,
+      "end_line": 192,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "html",
+      "start_line": 193,
+      "end_line": 193,
+      "raw": "<a id=\"구현과-검증\"></a>\n"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 194,
+      "end_line": 194,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "heading",
+      "start_line": 195,
+      "end_line": 195,
+      "raw": "## Implementation and Verification\n",
+      "level": 2,
+      "title": "Implementation and Verification"
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 196,
+      "end_line": 196,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "list",
+      "start_line": 197,
+      "end_line": 204,
+      "raw": "- `LocalDriveStore.swift`: Source validation, file operations, persistent ID, and change snapshots.\n- Validation of the parent path of the original also iterates over the bookmark URL as a finite path component. It does not repeat the top URL operation that maintains the base URL of the bookmark, and it includes regression tests for general and security scope bookmarks.\n- `FilesDriveStore.swift`: Projects Files as the public root, blocks private IDs and change targets, and converts public versions and previous anchors.\n- `FileProviderExtension.swift`: File item, enumeration, content transfer, change callback, source monitoring\n- `DriveHost.swift`: Register, View, Disconnect, Folder Access Permission Transfer\n- : `build_native.py` : C++ Catalog creation, host and extended compilation, bundle configuration, signing\n- `LocalDriveStoreTests.swift`: Verifies the same 8-section operations, file CRUD, reopening, move/replacement ID, version conflicts, anchors, root protection, and path traversal in a temporary directory.\n- `FilesDriveStoreTests.swift`: Direct exposure of Files root, denial of access to private areas and preservation of originals, root CRUD, app area access, public suspension and re-publication, removal of existing exposure of actual enumeration callbacks and root permission refresh verification\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "`LocalDriveStore.swift`: Source validation, file operations, persistent ID, and change snapshots.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Validation of the parent path of the original also iterates over the bookmark URL as a finite path component. It does not repeat the top URL operation that maintains the base URL of the bookmark, and it includes regression tests for general and security scope bookmarks.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`FilesDriveStore.swift`: Projects Files as the public root, blocks private IDs and change targets, and converts public versions and previous anchors.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`FileProviderExtension.swift`: File item, enumeration, content transfer, change callback, source monitoring",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`DriveHost.swift`: Register, View, Disconnect, Folder Access Permission Transfer",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": ": `build_native.py` : C++ Catalog creation, host and extended compilation, bundle configuration, signing",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`LocalDriveStoreTests.swift`: Verifies the same 8-section operations, file CRUD, reopening, move/replacement ID, version conflicts, anchors, root protection, and path traversal in a temporary directory.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`FilesDriveStoreTests.swift`: Direct exposure of Files root, denial of access to private areas and preservation of originals, root CRUD, app area access, public suspension and re-publication, removal of existing exposure of actual enumeration callbacks and root permission refresh verification",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 205,
+      "end_line": 205,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "paragraph",
+      "start_line": 206,
+      "end_line": 206,
+      "raw": "Test temporary files and build results are placed under the `build/` of the SDK. Actual File Provider domains and bookmarks and cache are created at macOS in the system management location. General CTest does not automatically register the domain. Actual Finder behavior is separately checked in the explicitly connected verification folder.\n"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 207,
+      "end_line": 207,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "paragraph",
+      "start_line": 208,
+      "end_line": 208,
+      "raw": "Since 0.6.0, storage, public-boundary, and File Provider implementations in `platform/apple/` are shared with iOS. Selected paths, security-scoped bookmarks, and FSEvents behavior on macOS are retained. Index transactions are coordinated, and the latest on-disk history is read to prevent ID conflicts between separate storage instances. `shared_location` and `ios_package_contract` also run on the host, but are not treated as actual iOS device-verification results.\n"
+    },
+    {
+      "id": "b000076",
+      "kind": "blank",
+      "start_line": 209,
+      "end_line": 209,
+      "raw": "\n"
+    },
+    {
+      "id": "b000077",
+      "kind": "paragraph",
+      "start_line": 210,
+      "end_line": 210,
+      "raw": "After updating the signed helper, the helper app must be one time via Launch Services to be recognized as belonging to an executable extension app. Society's connection flow performs `open -W -g -a ... --args list` after registration and connects the domain. If `NSFileProviderError -2001` and internal `-2014` occur by skipping this step, app registration and normal execution status are checked first.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000003",
+      "parent_id": null,
+      "level": 1,
+      "title": "macOS Society",
+      "anchor": "macos-society",
+      "start_line": 5
+    },
+    {
+      "block_id": "b000035",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Build and Link",
+      "anchor": "build-and-link",
+      "start_line": 142
+    },
+    {
+      "block_id": "b000049",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "File Contract",
+      "anchor": "file-contract",
+      "start_line": 175
+    },
+    {
+      "block_id": "b000069",
+      "parent_id": "b000003",
+      "level": 2,
+      "title": "Implementation and Verification",
+      "anchor": "implementation-and-verification",
+      "start_line": 195
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000007",
+        "line": 18,
+        "text": "Society never creates or removes an external mount directory. Stored data,",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000041",
+        "line": 156,
+        "text": "Society The app's `Connect to Finder` registers installed adapters and connects the File Provider domain to the SDK drive ID. For the first connection, Finder's standard `Enable` behavior may be required. The path of the original folder and the path managed by the system are different. CLI connection is as follows.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000051",
+        "line": 177,
+        "text": "Original selection is validated by `SocietyDrive` and native `LocalDriveStore`. `~/Library/CloudStorage/` Finder copies and their subfolders, and the interior of other Society containers cannot be created, opened, or registered as originals. Symbolic links are resolved to actual paths and do not create sections, manifests, or lock files before rejection. `SharedStorage` and Helper also use the same validation, so incorrect originals cannot be registered as common storage paths. If a copy is designated as the original and `Society/Files/` contains 8 nested areas, the file is preserved and moved to the corresponding area of the original, and the original path must be reselected in Society.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000059",
+        "line": 185,
+        "text": "File ID and change anchor are stored in the original's `.society-drive-provider.json`. Track moves with inode and creation time, and maintain path ID for atomic content replacement. If the moved original remains, a new file created in the old path receives a new ID. For anchors outside the recent 8 snapshots, request a full re-enum. If directory enumeration fails, do not process the partial result as a delete list. Since the current index scans the entire area, performance validation for large file sets is separate.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000077",
+        "line": 210,
+        "text": "After updating the signed helper, the helper app must be one time via Launch Services to be recognized as belonging to an executable extension app. Society's connection flow performs `open -W -g -a ... --args list` after registration and connects the domain. If `NSFileProviderError -2001` and internal `-2014` occur by skipping this step, app registration and normal execution status are checked first.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000039",
+        "language": "sh",
+        "code": "cmake -S . -B build \\\n  -DCMAKE_PREFIX_PATH=\"/Volumes/Storage/Qt/6.8.3/macos\" \\\n  -DCMAKE_INSTALL_PREFIX=\"$PWD/build/install\" \\\n  -DIISOCIETYCONTAINER_SIGNING_IDENTITY=\"<your code signing identity>\"\ncmake --build build --parallel\nctest --test-dir build --output-on-failure\ncmake --install build\n"
+      },
+      {
+        "block_id": "b000043",
+        "language": "sh",
+        "code": "build/iiSocietyContainerDriveTool create \"/path/to\"\n/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \\\n  -f \"$PWD/build/native/Society.app\"\npluginkit -a \"$PWD/build/native/Society.app/Contents/PlugIns/SocietyContainerProvider.appex\"\nopen -W -g -a \"$PWD/build/native/Society.app\" --args list\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" register \"/path/to/Society.societycontainer\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" list\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" path \"<drive-id>\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" refresh \"<drive-id>\"\n\"build/native/Society.app/Contents/MacOS/SocietyContainerDrive\" unregister \"<drive-id>\"\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000007",
+        "label": "`FSClient.mountSingleVolume`",
+        "target": "https://developer.apple.com/documentation/fskit/fsclient/mountsinglevolume%28resource%3Abundleid%3Aoptions%3Acompletionhandler%3A%29",
+        "kind": "external",
+        "line": 15
+      },
+      {
+        "block_id": "b000031",
+        "label": "replicated File Provider",
+        "target": "https://developer.apple.com/documentation/fileprovider/replicated-file-provider-extension",
+        "kind": "external",
+        "line": 138
+      },
+      {
+        "block_id": "b000063",
+        "label": "Apple's File Provider change-tracking contract",
+        "target": "https://developer.apple.com/documentation/fileprovider/tracking-your-file-provider-s-changes",
+        "kind": "external",
+        "line": 189
+      },
+      {
+        "block_id": "b000065",
+        "label": "Refer to Apple's inter-process bookmark passing method",
+        "target": "https://developer.apple.com/documentation/browserenginekit/accessing-files-in-browser-extensions",
+        "kind": "external",
+        "line": 191
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

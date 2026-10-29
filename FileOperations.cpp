@@ -176,7 +176,8 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
     if (!storage) return failed(storageError);
     FileRepositoryContext context; context.description = deleting ? "Delete Society file" : importing ? "Import Society file" : "Move or copy Society file";
     std::unique_ptr<FileRepository> repository;
-    if (!deleting || std::filesystem::exists(FileRepository::packagePath(detail::nativePath(m_drive.rootPath()), m_drive.identifier().toStdString()) / "objects.sqlite3"))
+    const auto repositoryId = m_drive.storageKind() == SocietyDrive::StorageKind::LogicalDisk ? m_drive.storageIdentifier() : m_drive.identifier();
+    if (!deleting || std::filesystem::exists(FileRepository::packagePath(detail::nativePath(m_drive.rootPath()), repositoryId.toStdString()) / "objects.sqlite3"))
         repository = storage->fileRepository(std::move(context));
     const auto sourceSection = m_drive.sectionForPath(source);
     const auto logicalSource = !importing && sourceSection ? storage->managedFilePath(*sourceSection,

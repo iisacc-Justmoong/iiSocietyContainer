@@ -47,9 +47,11 @@ bool catalogFile(const QString &relative)
 {
     const auto type = modelTypeFromName(categoryForPath(relative)).value_or(ModelType::Other);
     const auto suffix = QFileInfo(relative).suffix().toLower();
+    // Keep unsupported files on disk, but do not present ONNX as a model candidate.
+    if (suffix == "onnx") return false;
     if (type == ModelType::Other) return true;
     if (QStringList{"safetensors", "safetensor", "gguf", "ggml", "bin", "ckpt", "pt", "pth",
-        "onnx", "pb", "tflite", "h5", "hdf5", "npz", "npy", "model", "mlmodel", "engine"}.contains(suffix)) return true;
+        "pb", "tflite", "h5", "hdf5", "npz", "npy", "model", "mlmodel", "engine"}.contains(suffix)) return true;
     if (type == ModelType::Wildcards) return suffix == "txt" || suffix == "wildcards";
     if (type == ModelType::Poses || type == ModelType::Workflows || type == ModelType::ComfyUIWorkflows)
         return QStringList{"json", "png", "jpg", "jpeg", "webp"}.contains(suffix);

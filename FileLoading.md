@@ -1,47 +1,26 @@
+# Document moved
+
+<!-- workspace-docs:redirect -->
+
+The maintained document is [FileLoading.md](docs/FileLoading.md).
+
+<a id="파일-로딩-및-앱-로컬-캐시"></a>
+[Continue to this section](docs/FileLoading.md#%ED%8C%8C%EC%9D%BC-%EB%A1%9C%EB%94%A9-%EB%B0%8F-%EC%95%B1-%EB%A1%9C%EC%BB%AC-%EC%BA%90%EC%8B%9C).
+
+<a id="목록-캐시"></a>
+[Continue to this section](docs/FileLoading.md#%EB%AA%A9%EB%A1%9D-%EC%BA%90%EC%8B%9C).
+
+<a id="해시-및-미리보기-캐시"></a>
+[Continue to this section](docs/FileLoading.md#%ED%95%B4%EC%8B%9C-%EB%B0%8F-%EB%AF%B8%EB%A6%AC%EB%B3%B4%EA%B8%B0-%EC%BA%90%EC%8B%9C).
+
+<a id="검증과-측정"></a>
+[Continue to this section](docs/FileLoading.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EC%B8%A1%EC%A0%95).
+
 <a id="file-loading-and-app-local-caches"></a>
-
-# 파일 로딩 및 앱 로컬 캐시
-
-`StorageDirectoryModel`과 `DashboardFiles`는 파일 시스템 메타데이터를 비동기로 조회한다. 로컬 호스트는 실제 디렉터리를 기준으로 목록을 만들며 전체 동기화 카탈로그를 파싱하지 않는다. 복제본은 카탈로그 기반 메타데이터와 주문형 다운로드 계약을 유지한다. 목록 열거는 원본 전체 해시나 이미지 디코딩을 실행하지 않는다.
+[Continue to this section](docs/FileLoading.md#file-loading-and-app-local-caches).
 
 <a id="listing-cache"></a>
-
-## 목록 캐시
-
-디렉터리 스냅샷은 원본 컨테이너의 `.society-runtime/cache/files/directories-v1`에 저장한다. 키에는 절대 폴더와 필터·정렬 옵션이 포함되며, 레코드는 컨테이너 ID에 바인딩된다. 최대 128개, 개별 16 MiB, 총 128 MiB로 제한한다. 쓰기는 원자적이며 변경되지 않은 행은 다시 저장하지 않는다. `entry(index)`는 한 행의 역할 맵을 한 번에 반환하여 QML의 역할별 왕복 호출을 줄인다. 잘못된 인덱스는 빈 맵이다.
-
-스냅샷으로 이름을 먼저 표시하되 `Ready`는 새 스캔 완료를 의미한다. `activate()`는 로딩 중 항목을 열지 않는다. `snapshotRestored()`는 임시 행 표시를 식별하며, 새 스캔은 행 차이로 변경·삭제·순서를 조정한다. 누락되거나 손상된 스냅샷은 정상 스캔으로 대체한다. 선택과 스크롤 보존은 앱의 책임이다.
-
-파일 시스템 알림은 100ms 동안 병합하며 최대 64개 감시 핸들을 사용한다. 감시가 불가능한 환경에는 10초 폴백을 둔다. 감시 핸들은 프레임 사이에 8개씩 설치한다. 큰 디렉터리는 256개 항목당 하나의 메타데이터 작업자를 사용하되 하드웨어 스레드 수로 제한한다. 대시보드의 Files·Published·Generation History는 섹션 경계와 취소를 유지하며 병렬 조회한다.
+[Continue to this section](docs/FileLoading.md#listing-cache).
 
 <a id="hash-and-preview-cache"></a>
-
-## 해시 및 미리보기 캐시
-
-QML 엔진에 `PreviewProvider`를 `society-preview`로 등록하고 `fileThumbnailUrl` 또는 대시보드의 `thumbnailSource`를 렌더링한다. 원본 열기·다운로드용 `fileUrl`과 `filePreviewUrl`은 유지한다. 캐시 URL은 정규 절대 경로, 크기, 고해상도 수정 시각과 메타데이터 변경 토큰을 포함한다. 일반 파일은 확장자와 관계없이 iiFileProvider의 프리뷰를 사용한다. 디렉터리·누락·링크·내부 제어 파일은 제외한다.
-
-캐시를 먼저 확인하여 적중하면 프리뷰 준비와 원본 재해시를 생략한다. 누락 시 iiFileProvider의 이미지·문서·오디오·등록된 캔버스 렌더러를 사용하여 최대 512픽셀 PNG를 저장한다. 네이티브 제공자가 정보 카드만 반환해도 기존 이미지 디코더는 256 MiB·32 Mi 픽셀 한도 안에서 실제 이미지를 시도한다. 그 경로에서도 디코딩할 수 없는 형식과 한도 초과 파일은 정보 카드로 표시할 수 있다. UI 요청은 `PreviewCache::HashPolicy::PreviewOnly`를 사용하므로 원본 전체 SHA-256 계산을 기다리지 않는다.
-
-v2 매니페스트의 `previewSha256`은 작은 PNG의 무결성을 검사한다. `sha256`이 비어 있으면 원본 전체 해시를 아직 요청하지 않았다는 뜻이다. 기존 `PreviewCache::load(path)`는 원본 전체 SHA-256을 요구하는 계약을 유지한다. 프리뷰만 저장된 항목을 이 API로 조회하면 이미지를 재생성하지 않고 원본 해시를 추가한다. 이 해시는 동기화·인증 해시를 대신하지 않는다. v1 캐시도 읽는다.
-
-매니페스트와 PNG는 `.society-runtime/cache/files/previews-v1`에 원자적으로 저장한다. 손상된 프리뷰는 재생성하며, 처리 중 원본 리비전이 바뀌면 결과를 폐기한다. 같은 키의 동시 요청은 스트라이프 잠금으로 병합한다. 캐시는 약 512 MiB를 목표로 32회 쓰기마다 오래된 항목을 정리하므로 일시적으로 초과할 수 있다.
-
-이미지 제공자는 전용 표준 C++23 작업자 큐를 사용한다. 작업자 수는 데스크톱 최대 8개, 모바일 최대 2개이다. 취소된 대기 작업은 건너뛰며 종료 시 작업자를 회수한다. 원본 내용은 다시 저장하지 않지만 iiFileProvider는 지원되는 플랫폼에서 프리뷰 메타데이터를 파일 속성으로 게시할 수 있다. 타일 표시를 위해 원격 원본을 다운로드하지 않는다. 기존에 내려받은 원격 프리뷰는 같은 캐시를 사용할 수 있다.
-
-`IISOCIETY_FILE_CACHE_DIRECTORY`와 명시적 프리뷰 디렉터리도 해당 컨테이너의 검증된 비공개 런타임 내부여야 한다. 외부·리디렉션 경로는 쓰기 전에 거부한다. 선택된 컨테이너가 없으면 영속 캐시를 생성하지 않는다. 일반 폴더의 이미지는 `PreviewOnly`에서 크기 한도를 적용해 읽기만 하며 파일 속성도 게시하지 않는다. 명시적 캐시 설정이 있는 외부 경로와 원본 해시 요청은 이 폴백을 사용하지 않는다.
-
-## 검증과 측정
-
-디렉터리 스냅샷은 16 MiB 상한 안에서 메모리로 읽고 역직렬화하여 필드마다
-제공자 읽기를 요청하지 않는다. 컨테이너 GUI 미러는 동일한 입력을 재정렬하지 않고,
-변경된 입력은 키·수정 시각을 한 번 계산하여 정렬한다. 입력이 같으면 상태 리비전과
-신호도 유지하며, 컨테이너 변경과 잘못된 키의 검증은 계속 적용한다.
-
-픽스처와 캐시는 `build/` 아래에 둔다. `iiSocietyContainerLoadingBenchmark [folder]`는 3회에 걸쳐 최초 행·Ready 시각·스냅샷 복원 여부·행 맵 조회 비용을 출력한다. 인자가 없으면 유효한 테스트 컨테이너에 2,000개 파일을 생성하여 캐시 재사용을 측정한다. 폴더를 전달하면 캐시 쓰기를 비활성화하고 원본을 읽기만 한다. OS 페이지 캐시와 영속 스냅샷의 효과는 구분해야 한다.
-
-```sh
-cmake --build build --parallel 4 --target iiSocietyContainerPreviewCacheTests iiSocietyContainerSharedStorageTests iiSocietyContainerFileTreeTests iiSocietyContainerLoadingBenchmark
-ctest --test-dir build -R '^iiSocietyContainer[.](preview_cache|shared_storage|file_tree)$' --output-on-failure
-```
-
-회귀 검증은 프리뷰 우선 표시·원본 해시 추가·이미지/캔버스 렌더러·동시 요청·취소·손상 복구·리비전 무효화·캐시 경계·스냅샷 조정·파일 트리 링크 거부를 포함한다. GUI 클래스 변경 후에는 SDK와 소비자 테스트를 함께 다시 빌드해야 한다.
+[Continue to this section](docs/FileLoading.md#hash-and-preview-cache).

@@ -1,0 +1,121 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:0229ab27f655ccbb25734b005d08dd6b1aa1b436fb1d228ea5f474b0e595ee31",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/WindowsModelReadBoundary.md",
+    "sha256": "3fe4ffa4dc3e7d1ea3e6d7e6701a2bbc25f980603f973fd2c97d869ea30649d7",
+    "bytes": 2017,
+    "line_count": 24,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Windows 모델 참조와 유지보수 읽기",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Windows 모델 참조와 유지보수 읽기\n",
+      "level": 1,
+      "title": "Windows 모델 참조와 유지보수 읽기"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "NTFS의 미리보기 보조 스트림은 파일의 수정 시각을 공유한다. provider는 원래 시각을\n복원하지만, 복원 전의 짧은 구간에서 읽은 시각을 모델 참조에 사용하면 실제 모델\n내용을 변경하지 않아도 이전 참조가 무효가 된다. 모델 내용과 로컬 버전 시각은\nprovider `SourceAccess` 경계 안에서 새로 조회한다. 실제 내용 변경의 거절은 유지한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 10,
+      "raw": "회귀 검사는 같은 모델에 64회 미리보기를 게시하는 동안 기존 참조를 64회 확인하고,\n게시 완료 후에도 동일 경로를 반환하는지 검사한다. 이후 실제 모델 내용을 변경하여\n이전 참조가 거절되는지도 확인한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 20,
+      "raw": "유지보수의 manifest 읽기는 네이티브 provider `ReadFile`을 사용한다. Windows에서\n삭제 공유가 없는 CRT 입력 스트림이 복제본 식별 정보의 원자적 교체를 막지 않도록\n한다. manifest 크기 제한과 schema·식별 정보 검증은 유지한다. 유지보수를 동시에\n실행하면서 복제본 식별 정보 채택·완료를 각각 64회 수행하는 검사도 실행한다.\n각 전환에서는 네이티브 읽기 스냅샷을 열린 채 유지한다. 이 조건에서 기존 Qt 저장은\nWindows의 액세스 거부로 실패함을 재현하였다. 기존 manifest의 레이아웃 갱신·복제본\n채택·완료는 provider의 네이티브 원자적 교체 API로 저장한다. 새 패키지는 기존 생성\n경로로 9개 section과 manifest만 만들며 CLI의 최소 구성 검사를 유지한다. 외부 읽기 핸들,\n이전 식별 정보 검사와 프로세스 간 잠금은 유지한다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 22,
+      "end_line": 24,
+      "raw": "공유 저장소 실패 원문은 `build/shared-storage-qt.txt`에 보존하며 복제본 준비 실패에는\n생산 코드가 반환한 오류 메시지를 함께 기록한다. 호스트 전환 검사는 별도 fixture로\n16회 실행하여 이전 검사의 상태를 재사용하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Windows 모델 참조와 유지보수 읽기",
+      "anchor": "windows-모델-참조와-유지보수-읽기",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000009",
+        "line": 24,
+        "text": "16회 실행하여 이전 검사의 상태를 재사용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

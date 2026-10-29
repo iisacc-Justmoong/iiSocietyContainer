@@ -1,0 +1,442 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:0f368f85f4219a7cb1fe18149f83ddd24c3645d7b06cd5230cd6b1476987bdbc",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/DiskImage.md",
+    "sha256": "db1cb293a829446b77c1bee4904fbec807139619dcb51282bd56f7574ffd495d",
+    "bytes": 8346,
+    "line_count": 92,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "네이티브 Society 디스크",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 네이티브 Society 디스크\n",
+      "level": 1,
+      "title": "네이티브 Society 디스크"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "`DiskImage.h`는 Qt를 포함하지 않는 C++23 API이다. macOS에서 경로에 저장되는\n기존 APFS sparsebundle과 마운트 볼륨의 생성·발견·복원·추출을 담당하는 레거시 호환 API이다. Society의 기본 생성·운영 방식은 [일반 디렉터리 저장소](DirectoryStorage.md)이다. 새 폴더 생성에서는 이 API를 호출하지 않는다.\nFoundation은 시스템 plist 해석에만 사용한다. GUI나 상위 앱을 참조하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "fenced_code",
+      "start_line": 7,
+      "end_line": 17,
+      "raw": "```cpp\n#include <DiskImage.h>\nusing iiSocietyContainer::DiskImage;\nauto volume = DiskImage::create(\"/absolute/storage/location\");\nif (volume) {\n    // imagePath: /absolute/storage/location/Society.societycontainer\n    // mountPath: 파일 관리자에 표시하지 않는 내부 APFS 마운트 경로\n    // DiskImage::filesRoot(mountPath): Finder에 표시되는 공개 Society 볼륨\n    // device: /dev/disk...s1, imageDevice: 추출 대상 이미지 디바이스\n}\n```\n",
+      "language": "cpp",
+      "code": "#include <DiskImage.h>\nusing iiSocietyContainer::DiskImage;\nauto volume = DiskImage::create(\"/absolute/storage/location\");\nif (volume) {\n    // imagePath: /absolute/storage/location/Society.societycontainer\n    // mountPath: 파일 관리자에 표시하지 않는 내부 APFS 마운트 경로\n    // DiskImage::filesRoot(mountPath): Finder에 표시되는 공개 Society 볼륨\n    // device: /dev/disk...s1, imageDevice: 추출 대상 이미지 디바이스\n}\n",
+      "closed": true
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 21,
+      "raw": "호출자는 작업 스레드에서 실행해야 한다. 각 시스템 명령에는 120초 제한과 출력 크기 제한이 있다.\n명령은 쉘 없이 `posix_spawn` 인자로 실행한다. 부모 폴더의 잠금 파일로 동일 위치에 대한\n동시 생성·마운트를 거부하며, 이미지를 사용 중인 앱이 있으면 강제 추출하지 않는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 28,
+      "raw": "`create(location, capacityBytes = 0)`는 존재하는 절대 경로의 폴더 안에\n`Society.societycontainer`을 만든다. 기본 논리 용량은 현재 가용 공간이며 최소 512 MiB이다. 시스템 도구에는 명시적인\n`-megabytes` 인자로 MiB 단위를 전달한다. 모호한 바이트·섹터 접미사를 사용하지 않는다.\n이미지 실제 점유량은 기록한 데이터에 따라 증가한다. 같은 이름이 존재하면\nSDK 소유 마커가 있는 이미지에 한해 재사용한다. 새 이름이 없고 기존 `Society.sparsebundle`이 있으면 기존 디스크를 재사용하여 중복 컨테이너를 만들지 않는다. 일반 파일이나 외부 이미지 및 심볼릭 링크를 덮어쓰지 않는다.\n새 패키지는 APFS sparsebundle 구조를 유지하며 시스템 도구로 생성한 뒤 마운트 전에 `.societycontainer`로 이름을 변경한다. 데이터 변환이나 재포맷은 수행하지 않는다. 마커는 이미지 패키지의 `Society.volume`이며 컨테이너 UUID를 대신하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 37,
+      "raw": "`mount(imagePath)`는 저수준 유지보수 호출에서 이미 존재하는 이미지만 연다. 사라진 이미지나 손상된 이미지를\n새 이미지로 바꾸지 않는다. 확장자만 변경된 동일 이름의 소유 이미지가 있으면 `.sparsebundle`과 `.societycontainer` 사이의 기존 경로를 찾는다. Society 앱과 `SharedStorage`의 기본 연결은 이 호출을 사용하지 않는다. `mountedAt(root)`는 `hdiutil info`와 `statfs`를 함께 확인하여\n실제로 마운트된 쓰기 가능한 APFS 볼륨 루트인 경우에만 반환한다.\n일반 디렉터리는 먼저 `statfs`로 실제 마운트 루트가 아님을 판별하여 즉시 반환한다.\n따라서 소비자 앱의 반복적인 패키지 검증은 `hdiutil` 프로세스를 생성하지 않는다.\n실제 마운트 루트는 기존의 이미지 소유 마커와 시스템 디스크 정보 검증을 모두 수행한다.\n`detach(imagePath)`는 대응 이미지 디바이스를 정상 추출한다. 볼륨이 이미 추출되었으면 성공이다.\n앱 종료 시 자동 추출하지 않는다. Windows·Linux·모바일의 현재 구현은 `supported() == false`이다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 42,
+      "raw": "`SocietyDrive::create(mountPath)`와 `open(mountPath)`는 레거시 이미지의 마운트 경로를\n관리 저장소로 받아들이지 않는다. `SocietyDrive`는 유효한 `.societycontainer` 디렉터리\n패키지만 관리하며 `Files/`도 항상 그 패키지 내부이다. 과거 이미지의 명시적 저수준\n유지보수와 현재 앱의 패키지 생성·관리 계약은 별도이다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "heading",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "## 공통 저장 설정\n",
+      "level": 2,
+      "title": "공통 저장 설정"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 46,
+      "end_line": 47,
+      "raw": "`SharedStorage`는 새 디렉터리 패키지만 기본 저장소로 등록한다. 이미 마운트된 이미지의\n`setDefaultContainer()` 호출은 오류를 반환하고 기존 패키지 설정을 보존한다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 49,
+      "end_line": 55,
+      "raw": "과거 `schemaVersion: 2` 또는 `imagePath`가 포함된 저장 설정은 `SharedStorage::open()`이\n마운트·경로 변경·설정 재작성 없이 거부한다. Society 앱도 계정에 저장된 과거 이미지 위치,\n재연결과 기존 저장소 선택에서 과거 sparsebundle을 복원하지 않는다. `.societycontainer`\n확장자는 같아도 `Society.volume`·`Info.plist`와 `bands/` 등의 이미지 구조가 있으면 거부한다.\n오류가 발생하면 유효한 새 `.societycontainer` 디렉터리 패키지를 선택할 수 있다.\n이 정책은 과거 이미지 파일 자체를 변경하거나 삭제하지 않는다.\n새 패키지의 schema 1 `path`·`containerId` 설정과 명시 경로·환경 변수는 유지한다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 56,
+      "end_line": 56,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "heading",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "## 공개 Files 볼륨과 앱 내부 볼륨\n",
+      "level": 2,
+      "title": "공개 Files 볼륨과 앱 내부 볼륨"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 58,
+      "end_line": 58,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 59,
+      "end_line": 62,
+      "raw": "공개 `Society` 볼륨의 실제 루트는 Files의 내용이다. 내부 APFS 볼륨은 `nobrowse`로 마운트하며\nModels, Photos, 나머지 논리 영역, 매니페스트, 동기화 데이터는 그 안에서 앱이 사용한다.\n공개 루트에는 Files 중간 폴더나 내부 영역으로 향하는 링크를 만들지 않는다.\n일반 파일 관리자의 볼륨 표시 범위를 분리하는 기능이며 OS 관리자의 원본 접근 권한을 제한하는 암호화 경계는 아니다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 64,
+      "end_line": 68,
+      "raw": "공개 이미지 파일은 `Society.sparsebundle/Society.Files.sparsebundle`이다. 계정의 패키지 경로와\n컨테이너 UUID는 유지되며 패키지를 이동하면 두 이미지가 함께 이동한다. 각 sparse 이미지의\n논리 상한과 실제 저장 장치의 가용량은 별개이며 실제 쓰기는 같은 저장 장치의 공간을 사용한다.\n내부 `.society-disk.plist`는 양쪽 APFS 볼륨 UUID를 연결한다. 드라이브 이름이나 마운트 경로가\n바뀌어도 볼륨 식별자를 확인하며 공개 이미지가 사라지거나 교체되면 재생성하지 않고 오류를 반환한다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 70,
+      "end_line": 73,
+      "raw": "`filesRoot(privateRoot)`와 `containerRoot(publicEntry)`는 실제 마운트와 볼륨 UUID를 확인한다.\n`SocietyDrive::sectionPath`, `resolvePath`, `relativePath`로 논리 `Files/...`와 공개 물리 경로를\n변환한다. 소비자는 컨테이너 루트에 `/Files`를 직접 연결하면 안 된다. StorageMap, 파일 조회,\n파일 변경 및 동기화 계층은 이 연결을 사용하며 임의의 심볼릭 링크는 허용하지 않는다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 74,
+      "end_line": 74,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 75,
+      "end_line": 79,
+      "raw": "기존 단일 볼륨의 Files는 공개 이미지가 숨겨진 상태에서 복사한다. 성공한 원본 트리는\n내부 `.society-legacy-files`로 옮겨 보존하고 볼륨 연결을 원자적으로 기록한 뒤 공개한다.\n실패한 복사는 원본을 삭제하지 않는다. `detach`는 공개 이미지부터 정상 추출한 후 내부 이미지를\n추출하며 열린 파일이 있으면 강제 추출하지 않는다. Finder에서 공개 볼륨만 추출할 수도 있으며\n저수준 유지보수 호출자는 해당 상태를 검사할 수 있다. Society 앱은 같은 이미지로 재연결하지 않는다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 81,
+      "end_line": 81,
+      "raw": "데이터는 이미지 패키지에 보관되며 선택한 보관 폴더의 기존 파일은 컨테이너에 포함하거나 옮기지 않는다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 82,
+      "end_line": 82,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "heading",
+      "start_line": 83,
+      "end_line": 83,
+      "raw": "## 검증\n",
+      "level": 2,
+      "title": "검증"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 85,
+      "end_line": 92,
+      "raw": "`iiSocietyContainer.disk_image`는 과거 저장 설정을 읽어도 이미지를 마운트하거나\n패키지 이름과 설정을 변경하지 않음을 검사한다. 명시적인 테스트 이미지에서 기본 저장소 등록 거부와\n기존 일반 폴더 설정·UUID 보존을 검사하며, 저수준 유지보수 API의 Files 데이터 보존과 이름 충돌 거부도 검사한다.\n일반 패키지 경로의 128회 조회가 1.5초 안에 끝나는지도 검사하여 시스템 도구를 매번 호출하는 회귀를 방지한다.\n`iiSocietyContainer.shared_storage`는 schema 2 및 `imagePath`가 남은 schema 1의 거부,\n설정·이미지 파일 보존과 일반 폴더 재선택을 검사한다.\n`iiSocietyContainer.disk_image_header`는 Qt include 없이 C++23 공개 헤더를 컴파일한다.\n테스트의 backing image는 `build/` 아래에만 만들고 OS가 관리하는 볼륨은 종료 시 추출한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "네이티브 Society 디스크",
+      "anchor": "네이티브-society-디스크",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000015",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "공통 저장 설정",
+      "anchor": "공통-저장-설정",
+      "start_line": 44
+    },
+    {
+      "block_id": "b000021",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "공개 Files 볼륨과 앱 내부 볼륨",
+      "anchor": "공개-files-볼륨과-앱-내부-볼륨",
+      "start_line": 57
+    },
+    {
+      "block_id": "b000033",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "검증",
+      "anchor": "검증",
+      "start_line": 83
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "기존 APFS sparsebundle과 마운트 볼륨의 생성·발견·복원·추출을 담당하는 레거시 호환 API이다. Society의 기본 생성·운영 방식은 [일반 디렉터리 저장소](DirectoryStorage.md)이다. 새 폴더 생성에서는 이 API를 호출하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "Foundation은 시스템 plist 해석에만 사용한다. GUI나 상위 앱을 참조하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 19,
+        "text": "호출자는 작업 스레드에서 실행해야 한다. 각 시스템 명령에는 120초 제한과 출력 크기 제한이 있다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 21,
+        "text": "동시 생성·마운트를 거부하며, 이미지를 사용 중인 앱이 있으면 강제 추출하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 25,
+        "text": "`-megabytes` 인자로 MiB 단위를 전달한다. 모호한 바이트·섹터 접미사를 사용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 28,
+        "text": "새 패키지는 APFS sparsebundle 구조를 유지하며 시스템 도구로 생성한 뒤 마운트 전에 `.societycontainer`로 이름을 변경한다. 데이터 변환이나 재포맷은 수행하지 않는다. 마커는 이미지 패키지의 `Society.volume`이며 컨테이너 UUID를 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 31,
+        "text": "새 이미지로 바꾸지 않는다. 확장자만 변경된 동일 이름의 소유 이미지가 있으면 `.sparsebundle`과 `.societycontainer` 사이의 기존 경로를 찾는다. Society 앱과 `SharedStorage`의 기본 연결은 이 호출을 사용하지 않는다. `mountedAt(root)`는 `hdiutil info`와 `statfs`를 함께 확인하여",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 34,
+        "text": "따라서 소비자 앱의 반복적인 패키지 검증은 `hdiutil` 프로세스를 생성하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 37,
+        "text": "앱 종료 시 자동 추출하지 않는다. Windows·Linux·모바일의 현재 구현은 `supported() == false`이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 51,
+        "text": "재연결과 기존 저장소 선택에서 과거 sparsebundle을 복원하지 않는다. `.societycontainer`",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 54,
+        "text": "이 정책은 과거 이미지 파일 자체를 변경하거나 삭제하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 73,
+        "text": "파일 변경 및 동기화 계층은 이 연결을 사용하며 임의의 심볼릭 링크는 허용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 77,
+        "text": "실패한 복사는 원본을 삭제하지 않는다. `detach`는 공개 이미지부터 정상 추출한 후 내부 이미지를",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 78,
+        "text": "추출하며 열린 파일이 있으면 강제 추출하지 않는다. Finder에서 공개 볼륨만 추출할 수도 있으며",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 79,
+        "text": "저수준 유지보수 호출자는 해당 상태를 검사할 수 있다. Society 앱은 같은 이미지로 재연결하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "일반 디렉터리 저장소",
+        "target": "DirectoryStorage.md",
+        "kind": "relative",
+        "line": 4
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

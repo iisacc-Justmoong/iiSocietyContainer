@@ -1,0 +1,587 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:b06ba889c3034dddc0fbebec96935939ee70565a92d7cb3512b8e3cd44f79bd4",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/StorageMaintenance.md",
+    "sha256": "cdc9722800be576b991b83dfd094d1e08d629972a64f1705bf8ba6dd6a2fc335",
+    "bytes": 7905,
+    "line_count": 145,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Storage maintenance",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Storage maintenance\n",
+      "level": 1,
+      "title": "Storage maintenance"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "`StorageMaintenance` maintains the ordinary Society directory using C++23 and\nnative filesystem operations. It does not depend on Qt and is exported as\n`iiSocietyContainer::Maintenance`. The lower-level `iiFileProvider::Temporary`\ncomponent supplies cross-process temporary-file leases.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 13,
+      "raw": "`SocietyDrive` registers its ordinary source directory when it opens. The first\nscan runs asynchronously, then the same process worker scans every five minutes.\nRepeated opens of the same root and UUID reuse the registration. All registered\nroots share one worker, its registry is bounded to 128 roots, and normal process\nshutdown joins the worker. Applications may explicitly call `runOnce()` when an\nimmediate synchronous report is needed.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "fenced_code",
+      "start_line": 15,
+      "end_line": 20,
+      "raw": "```cpp\n#include <StorageMaintenance.h>\nusing iiSocietyContainer::StorageMaintenance;\nauto result = StorageMaintenance::runOnce(sourceDirectory, driveUuid);\nStorageMaintenance::monitor(sourceDirectory, driveUuid);\n```\n",
+      "language": "cpp",
+      "code": "#include <StorageMaintenance.h>\nusing iiSocietyContainer::StorageMaintenance;\nauto result = StorageMaintenance::runOnce(sourceDirectory, driveUuid);\nStorageMaintenance::monitor(sourceDirectory, driveUuid);\n",
+      "closed": true
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 22,
+      "end_line": 28,
+      "raw": "Each scan requires an absolute native directory whose components are neither\nsymbolic links nor Windows reparse points. The bounded, complete JSON manifest\nmust identify `SocietyDrive`, `schemaVersion: 1`, and the expected nonzero UUID.\nDuplicate identity keys, invalid JSON, oversized manifests, a changed UUID, and\nlegacy disk images are rejected. The native root identity and manifest are\nchecked again before deletion. Maintenance never mounts, restores, migrates, or\ncopies an old image.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "heading",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "## Temporary file ownership\n",
+      "level": 2,
+      "title": "Temporary file ownership"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "The scan removes only known SDK temporary namespaces:\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "list",
+      "start_line": 34,
+      "end_line": 46,
+      "raw": "- Direct regular files with `.society-import-`, `.society-write-`,\n  `.iifile-stage-`, `.society-install-`, or `.society-extract-` prefixes at the\n  source root or beneath the nine known storage sections.\n- `.society-objects/staging/snapshot-*` directories containing only the owned\n  `payload` file, or empty snapshot directories. Unknown children preserve the\n  complete directory.\n- `.society-sync/transfers/<64 lowercase hex digits>.part` and\n  `.society-sync/transfers/provider-<UUID>.part`.\n- `.society-sync/uploads/<UUID>` regular files.\n- Direct regular `.society-sync/capability-<UUID>` and\n  `.society-sync/capability-<UUID>.link` files left by Windows storage capability\n  probes. Other capability names and suffixes are preserved. Probe operations\n  hold their shared lease on `.society-sync` for their complete lifetime.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Direct regular files with `.society-import-`, `.society-write-`,",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`.society-objects/staging/snapshot-*` directories containing only the owned",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`.society-sync/transfers/<64 lowercase hex digits>.part` and",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`.society-sync/uploads/<UUID>` regular files.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Direct regular `.society-sync/capability-<UUID>` and",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 48,
+      "end_line": 52,
+      "raw": "Writers hold a shared `TemporaryLease` on the parent for the complete lifetime\nof temporary state. Cleanup attempts an exclusive lease on that same parent\nbefore rescanning and deleting. Busy parents are skipped. A resumable transfer\nis protected while its owning replica retains its shared lease; an abandoned\nunleased transfer is removed at the next scan with no age grace period.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 54,
+      "end_line": 57,
+      "raw": "The zero-byte `.iisacc-temporary.lock` sentinel remains stable after first use;\nit must not be deleted or rotated, because different processes must lock the\nsame native file. An empty source with no cleanup candidates creates no lock,\nmaintenance directory, log, or state file.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 58,
+      "end_line": 58,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 59,
+      "end_line": 62,
+      "raw": "Ordinary user `.tmp` and `.log` files, installed model weights, rejected imports,\ncommitted objects, synchronization catalogs, and SQLite `-wal`/`-shm` files are\npreserved. A matching symbolic link is also preserved, and its target is never\nfollowed. This cleanup policy is not an object-history pruning policy.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "heading",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "## Finder metadata at owned roots\n",
+      "level": 2,
+      "title": "Finder metadata at owned roots"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 65,
+      "end_line": 65,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 66,
+      "end_line": 74,
+      "raw": "Maintenance also removes a direct regular `.DS_Store` only at the source root\nand the `Models/` root when its first eight bytes are `00 00 00 01 42 75 64 31`\n(version 1 followed by `Bud1`). It checks this signature before taking a parent\nexclusive lease, rescans under that lease, and verifies the file handle again\nbefore deletion. Text files, other headers, links, and redirected paths are\npreserved. `.DS_Store` in `Files/`, the other sections, or nested model/package\ndirectories is preserved. Operating-system event directories are outside this\npolicy. Finder may regenerate its root metadata; the next scan applies the same\nbounded rule.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 75,
+      "end_line": 75,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "heading",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "## Log retention\n",
+      "level": 2,
+      "title": "Log retention"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 77,
+      "end_line": 77,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 78,
+      "end_line": 83,
+      "raw": "Only direct regular `*.log` files in the SDK-private directories\n`.society-maintenance/logs`, `.society-sync/logs`, and `.society-logs` are subject\nto retention. Each directory keeps one newest log by modification time. Ties\nkeep the lexicographically greatest filename. Other extensions and nested\ndirectories are preserved. Log writers use the same shared parent lease, so an\nactive log writer defers retention for that parent.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "heading",
+      "start_line": 85,
+      "end_line": 85,
+      "raw": "## Standalone CLI\n",
+      "level": 2,
+      "title": "Standalone CLI"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 86,
+      "end_line": 86,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 87,
+      "end_line": 87,
+      "raw": "The installed Qt-free tool supports one scan or a long-running watcher:\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 88,
+      "end_line": 88,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "fenced_code",
+      "start_line": 89,
+      "end_line": 95,
+      "raw": "```sh\niiSocietyContainerMaintenanceTool \\\n  --root /absolute/path/Society --identifier <drive-uuid> --once\niiSocietyContainerMaintenanceTool \\\n  --root /absolute/path/Society --identifier <drive-uuid> \\\n  --watch --interval-seconds 300\n```\n",
+      "language": "sh",
+      "code": "iiSocietyContainerMaintenanceTool \\\n  --root /absolute/path/Society --identifier <drive-uuid> --once\niiSocietyContainerMaintenanceTool \\\n  --root /absolute/path/Society --identifier <drive-uuid> \\\n  --watch --interval-seconds 300\n",
+      "closed": true
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 97,
+      "end_line": 100,
+      "raw": "The watcher immediately scans once and writes one JSON report per interval to\nstandard output. SIGINT and SIGTERM stop it. An invalid root or scan error emits\nthe report and exits with status 1; malformed command-line arguments exit with\nstatus 2. `--interval-seconds` accepts 1 through 86400 seconds.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 101,
+      "end_line": 101,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 102,
+      "end_line": 106,
+      "raw": "Reports contain removed temporary-file count, removed log-file count, removed\nFinder-cache file count (`cacheRemoved`), logical removed bytes, busy parent\ncount, and error strings. Snapshot directories do not\nincrement the file count. Logical removed bytes do not measure APFS shared or\ncompressed allocations.\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 107,
+      "end_line": 107,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "fenced_code",
+      "start_line": 108,
+      "end_line": 110,
+      "raw": "```json\n{\"tempRemoved\":3,\"logsRemoved\":2,\"cacheRemoved\":1,\"bytesRemoved\":2048,\"skippedBusy\":1,\"errors\":[]}\n```\n",
+      "language": "json",
+      "code": "{\"tempRemoved\":3,\"logsRemoved\":2,\"cacheRemoved\":1,\"bytesRemoved\":2048,\"skippedBusy\":1,\"errors\":[]}\n",
+      "closed": true
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 111,
+      "end_line": 111,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 112,
+      "end_line": 114,
+      "raw": "An installed native service can use `--watch` to perform the same policy when no\nconsumer application is running. This is separate from the process-local\nmonitor, and both use the same cross-process leases.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 115,
+      "end_line": 115,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 116,
+      "end_line": 122,
+      "raw": "Society's installed background daemon opens the selected ordinary folder at\nstartup and refreshes that selection every five minutes, independently of\naccount sign-in or network ownership. This registers the SDK worker while the\ndesktop window is closed. Saved legacy images are rejected by `SharedStorage`\nbefore registration. The daemon uses its existing operating-system service and\napplication permissions. A direct CLI diagnostic prints the JSON report to the\ncaller without creating persistent scheduler logs.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "heading",
+      "start_line": 124,
+      "end_line": 124,
+      "raw": "## Build and verification\n",
+      "level": 2,
+      "title": "Build and verification"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 125,
+      "end_line": 125,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 126,
+      "end_line": 126,
+      "raw": "Qt-free consumers discover the component and its standalone dependency:\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 127,
+      "end_line": 127,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "fenced_code",
+      "start_line": 128,
+      "end_line": 131,
+      "raw": "```cmake\nfind_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS Maintenance)\ntarget_link_libraries(your_tool PRIVATE iiSocietyContainer::Maintenance)\n```\n",
+      "language": "cmake",
+      "code": "find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS Maintenance)\ntarget_link_libraries(your_tool PRIVATE iiSocietyContainer::Maintenance)\n",
+      "closed": true
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 132,
+      "end_line": 132,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 133,
+      "end_line": 141,
+      "raw": "The `iiSocietyContainer.maintenance` test verifies immediate cleanup, active\nwriter and transfer protection, deterministic log retention, ordinary files and\nSQLite WAL preservation, strict identity checks, legacy-image rejection,\nredirected path preservation, recognized root-only Finder caches and public\nnamesake preservation, a minimal empty source, and initial/subsequent\nperiodic scans. Platform compilation and installed consumption are separate\nchecks from a live operating-system service.\nSociety's `daemonMaintainsSelectedFolderWithoutAnAccount` integration test\nverifies initial cleanup by the actual headless daemon process.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 142,
+      "end_line": 142,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "paragraph",
+      "start_line": 143,
+      "end_line": 143,
+      "raw": "Maintenance requires a canonical `.societycontainer` directory package. A manifest in an ordinary directory does not grant cleanup authority. Legacy disk images remain rejected; neither the selected source nor an arbitrary ancestor can broaden the managed boundary.\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 144,
+      "end_line": 144,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 145,
+      "end_line": 145,
+      "raw": "Leased private model jobs use `.society-runtime/tmp/.society-model-merge-<UUID>` or `.society-model-package-<UUID>`. Unleased orphan workspaces are removed on the next scan; active jobs hold a shared parent lease. The standard iiLocalDiffusion merge staging name is `.iild-merge-<eight-character tempfile token>` and is checked exactly. Redirected entries preserve a whole orphan workspace. Managed `.society-runtime/logs/` follows the same latest-log retention rule.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Storage maintenance",
+      "anchor": "storage-maintenance",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000011",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Temporary file ownership",
+      "anchor": "temporary-file-ownership",
+      "start_line": 30
+    },
+    {
+      "block_id": "b000023",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Finder metadata at owned roots",
+      "anchor": "finder-metadata-at-owned-roots",
+      "start_line": 64
+    },
+    {
+      "block_id": "b000027",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Log retention",
+      "anchor": "log-retention",
+      "start_line": 76
+    },
+    {
+      "block_id": "b000031",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Standalone CLI",
+      "anchor": "standalone-cli",
+      "start_line": 85
+    },
+    {
+      "block_id": "b000047",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Build and verification",
+      "anchor": "build-and-verification",
+      "start_line": 124
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000009",
+        "line": 24,
+        "text": "must identify `SocietyDrive`, `schemaVersion: 1`, and the expected nonzero UUID.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 27,
+        "text": "checked again before deletion. Maintenance never mounts, restores, migrates, or",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 55,
+        "text": "it must not be deleted or rotated, because different processes must lock the",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 61,
+        "text": "preserved. A matching symbolic link is also preserved, and its target is never",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000039",
+        "line": 104,
+        "text": "count, and error strings. Snapshot directories do not",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000039",
+        "line": 105,
+        "text": "increment the file count. Logical removed bytes do not measure APFS shared or",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000035",
+        "language": "sh",
+        "code": "iiSocietyContainerMaintenanceTool \\\n  --root /absolute/path/Society --identifier <drive-uuid> --once\niiSocietyContainerMaintenanceTool \\\n  --root /absolute/path/Society --identifier <drive-uuid> \\\n  --watch --interval-seconds 300\n"
+      }
+    ],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}
