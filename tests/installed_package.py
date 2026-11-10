@@ -34,4 +34,8 @@ run(config)
 run([cmake, '--build', consumer, '--config', cache.get('CMAKE_BUILD_TYPE', 'Release'), '--parallel', '2'])
 env['PATH'] = str(stage / 'bin') + os.pathsep + env['PATH']
 run([str(Path(cmake).with_name('ctest.exe' if os.name == 'nt' else 'ctest')), '--test-dir', consumer, '-C', cache.get('CMAKE_BUILD_TYPE', 'Release'), '--output-on-failure', '--no-tests=error'])
-print('Staged FileTree, Maintenance and managed Repository consumers execute without importing Qt.')
+env['IISOCIETYCONTAINER_PYTHON_DIR'] = str(stage / 'share/iiSocietyContainer/python')
+tool = stage / 'bin' / ('iiSocietyContainerMobileStorageTool.exe' if os.name == 'nt' else 'iiSocietyContainerMobileStorageTool')
+run([sys.executable, '-B', source.parent / 'resource_runner.py', 'auto', source.parent.parent / 'resources',
+     sys.executable, '-B', source.parent / 'mobile_storage_python.py', tool, '@WORK@'])
+print('Staged FileTree, Maintenance, MobileStorage and managed Repository C++ and Python consumers execute without importing Qt.')

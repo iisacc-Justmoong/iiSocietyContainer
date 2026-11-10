@@ -2,8 +2,8 @@
 #include "SharedStorage.h"
 
 namespace iiSocietyContainer {
-// All iisacc products use one shared Society storage contract. The creating app
-// is provenance, not an isolation boundary. Society adoption preserves the disk.
+// Shared Society storage adapter. Mobile applications without a shared store
+// use MobileStorage for their app-private container until migration is possible.
 class IISOCIETYCONTAINER_EXPORT ApplicationStorage final {
 public:
     // Resolves without creating storage. Windows/Linux use a per-user suite data

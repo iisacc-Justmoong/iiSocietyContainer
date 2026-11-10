@@ -42,10 +42,15 @@ int main(int argc, char** argv)
         for (const auto type : allModelTypes()) types.append(modelTypeName(type));
         output.write(QJsonDocument(types).toJson()); return 0;
     }
-    if (args.size() == 3 && (args[1] == "models" || args[1] == "organize-models")) {
+    if (args.size() == 3 && (args[1] == "models" || args[1] == "organize-models" || args[1] == "repair-model-companions")) {
         QString error;
         const auto store = ModelStore::open(args[2], &error);
         if (!store) { output.write(QJsonDocument(QJsonObject{{"error", error}}).toJson()); return 1; }
+        if (args[1] == "repair-model-companions") {
+            QStringList errors; const auto repaired = store->repairCompanions(&errors);
+            output.write(QJsonDocument(QJsonObject{{"repaired", QJsonArray::fromStringList(repaired)}, {"errors", QJsonArray::fromStringList(errors)}}).toJson());
+            return errors.isEmpty() ? 0 : 1;
+        }
         if (args[1] == "organize-models") {
             const auto report = store->organize();
             QJsonArray moved;
@@ -59,7 +64,7 @@ int main(int argc, char** argv)
         output.write(QJsonDocument(QJsonObject{{"models", models}, {"error", error}}).toJson()); return error.isEmpty() ? 0 : 1;
     }
     if (args.size() != 3 || (args[1] != "create" && args[1] != "open")) {
-        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <existing-absolute-parent-or-package> | open <existing-storage> | logical <path> <application> | application <shared-group> <application> | adopt-application <shared-group> | models <directory> | organize-models <directory>\n");
+        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <existing-absolute-parent-or-package> | open <existing-storage> | logical <path> <application> | application <shared-group> <application> | adopt-application <shared-group> | models <directory> | organize-models <directory> | repair-model-companions <directory>\n");
         return 2;
     }
     QString error;

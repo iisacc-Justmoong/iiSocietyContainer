@@ -26,6 +26,7 @@ class IISOCIETYCONTAINER_EXPORT StorageDirectoryModel : public QAbstractListMode
     Q_PROPERTY(bool sortReversed MEMBER m_sortReversed NOTIFY optionsChanged)
     Q_PROPERTY(SortField sortField MEMBER m_sortField NOTIFY optionsChanged)
     Q_PROPERTY(QStringList nameFilters MEMBER m_nameFilters NOTIFY optionsChanged)
+    Q_PROPERTY(QString searchText MEMBER m_searchText NOTIFY optionsChanged)
 public:
     enum Status { Null, Ready, Loading }; Q_ENUM(Status)
     enum SortField { Name, Time, Size, Type, Unsorted }; Q_ENUM(SortField)
@@ -66,6 +67,7 @@ signals:
     void downloadFailed(QString error);
 private:
     void applyRows(const QList<QVariantMap> &rows);
+    void openCatalogDirectory(const QString &path);
     void checkRequest();
     void addWatches(QStringList paths, quint64 revision);
     QUrl m_folder;
@@ -74,6 +76,7 @@ private:
     bool m_showDirs = true, m_showFiles = true, m_showHidden = false, m_showDotAndDotDot = false;
     bool m_showDirsFirst = true, m_caseSensitive = false, m_sortCaseSensitive = false, m_sortReversed = false;
     QStringList m_nameFilters;
+    QString m_searchText;
     QList<QVariantMap> m_rows;
     std::optional<SocietyDrive> m_drive;
     QJsonArray m_catalog;

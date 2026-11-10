@@ -1,0 +1,121 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:82eb14e0651f5778582ef1a254080a3c75fe50a897ebcc4376b9ca692eb8609d",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/BuildLayout.md",
+    "sha256": "ca5437d456a22a0f514a950a81a6a9c3694994d505fc9d124552900ee357e789",
+    "bytes": 1223,
+    "line_count": 20,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Build and resource layout",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Build and resource layout\n",
+      "level": 1,
+      "title": "Build and resource layout"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "The repository `build/` contains the module, its platform host and test\ncompilation outputs. Demonstration applications are disabled by default; set\n`IISOCIETYCONTAINER_BUILD_EXAMPLES=ON` to opt in. The loading benchmark remains\nan explicit target and is not built by the default target.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 12,
+      "raw": "Container volumes and other runtime resources are user data. They belong under\n`resources/`, never in a disposable build directory. Existing volumes recovered\nfrom older build trees must be retained without opening or mounting them. An\nexisting consumer may temporarily use a compatibility link to a recovered SDK\npackage while its configuration still references the old path.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 20,
+      "raw": "Several legacy container tests currently use the build directory for fixtures\nor reports, and some launch a daemon, mount a volume, or execute an installed\nconsumer. Their isolation remains a separate migration; clean-layout checks\nmust not run those tests until they are moved to private resource workspaces.\nNative directory, file-tree, maintenance and file-repository tests, including\ntheir Qt-enabled counterparts, instead run in disposable `resources/test-workspaces/`\nworkspaces and clean their fixtures after each test.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Build and resource layout",
+      "anchor": "build-and-resource-layout",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 9,
+        "text": "`resources/`, never in a disposable build directory. Existing volumes recovered",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "from older build trees must be retained without opening or mounting them. An",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 17,
+        "text": "must not run those tests until they are moved to private resource workspaces.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

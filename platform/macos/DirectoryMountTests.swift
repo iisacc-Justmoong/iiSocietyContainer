@@ -19,6 +19,8 @@ enum DirectoryMountTests {
         let root = fixture.appendingPathComponent("Society.societycontainer", isDirectory: true)
         try manager.createDirectory(at: root, withIntermediateDirectories: false)
         let identifier = UUID().uuidString.lowercased()
+        try DirectoryMount.requireMountEntitlement(true)
+        try reject { try DirectoryMount.requireMountEntitlement(false) }
         let expected = root.appendingPathComponent(".society-runtime/mounts/" + identifier + "/Society")
         try check(DirectoryMount.location(source: root, identifier: identifier).path == expected.path,
                   "The system mount directory must belong to its source package")
@@ -41,6 +43,22 @@ enum DirectoryMountTests {
                   "A redirected runtime directory must never create files outside its package")
         try reject { _ = try DirectoryMount.location(source: outside, identifier: identifier) }
         try reject { _ = try DirectoryMount.location(source: root, identifier: "../outside") }
+        // A redirected runtime directory may not be used to create a lock.
+        try reject { _ = try DirectoryMount.acquireLease(source: root) }
+        try check(manager.contentsOfDirectory(atPath: outside.path).isEmpty,
+                  "Mount coordination must never write through a redirected runtime directory")
+        try manager.removeItem(at: root.appendingPathComponent(".society-runtime"))
+        let lease = try DirectoryMount.acquireLease(source: root)
+        try reject { _ = try DirectoryMount.acquireLease(source: root, waitFor: 0.1) }
+        // A GUI request and the background coordinator can arrive together.
+        // The second process waits for the first rather than showing a false
+        // connection failure while its peer is mounting the same container.
+        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(150)) { lease.release() }
+        let started = ProcessInfo.processInfo.systemUptime
+        let nextLease = try DirectoryMount.acquireLease(source: root, waitFor: 1)
+        try check(ProcessInfo.processInfo.systemUptime - started >= 0.1,
+                  "A concurrent mount must wait until the active operation releases its lease")
+        nextLease.release()
         let mount = DirectoryMount.MountedVolume(type: "societyfs", source: root.absoluteString,
                                                   point: "/Volumes/Society", identifier: identifier.uppercased())
         try check(DirectoryMount.existingVolume(source: root, identifier: identifier, volumes: [mount]) == mount,

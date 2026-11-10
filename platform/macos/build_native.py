@@ -15,14 +15,47 @@ def run(*command):
     subprocess.run(command, check=True)
 
 
-def build_filesystem(source, output, app, team):
+def provisioning_options(offline):
+    return [] if offline else ["-allowProvisioningUpdates"]
+
+
+def validate_signing_configuration(team, identity):
+    if team and (not identity or identity == "-"):
+        raise ValueError("FSKit requires a provisioned signing identity, not ad-hoc signing")
+
+
+def clear_unprovisioned_filesystem(app):
+    """Do not combine a stale signed module/profile with an ad-hoc host."""
+    extension = app / "Contents/Extensions/SocietyDriveFS.appex"
+    profile = app / "Contents/embedded.provisionprofile"
+    if extension.is_symlink() or profile.is_symlink():
+        raise ValueError("The generated FSKit bundle is redirected")
+    if extension.exists():
+        if not extension.is_dir():
+            raise ValueError("The generated FSKit module is not a directory")
+        shutil.rmtree(extension)
+    if profile.exists():
+        if not profile.is_file():
+            raise ValueError("The generated host profile is not a file")
+        profile.unlink()
+
+
+def replace_generated_directory(source, destination):
+    if destination.is_symlink() or (destination.exists() and not destination.is_dir()):
+        raise ValueError("The generated FSKit module is invalid or redirected")
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(source, destination, symlinks=True)
+
+
+def build_filesystem(source, output, app, team, offline):
     """Use Xcode's normal provisioning for the restricted FSKit entitlement."""
     if not team:
         return
     filesystem = source / "FSKit"
     project = output / "SocietyDriveFS.xcodeproj"
     project.mkdir(exist_ok=True)
-    files = [FILE_PROVIDER_SWIFT, *sorted(filesystem.glob("*.swift"))]
+    files = [FILE_PROVIDER_SWIFT, source.parent / "apple/LocalDriveStore.swift", *sorted(filesystem.glob("*.swift"))]
     objects = []
     refs, builds = [], []
     for index, path in enumerate(files, 20):
@@ -55,14 +88,14 @@ def build_filesystem(source, output, app, team):
     (project / "project.pbxproj").write_text("// !$*UTF8*$!\n{archiveVersion = 1; objectVersion = 56; classes = {}; objects = {\n" +
                                          "\n".join(objects) + f"\n}}; rootObject = {root}; }}\n")
     run("xcodebuild", "-quiet", "-project", str(project), "-target", "SocietyDriveFS", "-configuration", "Release",
-        "-allowProvisioningUpdates", f"SYMROOT={output / 'fskit-products'}", f"OBJROOT={output / 'fskit-intermediates'}")
+        *provisioning_options(offline), f"SYMROOT={output / 'fskit-products'}", f"OBJROOT={output / 'fskit-intermediates'}")
     destination = app / "Contents/Extensions/SocietyDriveFS.appex"
-    shutil.copytree(output / "fskit-products/Release/SocietyDriveFS.appex", destination, dirs_exist_ok=True)
+    replace_generated_directory(output / "fskit-products/Release/SocietyDriveFS.appex", destination)
     shutil.copy2(filesystem / "LICENSE.txt", app / "Contents/Resources/FSKit-LICENSE.txt")
 
 
 
-def build_mount_host(source, shared, output, app, team):
+def build_mount_host(source, shared, output, app, team, offline):
     """Provision the macOS 27 public mounting capability for the native host."""
     if not team:
         return None
@@ -97,13 +130,13 @@ def build_mount_host(source, shared, output, app, team):
             INFOPLIST_FILE = "{info}"; CODE_SIGN_ENTITLEMENTS = "{entitlements}";
             CODE_SIGN_STYLE = Automatic; CODE_SIGN_IDENTITY = "Apple Development"; DEVELOPMENT_TEAM = "{team}";
             MACOSX_DEPLOYMENT_TARGET = 15.0; SWIFT_VERSION = 5.0; SWIFT_OPTIMIZATION_LEVEL = "-O";
-            ENABLE_HARDENED_RUNTIME = YES; SKIP_INSTALL = YES; OTHER_LDFLAGS = "-framework Foundation -framework CryptoKit -framework FSKit -framework DiskArbitration -framework FileProvider";
+            ENABLE_HARDENED_RUNTIME = YES; SKIP_INSTALL = YES; OTHER_LDFLAGS = "-framework Foundation -framework CryptoKit -framework FSKit -framework DiskArbitration -framework FileProvider -framework Security";
         }}; }};''',
     ]
     (project / "project.pbxproj").write_text("// !$*UTF8*$!\n{archiveVersion = 1; objectVersion = 56; classes = {}; objects = {\n" +
                                          "\n".join(objects) + f"\n}}; rootObject = {root}; }}\n")
     run("xcodebuild", "-quiet", "-project", str(project), "-target", "SocietyContainerDrive", "-configuration", "Release",
-        "-allowProvisioningUpdates", f"SYMROOT={output / 'host-products'}", f"OBJROOT={output / 'host-intermediates'}")
+        *provisioning_options(offline), f"SYMROOT={output / 'host-products'}", f"OBJROOT={output / 'host-intermediates'}")
     built = output / "host-products/Release/Society.app"
     shutil.copy2(built / "Contents/MacOS/SocietyContainerDrive", app / "Contents/MacOS/SocietyContainerDrive")
     shutil.copy2(built / "Contents/embedded.provisionprofile", app / "Contents/embedded.provisionprofile")
@@ -123,7 +156,9 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--tests", action="store_true")
     parser.add_argument("--fskit-team", default="")
+    parser.add_argument("--offline-provisioning", action="store_true")
     args = parser.parse_args()
+    validate_signing_configuration(args.fskit_team, args.sign)
     source = pathlib.Path(__file__).resolve().parent
     shared = source.parent / "apple"
     output = args.output.resolve()
@@ -131,6 +166,8 @@ def main():
     catalog = subprocess.check_output([args.catalog_tool, "catalog"])
     (output / "Sections.json").write_bytes(catalog)
     app = output / "Society.app"
+    if not args.fskit_team:
+        clear_unprovisioned_filesystem(app)
     provider = app / "Contents/PlugIns/SocietyContainerProvider.appex"
     identifier = "com.iisacc.society.container.drive"
     for bundle, executable, bundle_id, package_type in [
@@ -164,7 +201,7 @@ def main():
         str(shared / "LocalDriveStore.swift"), str(shared / "FilesDriveStore.swift"),
         str(shared / "FileProviderExtension.swift"),
         "-o", str(provider / "Contents/MacOS/SocietyContainerProvider"))
-    run(*compiler, "-framework", "FileProvider", "-framework", "FSKit", "-framework", "DiskArbitration", str(shared / "LocalDriveStore.swift"),
+    run(*compiler, "-framework", "FileProvider", "-framework", "FSKit", "-framework", "DiskArbitration", "-framework", "Security", str(shared / "LocalDriveStore.swift"),
         str(source / "DirectoryMount.swift"), str(source / "DriveHost.swift"),
         "-o", str(app / "Contents/MacOS/SocietyContainerDrive"))
     entitlements = output / "provider.entitlements"
@@ -175,14 +212,20 @@ def main():
     }))
     run("codesign", "--force", "--timestamp=none", "--sign", args.sign,
         "--entitlements", str(entitlements), str(provider))
-    build_filesystem(source, output, app, args.fskit_team)
-    host_entitlements = build_mount_host(source, shared, output, app, args.fskit_team)
+    build_filesystem(source, output, app, args.fskit_team, args.offline_provisioning)
+    host_entitlements = build_mount_host(source, shared, output, app, args.fskit_team, args.offline_provisioning)
     sign_host = ["codesign", "--force", "--timestamp=none", "--sign", args.sign]
     if host_entitlements:
         sign_host += ["--entitlements", str(host_entitlements)]
     run(*sign_host, str(app))
+    if args.fskit_team:
+        from install_native_bundle import inspect_bundle
+        if inspect_bundle(app) != (True, True, True):
+            raise ValueError("The built FSKit module and host are not correctly signed and provisioned")
     if args.tests:
-        run(*compiler, "-framework", "FSKit", "-framework", "DiskArbitration", str(shared / "LocalDriveStore.swift"), str(source / "DirectoryMount.swift"),
+        run(*compiler, str(shared / "LocalDriveStore.swift"), str(source / "FSKit/SocietyFSRoot.swift"), str(source / "FSKitRootTests.swift"),
+            "-o", str(output / "FSKitRootTests"))
+        run(*compiler, "-framework", "FSKit", "-framework", "DiskArbitration", "-framework", "Security", str(shared / "LocalDriveStore.swift"), str(source / "DirectoryMount.swift"),
             str(source / "DirectoryMountTests.swift"), "-o", str(output / "DirectoryMountTests"))
         run(*compiler, str(source / "FSKit/SocietyFSMetadata.swift"), str(source / "FSKitMetadataTests.swift"),
             "-o", str(output / "FSKitMetadataTests"))

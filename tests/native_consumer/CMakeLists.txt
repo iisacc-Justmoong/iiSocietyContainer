@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 project(SocietyNativeStorageConsumer LANGUAGES CXX)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_DISABLE_FIND_PACKAGE_Qt6 TRUE)
-find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS FileTree Maintenance)
+find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS FileTree Maintenance MobileStorage)
 if(TARGET Qt6::Core OR TARGET Qt6::Gui OR TARGET Qt6::Quick)
     message(FATAL_ERROR "Native storage imported Qt")
 endif()
@@ -15,4 +15,17 @@ target_link_libraries(native_maintenance PRIVATE iiSocietyContainer::Maintenance
 add_test(NAME NativeStorage.InstalledMaintenance COMMAND native_maintenance "${CMAKE_CURRENT_BINARY_DIR}")
 add_executable(native_file_repository ../file_repository.cpp)
 target_link_libraries(native_file_repository PRIVATE iiSocietyContainer::FileTree)
+# The test fixture uses an internal ontology helper; it is not a public header.
+target_include_directories(native_file_repository PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME NativeStorage.InstalledRepository COMMAND native_file_repository "${CMAKE_CURRENT_BINARY_DIR}")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_executable(native_resource resource.cpp)
+target_link_libraries(native_resource PRIVATE iiSocietyContainer::FileTree)
+add_test(NAME NativeStorage.InstalledResource COMMAND "${Python3_EXECUTABLE}" -B
+    "${CMAKE_CURRENT_SOURCE_DIR}/../resource_runner.py" auto "${CMAKE_CURRENT_SOURCE_DIR}/../../resources"
+    $<TARGET_FILE:native_resource> "@WORK@")
+add_executable(native_mobile_storage ../mobile_storage.cpp)
+target_link_libraries(native_mobile_storage PRIVATE iiSocietyContainer::MobileStorage)
+add_test(NAME NativeStorage.InstalledMobileStorage COMMAND "${Python3_EXECUTABLE}" -B
+    "${CMAKE_CURRENT_SOURCE_DIR}/../resource_runner.py" auto "${CMAKE_CURRENT_SOURCE_DIR}/../../resources"
+    $<TARGET_FILE:native_mobile_storage> "@WORK@")

@@ -2,19 +2,20 @@
 set(IISOCIETYCONTAINER_BUILD_GUI OFF)
 set(IISOCIETYCONTAINER_HAS_DESKTOP_MOUNT OFF)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
-    foreach(name IN ITEMS directory_storage file_tree maintenance file_repository)
+    foreach(name IN ITEMS directory_storage file_tree maintenance file_repository file_repository_locking inventory_index)
         add_executable(iiSocietyContainerNative_${name} "tests/${name}.cpp")
         target_link_libraries(iiSocietyContainerNative_${name} PRIVATE
             iiSocietyContainer::FileTree iiSocietyContainer::Maintenance iiFileProvider::Temporary Threads::Threads)
         add_test(NAME "iiSocietyContainer.native_${name}"
-            COMMAND iiSocietyContainerNative_${name} "${CMAKE_CURRENT_BINARY_DIR}")
+            COMMAND ${_society_test_runner} "$<TARGET_FILE:iiSocietyContainerNative_${name}>" @WORK@)
     endforeach()
 endif()
-install(TARGETS iiSocietyContainerFileTree iiSocietyContainerMaintenance EXPORT iiSocietyContainerTargets
+install(TARGETS iiSocietyContainerFileTree iiSocietyContainerMaintenance iiSocietyContainerMobileStorage EXPORT iiSocietyContainerTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES FileTree.h DirectoryStorage.h StorageMaintenance.h FileRepository.h iiSocietyContainerExport.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES src/Index/InventoryIndex.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
 install(FILES docs/ManagedFiles.md docs/FileTree.md docs/DirectoryStorage.md docs/StorageMaintenance.md docs/NativeBuild.md
     DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)

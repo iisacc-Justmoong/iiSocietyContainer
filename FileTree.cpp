@@ -155,7 +155,8 @@ FileTree::ChildrenResult FileTree::children(const std::filesystem::path& relativ
 }
 
 FileTree::ChildrenResult FileTree::readChildren(const std::filesystem::path& relative,
-                                               bool includeHidden, std::size_t limit) const
+                                               bool includeHidden, std::size_t limit,
+                                               bool rejectUnsupported) const
 {
     const auto parent = entry(relative);
     if (!parent) return failed<std::vector<Entry>>(parent.error);
@@ -174,7 +175,10 @@ FileTree::ChildrenResult FileTree::readChildren(const std::filesystem::path& rel
         if (error) return failed<std::vector<Entry>>(error);
         if (!std::filesystem::is_regular_file(status) && !std::filesystem::is_directory(status)) continue;
         const auto key = parent.value->relativePath == "." ? name : parent.value->relativePath / name;
-        if (!validRelative(key)) continue;
+        if (!validRelative(key)) {
+            if (rejectUnsupported) return failed<std::vector<Entry>>(invalidPath());
+            continue;
+        }
 #ifdef _WIN32
         const auto attributes = GetFileAttributesW(iterator->path().c_str());
         if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) continue;
@@ -221,13 +225,22 @@ FileTree::EntryResult FileTree::snapshot(const std::filesystem::path& relative) 
 }
 FileTree::EntryResult FileTree::snapshot(const std::filesystem::path& relative, const Options& options) const
 {
+    return snapshotImpl(relative, options, false);
+}
+FileTree::EntryResult FileTree::snapshotForIndex(const std::filesystem::path& relative, const Options& options) const
+{
+    return snapshotImpl(relative, options, true);
+}
+FileTree::EntryResult FileTree::snapshotImpl(const std::filesystem::path& relative, const Options& options,
+                                            bool rejectUnsupported) const
+{
     if (options.maxEntries == 0 || options.maxDepth > 256) return failed<Entry>(invalidPath());
     auto result = entry(relative);
     if (!result) return result;
     std::size_t count = 1;
     std::function<std::error_code(Entry&, std::size_t)> load = [&](Entry& node, std::size_t depth) -> std::error_code {
         if (node.kind != Kind::Directory || depth == options.maxDepth) return {};
-        auto list = readChildren(node.relativePath, options.includeHidden, options.maxEntries - count);
+        auto list = readChildren(node.relativePath, options.includeHidden, options.maxEntries - count, rejectUnsupported);
         if (!list) return list.error;
         if (list.value->size() > options.maxEntries - count)
             return std::make_error_code(std::errc::value_too_large);

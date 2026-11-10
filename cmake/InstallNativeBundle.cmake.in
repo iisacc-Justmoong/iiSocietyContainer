@@ -1,0 +1,7 @@
+execute_process(COMMAND "@Python3_EXECUTABLE@" -B
+    "@CMAKE_CURRENT_SOURCE_DIR@/platform/macos/install_native_bundle.py"
+    "@_native_app@" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_DATADIR@/iiSocietyContainer/Society.app"
+    RESULT_VARIABLE _society_native_result)
+if(NOT _society_native_result EQUAL 0)
+    message(FATAL_ERROR "Society native bundle was not installed; the existing host was preserved.")
+endif()

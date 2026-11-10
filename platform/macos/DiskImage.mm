@@ -3,7 +3,9 @@
 #import <Foundation/Foundation.h>
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -161,12 +163,13 @@ std::string volumeId(const fs::path &root) {
     return text(identifier);
 }
 std::vector<fs::path> mountedRoots() {
-    struct statfs *mounts = nullptr;
-    const int count = getmntinfo(&mounts, MNT_NOWAIT);
+    struct statfs *snapshot = nullptr;
+    const int count = getmntinfo_r_np(&snapshot, MNT_NOWAIT);
+    const std::unique_ptr<struct statfs, decltype(&std::free)> mounts(snapshot, &std::free);
     std::vector<fs::path> result;
     for (int i = 0; i < count; ++i)
-        if (std::string(mounts[i].f_fstypename) == "apfs" && !(mounts[i].f_flags & MNT_RDONLY))
-            result.emplace_back(mounts[i].f_mntonname);
+        if (std::string(mounts.get()[i].f_fstypename) == "apfs" && !(mounts.get()[i].f_flags & MNT_RDONLY))
+            result.emplace_back(mounts.get()[i].f_mntonname);
     return result;
 }
 NSDictionary *layout(const fs::path &root) {

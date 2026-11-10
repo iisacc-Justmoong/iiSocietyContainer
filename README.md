@@ -1,6 +1,8 @@
 # iiSocietyContainer
 
 Project-owned fixed assets belong in `resources/`. User models and files remain in their Society containers.
+[Build layout and test isolation](docs/BuildLayout.md) describes default targets,
+preserved volumes and the remaining legacy fixture paths.
 GUI file actions, preview caching, and application integration live together in
 `src/Gui/`; their existing `<iiSocietyContainer/...>` include names remain stable.
 
@@ -14,6 +16,24 @@ Native `FileRepository` and the `SharedStorage` adapter connect actual files to
 iiFileProvider RAW originals, mutable revisions, work sessions, classification
 search and ontology directories. Public files retain their native paths. See
 [managed storage and search](docs/ManagedFiles.md) for intake, cursors and recovery.
+
+The Qt Core `ModelImportService` owns model import, classification changes,
+background organization, and persistent job history on top of iiJob. The host
+supplies file-provider inputs and observes progress; a running worker currently
+does not survive its owning process. Background intake yields cooperatively to
+foreground repository operations, and only one intake pass per container runs
+at once. Newly imported model payloads are copied once into `Models/` and
+indexed by the file catalog without duplicating the payload in the object
+database. Catalog-only models are working copies; this does not imply a retained
+immutable revision or backup. Previously retained object history is preserved.
+See [model operations](docs/Models.md) and [managed storage](docs/ManagedFiles.md).
+
+Container file operations treat provider metadata and previews as internal
+members of the selected asset. The same asset plan covers model import, rename,
+move, trash and restoration; ordinary JSON documents remain visible.
+Hosts can participate in file relocation through a synchronous prepare, commit
+and cancel interface. Project packages move as single items, with validated
+catalog companions. See [file operations](docs/FileActions.md).
 
 [Windows build and execution](docs/WindowsBuildAndRun.md)
 
@@ -81,6 +101,13 @@ in the [Models management document](docs/Models.md).
 <a id="공개-api"></a>
 
 ## Public API
+
+The Qt-free `iiSocietyContainer::MobileStorage` target prepares an independent
+`.societycontainer` in an application's own mobile sandbox. It can copy the
+contents to a validated Society container later without overwriting conflicts
+or deleting the source. Apple App Group lookup uses the operating system's
+entitlement-controlled location; the private container is never registered as
+a system drive. See [directory storage](docs/DirectoryStorage.md).
 
 Version 0.15.0 adds live file metadata, immediate directory children, and recursive tree snapshots through `SocietyContainer::entry/entries/tree` and `SocietyDrive::entry/entries/tree`. Nodes expose native and relative paths, parent relationships, file type, size, modification time, permissions, loaded children, and lookup with `find()`. Depth and node limits keep traversal explicit. Drive snapshots preserve all nine logical sections and correctly map a separate Files volume. The standalone `iiSocietyContainer::FileTree` C++23 target has no Qt dependency. Directory creation and collision-safe moves extend `FileOperations`; see the [file tree API and examples](docs/FileTree.md).
 

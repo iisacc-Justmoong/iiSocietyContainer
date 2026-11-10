@@ -83,6 +83,24 @@ with tempfile.TemporaryDirectory(prefix="drive-cli-", dir=str(build)) as tempora
         assert reopened["rootPath"] == expected_root and reopened["identifier"] == identifier, reopened
         assert snapshot(parent) == preserved, "Reopening must retain user bytes and the minimal layout"
 
+    repaired = call("repair-model-companions", package)
+    assert repaired == {"repaired": [], "errors": []}, repaired
+    assert snapshot(parent) == preserved, "Checking an empty model store must not create a catalog"
+    orphan_folder = package / "Models" / "Checkpoint"
+    orphan_folder.mkdir()
+    orphan = orphan_folder / "model.safetensors.iisacc.json"
+    document = json.dumps({"format": "iiFileProvider.Metadata", "schema": 1,
+                           "fileKey": "file-unverified", "path": "Checkpoint/model.safetensors"}).encode()
+    orphan.write_bytes(document)
+    result = subprocess.run([str(tool), "repair-model-companions", str(package)], cwd=str(work),
+                            capture_output=True, text=True, encoding="utf-8", timeout=30)
+    report = json.loads(result.stdout)
+    assert result.returncode == 1 and not report["repaired"] and report["errors"], report
+    assert orphan.read_bytes() == document
+    assert not (package / "Models" / ".iisacc-file-provider").exists()
+    orphan.unlink()
+    orphan_folder.rmdir()
+
     # Rejection must neither create a fallback package nor modify caller data.
     relative = work / "relative-parent"
     relative.mkdir()

@@ -25,17 +25,37 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(CTest)
+# Publish the native host before any SDK files. If an unprovisioned build
+# would downgrade an existing FSKit installation, fail before changing it.
+if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    set(_native_directory "${CMAKE_CURRENT_BINARY_DIR}/native")
+    set(_native_app "${_native_directory}/Society.app")
+    configure_file(cmake/InstallNativeBundle.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/InstallNativeBundle.cmake" @ONLY)
+    install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/InstallNativeBundle.cmake" COMPONENT Native)
+endif()
+option(IISOCIETYCONTAINER_BUILD_EXAMPLES "Build demonstration applications" OFF)
 if(BUILD_TESTING)
+    if(NOT CMAKE_CROSSCOMPILING)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        set(_society_test_runner "${Python3_EXECUTABLE}" -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/resource_runner.py" auto "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+        add_test(NAME iiSocietyContainer.resource_workspace COMMAND ${_society_test_runner}
+            "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_resource_runner.py")
+    endif()
     add_test(NAME iiSocietyContainer.source_layout COMMAND "${CMAKE_COMMAND}"
         "-DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/source_layout.cmake")
+    if(NOT IISOCIETYCONTAINER_BUILD_EXAMPLES)
+        add_test(NAME iiSocietyContainer.default_targets COMMAND "${CMAKE_COMMAND}"
+            "-DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/default_targets.cmake")
+    endif()
 endif()
 find_package(Threads REQUIRED)
 find_package(iiFileProviderTemporary CONFIG REQUIRED)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(_library_type STATIC)
-else()
-    set(_library_type SHARED)
+set(_library_type SHARED)
+if(EMSCRIPTEN)
+    set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
 endif()
 
 include(cmake/NativeTargets.cmake)
@@ -46,18 +66,26 @@ if(NOT IISOCIETYCONTAINER_BUILD_QT)
 endif()
 find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Core)
 find_package(iiFileProvider 0.7.1 CONFIG REQUIRED HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider")
+find_package(iiJob 0.1 CONFIG REQUIRED HINTS "$ENV{HOME}/.local/SDK/iiJob")
 
 add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyContainer.cpp Container.h Container.cpp DiskImage.h
         iiSocietyContainerExport.h
         SocietyDrive.h SocietyDrive.cpp
         FilesView.h FilesView.cpp
         FileDirectory.h FileDirectory.cpp FilesLayout.h FilesLayout.cpp
-        FileOperations.h FileOperations.cpp
+        FileOperations.h FileOperations.cpp src/DeletedOrigins.h src/DeletedOrigins.cpp src/ExclusiveRename.h src/ExclusiveRename.cpp
+        src/AssetCompanions.h src/AssetCompanions.cpp
+        src/AssetTransfer.h src/AssetTransfer.cpp
+        src/CompanionRecovery.h src/CompanionRecovery.cpp
         PhotosLayout.h PhotosLayout.cpp
         SharedStorage.h SharedStorage.cpp StorageMap.h StorageMap.cpp StorageDirectoryModel.h StorageDirectoryModel.cpp
         ManagedStorage.cpp
         StorageModelCatalog.h StorageModelCatalog.cpp
         ModelType.h ModelType.cpp ModelClassifier.h ModelClassifier.cpp ModelStore.h ModelStore.cpp
+        src/Models/ModelCompanionNames.h src/Models/DirectoryBackground.h
+        src/Models/ModelImportService.h src/Models/ModelImportService.cpp src/Models/ModelImportSource.h
+        src/Models/ModelImportHistory.cpp src/Models/ContainerJobStorage.h src/Models/ContainerJobStorage.cpp
+        src/Operations/FileJobService.h src/Operations/FileJobService.cpp
         ModelLayout.h ModelLayout.cpp
         src/Store/AssetLibrary/iiGE.cpp
         src/Store/AssetLibrary/iiGE.h
@@ -90,6 +118,12 @@ add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyCo
 target_sources(iiSocietyContainer PRIVATE src/Storage/ApplicationStorage.h src/Storage/ApplicationStorage.cpp)
 install(FILES src/Storage/ApplicationStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 add_library(iiSocietyContainer::iiSocietyContainer ALIAS iiSocietyContainer)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set_target_properties(iiSocietyContainer PROPERTIES FRAMEWORK TRUE)
+elseif(EMSCRIPTEN)
+    target_compile_options(iiSocietyContainer PRIVATE -fPIC)
+    target_link_options(iiSocietyContainer PRIVATE -sSIDE_MODULE=1)
+endif()
 if(ANDROID)
     target_sources(iiSocietyContainer PRIVATE platform/android/AndroidStorage.cpp platform/android/AndroidStorage.h)
 endif()
@@ -111,6 +145,7 @@ endif()
 target_compile_definitions(iiSocietyContainer PRIVATE IISOCIETYCONTAINER_BUILDING_LIBRARY)
 target_link_libraries(iiSocietyContainer PUBLIC Qt6::Core iiSocietyContainer::FileTree iiSocietyContainer::Maintenance)
 target_link_libraries(iiSocietyContainer PUBLIC iiFileProvider::iiFileProvider PRIVATE iiFileProvider::Native iiFileProvider::Temporary)
+target_link_libraries(iiSocietyContainer PRIVATE iiJob::iiJob)
 target_include_directories(iiSocietyContainer PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -146,6 +181,12 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
         endforeach()
     endif()
     add_library(iiSocietyContainerSharing ${_library_type} FileActions.h FileActions.cpp)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set_target_properties(iiSocietyContainerSharing PROPERTIES FRAMEWORK TRUE)
+    elseif(EMSCRIPTEN)
+        target_compile_options(iiSocietyContainerSharing PRIVATE -fPIC)
+        target_link_options(iiSocietyContainerSharing PRIVATE -sSIDE_MODULE=1)
+    endif()
     add_library(iiSocietyContainer::Sharing ALIAS iiSocietyContainerSharing)
     target_compile_features(iiSocietyContainerSharing PUBLIC cxx_std_23)
     target_compile_definitions(iiSocietyContainerSharing PRIVATE IISOCIETYCONTAINER_SHARING_BUILD)
@@ -159,7 +200,7 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
     target_sources(iiSocietyContainerSharing INTERFACE
         "$<INSTALL_INTERFACE:$<$<BOOL:$<TARGET_PROPERTY:QT_CONSUMES_METATYPES>>:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/metatypes/${society_sharing_metatypes_name}>>")
     install(TARGETS iiSocietyContainerSharing EXPORT iiSocietyContainerTargets
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR})
     foreach(_header DashboardFiles PreviewCache SocietyApplication)
         file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/include/iiSocietyContainer/${_header}.h"
             CONTENT "#pragma once\n#include \"${CMAKE_CURRENT_SOURCE_DIR}/src/Gui/${_header}.h\"\n")
@@ -168,6 +209,12 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
         src/Gui/PreviewCache.h src/Gui/PreviewCache.cpp
         src/Gui/DashboardFiles.h src/Gui/DashboardFiles.cpp
         src/Gui/SocietyApplication.h src/Gui/SocietyApplication.cpp)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set_target_properties(iiSocietyContainerGui PROPERTIES FRAMEWORK TRUE)
+    elseif(EMSCRIPTEN)
+        target_compile_options(iiSocietyContainerGui PRIVATE -fPIC)
+        target_link_options(iiSocietyContainerGui PRIVATE -sSIDE_MODULE=1)
+    endif()
     add_library(iiSocietyContainer::Gui ALIAS iiSocietyContainerGui)
     target_compile_features(iiSocietyContainerGui PUBLIC cxx_std_23)
     target_include_directories(iiSocietyContainerGui PUBLIC
@@ -194,7 +241,7 @@ if(IISOCIETYCONTAINER_BUILD_GUI)
         set_source_files_properties(platform/macos/FileSharing.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     endif()
     install(TARGETS iiSocietyContainerGui EXPORT iiSocietyContainerTargets
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR})
     install(FILES FileActions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
     install(FILES src/Gui/DashboardFiles.h src/Gui/SocietyApplication.h src/Gui/PreviewCache.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iiSocietyContainer)
@@ -260,17 +307,21 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     find_package(iiFileProviderSwift 0.7 CONFIG REQUIRED)
     set(IISOCIETYCONTAINER_SIGNING_IDENTITY "-" CACHE STRING "Identity used to sign the macOS File Provider; '-' is an ad hoc development build")
     set(IISOCIETYCONTAINER_FSKIT_TEAM "" CACHE STRING "Apple developer team for the FSKit module and macOS 27 public mount host")
+    option(IISOCIETYCONTAINER_FSKIT_OFFLINE "Use existing local provisioning profiles without developer portal updates" ON)
     file(GLOB _filesystem_sources CONFIGURE_DEPENDS "platform/macos/FSKit/*.swift")
     set(_native_directory "${CMAKE_CURRENT_BINARY_DIR}/native")
     set(_native_app "${_native_directory}/Society.app")
     set(_native_outputs "${_native_app}/Contents/MacOS/SocietyContainerDrive")
     set(_native_arguments)
+    if(IISOCIETYCONTAINER_FSKIT_OFFLINE)
+        list(APPEND _native_arguments --offline-provisioning)
+    endif()
     if(BUILD_TESTING)
-        list(APPEND _native_outputs "${_native_directory}/LocalDriveStoreTests" "${_native_directory}/FilesDriveStoreTests" "${_native_directory}/SharedDriveLocationTests" "${_native_directory}/DirectoryMountTests" "${_native_directory}/FSKitStatTests" "${_native_directory}/FSKitMetadataTests" "${_native_directory}/FSKitIOTests" "${_native_directory}/FSKitDirectoryTests")
+        list(APPEND _native_outputs "${_native_directory}/LocalDriveStoreTests" "${_native_directory}/FilesDriveStoreTests" "${_native_directory}/SharedDriveLocationTests" "${_native_directory}/DirectoryMountTests" "${_native_directory}/FSKitStatTests" "${_native_directory}/FSKitMetadataTests" "${_native_directory}/FSKitIOTests" "${_native_directory}/FSKitDirectoryTests" "${_native_directory}/FSKitRootTests")
         list(APPEND _native_arguments --tests)
     endif()
     file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/native-settings.txt"
-        CONTENT "${IISOCIETYCONTAINER_SIGNING_IDENTITY}\n${PROJECT_VERSION}\n${BUILD_TESTING}\n${IISOCIETYCONTAINER_FSKIT_TEAM}\n")
+        CONTENT "${IISOCIETYCONTAINER_SIGNING_IDENTITY}\n${PROJECT_VERSION}\n${BUILD_TESTING}\n${IISOCIETYCONTAINER_FSKIT_TEAM}\n${IISOCIETYCONTAINER_FSKIT_OFFLINE}\n")
     add_custom_command(OUTPUT ${_native_outputs}
         COMMAND ${CMAKE_COMMAND} -E env "IIFILEPROVIDER_SWIFT_SOURCE=${iiFileProviderSwift_SOURCE}"
             ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/platform/macos/build_native.py"
@@ -280,7 +331,7 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         DEPENDS iiSocietyContainerDriveTool "${CMAKE_CURRENT_BINARY_DIR}/native-settings.txt" "${iiFileProviderSwift_SOURCE}"
             platform/macos/build_native.py platform/apple/LocalDriveStore.swift
             platform/apple/FileProviderExtension.swift platform/macos/DriveHost.swift
-            platform/macos/LocalDriveStoreTests.swift platform/macos/FSKitStatTests.swift platform/macos/FSKitMetadataTests.swift
+            platform/macos/LocalDriveStoreTests.swift platform/macos/FSKitStatTests.swift platform/macos/FSKitMetadataTests.swift platform/macos/FSKitRootTests.swift
             platform/macos/FSKitIOTests.swift platform/macos/FSKitDirectoryTests.swift platform/apple/FilesDriveStore.swift
             platform/macos/FilesDriveStoreTests.swift platform/apple/SharedDriveLocation.swift
             platform/apple/SharedDriveLocationTests.swift platform/apple/Sections.json
@@ -289,10 +340,20 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         VERBATIM
     )
     add_custom_target(iiSocietyContainerNative ALL DEPENDS ${_native_outputs})
-    install(DIRECTORY "${_native_app}" DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer USE_SOURCE_PERMISSIONS COMPONENT Native)
     if(BUILD_TESTING)
-        add_test(NAME iiSocietyContainer.native_mount_location COMMAND "${_native_directory}/DirectoryMountTests"
-            "${CMAKE_CURRENT_BINARY_DIR}")
+        add_test(NAME iiSocietyContainer.native_bundle_install COMMAND ${_society_test_runner}
+            "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_native_bundle_install.py")
+        if(NOT IISOCIETYCONTAINER_FSKIT_TEAM)
+            add_test(NAME iiSocietyContainer.native_bundle_full_install_safety COMMAND ${_society_test_runner}
+                "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_native_install_order.py"
+                "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_COMMAND}")
+        endif()
+        add_test(NAME iiSocietyContainer.native_bundle_staged_install COMMAND ${_society_test_runner}
+            "${CMAKE_COMMAND}" --install "${CMAKE_CURRENT_BINARY_DIR}" --prefix @WORK@/prefix --component Native)
+        add_test(NAME iiSocietyContainer.native_mount_location COMMAND ${_society_test_runner}
+            "${_native_directory}/DirectoryMountTests" @WORK@)
+        add_test(NAME iiSocietyContainer.native_files_root COMMAND ${_society_test_runner}
+            "${_native_directory}/FSKitRootTests" @WORK@)
         add_test(NAME iiSocietyContainer.native_metadata COMMAND "${_native_directory}/FSKitMetadataTests"
             "${CMAKE_CURRENT_BINARY_DIR}")
         add_test(NAME iiSocietyContainer.native_io COMMAND "${_native_directory}/FSKitIOTests"
@@ -312,8 +373,8 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             --file-provider "${iiFileProviderSwift_DIR}")
         add_test(NAME iiSocietyContainer.native_store COMMAND "${_native_directory}/LocalDriveStoreTests"
             "${_native_directory}" $<TARGET_FILE:iiSocietyContainerDriveTool>)
-        add_test(NAME iiSocietyContainer.native_files COMMAND "${_native_directory}/FilesDriveStoreTests"
-            "${_native_directory}" $<TARGET_FILE:iiSocietyContainerDriveTool>)
+        add_test(NAME iiSocietyContainer.native_files COMMAND ${_society_test_runner}
+            "${_native_directory}/FilesDriveStoreTests" @WORK@ $<TARGET_FILE:iiSocietyContainerDriveTool>)
         # Compile the App Group bridge against host Catalyst Foundation. This
         # catches Objective-C++/Qt API errors without claiming an iOS device build.
         execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
@@ -341,7 +402,7 @@ endif()
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_executable(iiSocietyContainerMaintenanceTests tests/maintenance.cpp)
     target_link_libraries(iiSocietyContainerMaintenanceTests PRIVATE iiSocietyContainer::Maintenance iiFileProvider::Temporary)
-    add_test(NAME iiSocietyContainer.maintenance COMMAND iiSocietyContainerMaintenanceTests "${CMAKE_CURRENT_BINARY_DIR}")
+    add_test(NAME iiSocietyContainer.maintenance COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerMaintenanceTests> @WORK@)
     set_tests_properties(iiSocietyContainer.maintenance PROPERTIES TIMEOUT 30)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_test(NAME iiSocietyContainer.installed_package COMMAND "${Python3_EXECUTABLE}" -B
@@ -368,16 +429,18 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
         ENVIRONMENT_MODIFICATION "DYLD_LIBRARY_PATH=unset:;DYLD_FRAMEWORK_PATH=unset:;DYLD_FALLBACK_LIBRARY_PATH=unset:")
     add_executable(iiSocietyContainerDirectoryStorageTests tests/directory_storage.cpp)
     target_link_libraries(iiSocietyContainerDirectoryStorageTests PRIVATE iiSocietyContainer::FileTree)
-    add_test(NAME iiSocietyContainer.directory_storage COMMAND iiSocietyContainerDirectoryStorageTests "${CMAKE_CURRENT_BINARY_DIR}")
+    add_test(NAME iiSocietyContainer.directory_storage COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerDirectoryStorageTests> @WORK@)
     add_executable(iiSocietyContainerFileTreeTests tests/file_tree.cpp)
     target_link_libraries(iiSocietyContainerFileTreeTests PRIVATE iiSocietyContainer::FileTree)
-    add_test(NAME iiSocietyContainer.file_tree COMMAND iiSocietyContainerFileTreeTests "${CMAKE_CURRENT_BINARY_DIR}")
-    find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Test)
-    add_executable(iiSocietyContainerFileOperationsTests tests/file_operations.cpp)
+    add_test(NAME iiSocietyContainer.file_tree COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerFileTreeTests> @WORK@)
+    add_executable(iiSocietyContainerInventoryIndexTests tests/inventory_index.cpp)
+    target_link_libraries(iiSocietyContainerInventoryIndexTests PRIVATE iiSocietyContainer::FileTree)
+    add_test(NAME iiSocietyContainer.inventory_index COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerInventoryIndexTests> @WORK@)
+    find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Test Concurrent)
+    add_executable(iiSocietyContainerFileOperationsTests tests/file_operations.cpp src/ExclusiveRename.cpp src/AssetTransfer.cpp src/DeletedOrigins.cpp)
     target_link_libraries(iiSocietyContainerFileOperationsTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
-    target_compile_definitions(iiSocietyContainerFileOperationsTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
     set_target_properties(iiSocietyContainerFileOperationsTests PROPERTIES AUTOMOC ON)
-    add_test(NAME iiSocietyContainer.file_operations COMMAND iiSocietyContainerFileOperationsTests)
+    add_test(NAME iiSocietyContainer.file_operations COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerFileOperationsTests>)
     if(TARGET iiSocietyContainerGui)
         add_executable(iiSocietyContainerPreviewCacheTests tests/preview_cache.cpp)
         target_link_libraries(iiSocietyContainerPreviewCacheTests PRIVATE iiSocietyContainer::Gui Qt6::Test)
@@ -393,11 +456,11 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
         set_target_properties(iiSocietyContainerDashboardTests PROPERTIES AUTOMOC ON)
         add_test(NAME iiSocietyContainer.dashboard COMMAND iiSocietyContainerDashboardTests)
         set_tests_properties(iiSocietyContainer.dashboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-        add_executable(iiSocietyContainerFileActionsTests tests/file_actions.cpp)
+        add_executable(iiSocietyContainerFileActionsTests tests/file_actions.cpp src/DeletedOrigins.cpp)
         target_link_libraries(iiSocietyContainerFileActionsTests PRIVATE iiSocietyContainer::Gui Qt6::Test)
         target_compile_definitions(iiSocietyContainerFileActionsTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
         set_target_properties(iiSocietyContainerFileActionsTests PROPERTIES AUTOMOC ON)
-        add_test(NAME iiSocietyContainer.file_actions COMMAND iiSocietyContainerFileActionsTests)
+        add_test(NAME iiSocietyContainer.file_actions COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerFileActionsTests>)
         set_tests_properties(iiSocietyContainer.file_actions PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
     find_package(Qt6 6.8.3 EXACT REQUIRED COMPONENTS Network)
@@ -428,10 +491,12 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
         -o "${CMAKE_CURRENT_BINARY_DIR}/drive-qt.txt,txt")
     add_executable(iiSocietyContainerSharedStorageTests tests/shared_storage.cpp)
     add_executable(iiSocietyContainerLogicalStorageTests tests/logical_storage.cpp)
-    add_executable(iiSocietyContainerLogicalStorageExample example/logical_storage.cpp)
-    target_link_libraries(iiSocietyContainerLogicalStorageExample PRIVATE iiSocietyContainer)
-    target_compile_definitions(iiSocietyContainerLogicalStorageExample PRIVATE LOGICAL_STORAGE_EXAMPLE_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
-    add_test(NAME iiSocietyContainer.logical_storage_example COMMAND iiSocietyContainerLogicalStorageExample)
+    if(IISOCIETYCONTAINER_BUILD_EXAMPLES)
+        add_executable(iiSocietyContainerLogicalStorageExample example/logical_storage.cpp)
+        target_link_libraries(iiSocietyContainerLogicalStorageExample PRIVATE iiSocietyContainer)
+        target_compile_definitions(iiSocietyContainerLogicalStorageExample PRIVATE LOGICAL_STORAGE_EXAMPLE_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/resources")
+        add_test(NAME iiSocietyContainer.logical_storage_example COMMAND iiSocietyContainerLogicalStorageExample)
+    endif()
     target_link_libraries(iiSocietyContainerLogicalStorageTests PRIVATE iiSocietyContainer Qt6::Test)
     target_compile_definitions(iiSocietyContainerLogicalStorageTests PRIVATE LOGICAL_STORAGE_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
     set_target_properties(iiSocietyContainerLogicalStorageTests PROPERTIES AUTOMOC ON)
@@ -442,15 +507,29 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_executable(iiSocietyContainerRepositoryTests tests/file_repository.cpp)
     add_executable(iiSocietyContainerManagedStorageTests tests/managed_storage.cpp)
     target_link_libraries(iiSocietyContainerManagedStorageTests PRIVATE iiSocietyContainer::iiSocietyContainer)
-    add_test(NAME iiSocietyContainer.managed_storage COMMAND iiSocietyContainerManagedStorageTests)
+    add_test(NAME iiSocietyContainer.managed_storage COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerManagedStorageTests>)
     target_link_libraries(iiSocietyContainerRepositoryTests PRIVATE iiSocietyContainer::FileTree)
-    add_test(NAME iiSocietyContainer.file_repository COMMAND iiSocietyContainerRepositoryTests "${CMAKE_CURRENT_BINARY_DIR}")
-    add_executable(iiSocietyContainerLoadingBenchmark tests/loading_benchmark.cpp)
+    add_test(NAME iiSocietyContainer.file_repository COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerRepositoryTests> @WORK@)
+    add_executable(iiSocietyContainerRepositoryLockingTests tests/file_repository_locking.cpp)
+    target_link_libraries(iiSocietyContainerRepositoryLockingTests PRIVATE iiSocietyContainer::FileTree iiFileProvider::Temporary)
+    add_test(NAME iiSocietyContainer.file_repository_locking COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerRepositoryLockingTests> @WORK@)
+    add_executable(iiSocietyContainerLoadingBenchmark EXCLUDE_FROM_ALL tests/loading_benchmark.cpp)
     target_link_libraries(iiSocietyContainerLoadingBenchmark PRIVATE iiSocietyContainer::iiSocietyContainer)
     target_link_libraries(iiSocietyContainerSharedStorageTests PRIVATE iiSocietyContainer::iiSocietyContainer iiFileProvider::Native Qt6::Test)
     set_target_properties(iiSocietyContainerSharedStorageTests PROPERTIES AUTOMOC ON)
     add_test(NAME iiSocietyContainer.shared_storage COMMAND iiSocietyContainerSharedStorageTests
         -o "${CMAKE_CURRENT_BINARY_DIR}/shared-storage-qt.txt,txt")
+    if(NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME iiSocietyContainer.directory_search COMMAND ${_society_test_runner}
+            $<TARGET_FILE:iiSocietyContainerSharedStorageTests> directorySearchAndTypeSortUseCurrentOptions)
+        set_tests_properties(iiSocietyContainer.directory_search PROPERTIES TIMEOUT 120)
+        add_executable(iiSocietyContainerDirectoryBackgroundTests tests/directory_background.cpp)
+        set_target_properties(iiSocietyContainerDirectoryBackgroundTests PROPERTIES AUTOMOC ON)
+        target_include_directories(iiSocietyContainerDirectoryBackgroundTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+        target_link_libraries(iiSocietyContainerDirectoryBackgroundTests PRIVATE Qt6::Test Qt6::Concurrent)
+        add_test(NAME iiSocietyContainer.directory_background COMMAND ${_society_test_runner}
+            $<TARGET_FILE:iiSocietyContainerDirectoryBackgroundTests>)
+    endif()
     add_executable(iiSocietyContainerAliasTests tests/container_alias.cpp)
     target_link_libraries(iiSocietyContainerAliasTests PRIVATE iiSocietyContainer Qt6::Test)
     set_target_properties(iiSocietyContainerAliasTests PROPERTIES AUTOMOC ON)
@@ -466,10 +545,20 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
             -fsyntax-only "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/disk_image_header.cpp")
     endif()
     add_executable(iiSocietyContainerModelStoreTests tests/model_store.cpp)
-    target_link_libraries(iiSocietyContainerModelStoreTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
-    target_compile_definitions(iiSocietyContainerModelStoreTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
+    target_link_libraries(iiSocietyContainerModelStoreTests PRIVATE iiSocietyContainer::iiSocietyContainer iiFileProvider::Native Qt6::Test)
     set_target_properties(iiSocietyContainerModelStoreTests PROPERTIES AUTOMOC ON)
-    add_test(NAME iiSocietyContainer.model_store COMMAND iiSocietyContainerModelStoreTests)
+    add_test(NAME iiSocietyContainer.model_store COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerModelStoreTests>)
+    add_executable(iiSocietyContainerModelImportServiceTests tests/model_import_service.cpp)
+    target_include_directories(iiSocietyContainerModelImportServiceTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/Models)
+    target_link_libraries(iiSocietyContainerModelImportServiceTests PRIVATE iiSocietyContainer iiFileProvider::Temporary Qt6::Test)
+    set_target_properties(iiSocietyContainerModelImportServiceTests PROPERTIES AUTOMOC ON)
+    add_test(NAME iiSocietyContainer.model_import_service COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerModelImportServiceTests>)
+    add_executable(iiSocietyContainerNativeFileJobsTests tests/native_file_jobs.cpp)
+    target_include_directories(iiSocietyContainerNativeFileJobsTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/Operations ${CMAKE_CURRENT_SOURCE_DIR}/src/Models)
+    target_link_libraries(iiSocietyContainerNativeFileJobsTests PRIVATE iiSocietyContainer Qt6::Test iiJob::iiJob iiFileProvider::Native)
+    target_compile_definitions(iiSocietyContainerNativeFileJobsTests PRIVATE SOCIETY_TEST_RESOURCES="${CMAKE_CURRENT_SOURCE_DIR}/resources/test-workspaces")
+    set_target_properties(iiSocietyContainerNativeFileJobsTests PROPERTIES AUTOMOC ON)
+    add_test(NAME iiSocietyContainer.native_file_jobs COMMAND ${_society_test_runner} $<TARGET_FILE:iiSocietyContainerNativeFileJobsTests>)
     add_executable(iiSocietyContainerFilesViewTests tests/files_view.cpp)
     target_link_libraries(iiSocietyContainerFilesViewTests PRIVATE iiSocietyContainer::iiSocietyContainer Qt6::Test)
     target_compile_definitions(iiSocietyContainerFilesViewTests PRIVATE SOCIETY_TEST_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}")
@@ -478,10 +567,11 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
         -o "${CMAKE_CURRENT_BINARY_DIR}/files-view-qt.txt,txt")
 endif()
 
-install(TARGETS iiSocietyContainer iiSocietyContainerFileTree iiSocietyContainerMaintenance EXPORT iiSocietyContainerTargets
+install(TARGETS iiSocietyContainer iiSocietyContainerFileTree iiSocietyContainerMaintenance iiSocietyContainerMobileStorage EXPORT iiSocietyContainerTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 if(TARGET iiSocietyContainerDriveTool)
     install(TARGETS iiSocietyContainerDriveTool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -491,6 +581,10 @@ if(TARGET iiSocietyContainerMaintenanceTool)
 endif()
 install(FILES iiSocietyContainer.h iiSocietyContainerExport.h Container.h FileTree.h DirectoryStorage.h StorageMaintenance.h FileRepository.h SocietyDrive.h DiskImage.h SharedStorage.h FilesView.h FileOperations.h
     FileDirectory.h ModelType.h ModelClassifier.h ModelStore.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES src/Index/InventoryIndex.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES src/Models/ModelImportService.h src/Models/ModelImportSource.h src/Models/ContainerJobStorage.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES src/Operations/FileJobService.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
 install(FILES README.md docs/FileLoading.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer COMPONENT Documentation)

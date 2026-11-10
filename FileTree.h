@@ -60,10 +60,17 @@ public:
     [[nodiscard]] EntryResult snapshot(const std::filesystem::path& relative,
                                        const Options& options) const;
     [[nodiscard]] EntryResult snapshot(const std::filesystem::path& relative = {}) const;
+    /// Like snapshot(), but fails instead of omitting a name that cannot be
+    /// represented by the provider's relative-path contract.
+    [[nodiscard]] EntryResult snapshotForIndex(const std::filesystem::path& relative,
+                                               const Options& options) const;
 
 private:
     [[nodiscard]] ChildrenResult readChildren(const std::filesystem::path& relative,
-                                              bool includeHidden, std::size_t limit) const;
+                                              bool includeHidden, std::size_t limit,
+                                              bool rejectUnsupported = false) const;
+    [[nodiscard]] EntryResult snapshotImpl(const std::filesystem::path& relative,
+                                           const Options& options, bool rejectUnsupported) const;
     std::filesystem::path m_root;
     std::error_code m_error;
 };

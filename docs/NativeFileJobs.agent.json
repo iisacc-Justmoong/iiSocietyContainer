@@ -1,0 +1,156 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:bed96833003cca421982e4d926e7e1655759bac0ef36768039ea402270b85b33",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/NativeFileJobs.md",
+    "sha256": "01c366abdd81041ff51880fa62a545ac6f6ab3cfc82f63f24c34ea72eae80171",
+    "bytes": 2865,
+    "line_count": 34,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "네이티브 화면의 컨테이너 파일 작업",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 네이티브 화면의 컨테이너 파일 작업\n",
+      "level": 1,
+      "title": "네이티브 화면의 컨테이너 파일 작업"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "Society 백엔드는 파일과 내부 메타데이터를 하나의 컨테이너 객체로 조작한다.\n네이티브 화면은 경로와 의도를 요청하고 실제 이동·이름 변경·삭제·복원은\n컨테이너의 `FileOperations`가 수행한다. 작업은 화면과 별도의 데몬 수명에 속한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "작업 요청은 먼저 실행 대기 상태가 된다. 작업 레코드 생성이 확인되면 저장 완료를\n알리고, 실제 파일 효과를 적용한 뒤 성공 또는 오류를 기록한다. 완료 기록이 남기\n전에 프로세스가 중단된 작업의 효과는 알 수 없는 상태로 보존하며 자동으로 다시\n실행하지 않는다. 경로는 자원의 ID가 아닌 현재 위치이다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 19,
+      "raw": "`FileJobService::submit`은 식별자를 반환하지만 그 시점은 아직 메모리 대기 상태다.\n`recorded` 통지는 iiJob 기록이 생성된 이후 발생한다. `finished`는 결과 경로와\n오류를 함께 제공하므로 파일 조작은 끝났으나 색인 갱신이 실패한 부분 결과도\n구분된다. 완료 통지 전에 작업 기록 연결과 실행 임대를 해제하여 수신자가 기록을\n바로 다시 열 수 있게 한다. `inspect`는 작업 레코드를 별도 작업 스레드에서 조회한다. 다른 실행기가\n유효한 작업 임대를 보유하면 진행 상태를 유지하고, 임대 없이 중단된 작업의\n진행 중 항목은 확인 필요 상태로 전환한다. 영구 기록 전에 종료된 대기 요청은\n복구할 수 없다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 23,
+      "raw": "한 서비스의 같은 파일과 상·하위 경로에 대한 중복 변경은 거절한다. 무관한 파일은\n각각 대기열에 넣고 독립적으로 완료되며, 파일과 관리 메타데이터의 보호·부분 성공\n처리는 컨테이너의 기존 `FileOperations` 계약을 따른다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 29,
+      "raw": "일반 파일 가져오기와 다른 폴더로 복사는 `copy` 작업으로 요청한다. 원본은 정규 절대\n경로이고 대상은 선택된 컨테이너의 상대 폴더 경로이다. 원본은 그대로 유지하며,\n파일과 연결된 내부 메타데이터는 `FileOperations`의 동일한 객체 복사 규칙을 따른다.\n내부 제어 파일, 리다이렉트된 원본, 컨테이너 밖의 대상은 거절한다. 작업의 결과\n경로와 오류는 다른 지속 파일 작업과 같은 방식으로 조회한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 34,
+      "raw": "현재 작업은 가져오기·복사, 이름 변경, 복제, 이동, 휴지통 이동, 영구 삭제, 복원과 폴더 생성을\n지원한다. 이 서비스는 외부 파일 제공자의 권한을 획득하거나 원격 원본을 다운로드하지\n않으며, 아직 자동 재시도와 취소를 제공하지 않는다. C++ 호스트는 자신이 보유한\n데몬 수명에 서비스를 연결하고 `recorded`와 `finished`를 구분해 표시한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "네이티브 화면의 컨테이너 파일 작업",
+      "anchor": "네이티브-화면의-컨테이너-파일-작업",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "실행하지 않는다. 경로는 자원의 ID가 아닌 현재 위치이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 33,
+        "text": "않으며, 아직 자동 재시도와 취소를 제공하지 않는다. C++ 호스트는 자신이 보유한",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

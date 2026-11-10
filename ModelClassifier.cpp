@@ -1,4 +1,5 @@
 #include "ModelClassifier.h"
+#include "src/Models/ModelCompanionNames.h"
 
 #include <QDataStream>
 #include <QDir>
@@ -304,13 +305,10 @@ QStringList ModelClassifier::companionFiles(const QString &path)
 {
     const QFileInfo file(path);
     if (!file.isFile()) return {};
-    const auto stem = QDir(file.absolutePath()).filePath(file.completeBaseName());
     QStringList result;
-    for (const auto &prefix : {path, stem}) {
-        for (const auto *suffix : {".model.json", ".civitai.info", ".preview.png", ".preview.jpg", ".preview.webp"}) {
-            const auto candidate = prefix + QLatin1String(suffix);
-            if (candidate != path && plainFile(candidate) && !result.contains(candidate)) result.append(candidate);
-        }
+    for (const auto &name : detail::modelCompanionNames(file.fileName())) {
+        const auto candidate = QDir(file.absolutePath()).filePath(name);
+        if (plainFile(candidate)) result.append(candidate);
     }
     return result;
 }

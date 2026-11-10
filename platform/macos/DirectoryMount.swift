@@ -2,10 +2,78 @@ import Foundation
 import Darwin
 import FSKit
 import DiskArbitration
+import Security
 
 // Stored data and runtime state belong to the package. macOS 27 owns its
 // /Volumes mount namespace; macOS 26 uses an empty in-package backing directory.
 enum DirectoryMount {
+    static func requireMountEntitlement(_ allowed: Bool) throws {
+        guard allowed else {
+            throw DriveStoreError.invalid("The installed Society filesystem host lacks the macOS mount entitlement. Install the provisioned FSKit host.")
+        }
+    }
+
+    static func hasMountEntitlement() -> Bool {
+        guard let task = SecTaskCreateFromSelf(nil),
+              let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.fskit.mount" as CFString, nil) else { return false }
+        return (value as? Bool) == true
+    }
+    final class MountLease {
+        private var descriptor: Int32
+        init(_ descriptor: Int32) { self.descriptor = descriptor }
+        func release() {
+            guard descriptor >= 0 else { return }
+            _ = flock(descriptor, LOCK_UN)
+            _ = close(descriptor)
+            descriptor = -1
+        }
+        deinit { release() }
+    }
+
+    static func acquireLease(source: URL, waitFor: TimeInterval = 15) throws -> MountLease {
+        let root = source.standardizedFileURL
+        try LocalDriveStore.validateSourceLocation(root)
+        let rootFD = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard rootFD >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { close(rootFD) }
+        if mkdirat(rootFD, ".society-runtime", mode_t(0o700)) != 0 && errno != EEXIST {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        let runtimeFD = openat(rootFD, ".society-runtime", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard runtimeFD >= 0 else { throw DriveStoreError.invalid("The Society runtime directory is unavailable or redirected.") }
+        defer { close(runtimeFD) }
+        var rootInfo = stat(), runtimeInfo = stat()
+        guard fstat(rootFD, &rootInfo) == 0, fstat(runtimeFD, &runtimeInfo) == 0,
+              runtimeInfo.st_mode & S_IFMT == S_IFDIR, runtimeInfo.st_dev == rootInfo.st_dev else {
+            throw DriveStoreError.invalid("The Society runtime directory is outside its container.")
+        }
+        let descriptor = openat(runtimeFD, "system-drive.lock", O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, mode_t(0o600))
+        guard descriptor >= 0 else { throw DriveStoreError.invalid("The Society mount lock is unavailable or redirected.") }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+              info.st_dev == rootInfo.st_dev, info.st_nlink == 1 else {
+            close(descriptor)
+            throw DriveStoreError.invalid("The Society mount lock is invalid.")
+        }
+        // Each caller is a separate host process. Briefly wait for a peer to
+        // finish mounting, then recheck the mounted volume under the lease.
+        // No GUI or backend event loop waits on this filesystem lock.
+        let deadline = ProcessInfo.processInfo.systemUptime + max(0, waitFor)
+        while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+            let code = errno
+            guard code == EWOULDBLOCK || code == EAGAIN || code == EINTR else {
+                close(descriptor)
+                throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+            }
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                close(descriptor)
+                throw DriveStoreError.invalid("Another Society mount operation is in progress. Try again.")
+            }
+            usleep(50_000)
+        }
+        return MountLease(descriptor)
+    }
+
     static func location(source: URL, identifier: String) throws -> URL {
         guard UUID(uuidString: identifier) != nil else { throw DriveStoreError.invalid("Invalid Society drive identifier.") }
         let root = source.resolvingSymlinksInPath().standardizedFileURL
@@ -145,6 +213,7 @@ enum DirectoryMount {
         do {
             guard #available(macOS 26.0, *) else { throw DriveStoreError.invalid("Directory drive mounting requires macOS 26 or later.") }
             let store = try LocalDriveStore(root: source.resolvingSymlinksInPath(), catalog: catalog)
+            let lease = try acquireLease(source: store.root)
             let existing = try existingVolume(source: store.root, identifier: store.manifest.identifier, volumes: mountedVolumes())
             if command == "unmount" {
                 guard let volume = existing else {
@@ -153,7 +222,8 @@ enum DirectoryMount {
                 }
                 // Disk Arbitration owns lifecycle of OS-created mount points.
                 // The caller never removes a /Volumes directory itself.
-                unmount(volume) { error in
+                unmount(volume) { [lease] error in
+                    lease.release()
                     if let error { completion(nil, error); return }
                     completion(["identifier": store.manifest.identifier, "isMounted": false, "enabled": false], nil)
                 }
@@ -163,7 +233,8 @@ enum DirectoryMount {
                 if needsSourceReload(existing, source: store.root) {
                     // A filesystem resource's path grant must be renewed after
                     // source rename; UUID discovery alone cannot update it.
-                    unmount(existing) { error in
+                    unmount(existing) { [lease] error in
+                        lease.release()
                         if let error { completion(nil, error); return }
                         perform(command, source: store.root, catalog: catalog, completion: completion)
                     }
@@ -175,6 +246,7 @@ enum DirectoryMount {
                 throw DriveStoreError.invalid("The signed Society filesystem module is not installed.")
             }
             if #available(macOS 27.0, *) {
+                try requireMountEntitlement(hasMountEntitlement())
                 let bookmark = try store.root.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
                 var stale = false
                 let scoped = try URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale)
@@ -182,7 +254,8 @@ enum DirectoryMount {
                     throw DriveStoreError.invalid("macOS did not grant access to the selected Society container.")
                 }
                 let resource = FSPathURLResource(url: scoped, writable: true)
-                FSClient.shared.mountSingleVolume(resource: resource, bundleID: "com.iisacc.society.container.drive.fskit", options: []) { point, error in
+                FSClient.shared.mountSingleVolume(resource: resource, bundleID: "com.iisacc.society.container.drive.fskit", options: []) { [lease] point, error in
+                    defer { lease.release() }
                     defer { scoped.stopAccessingSecurityScopedResource() }
                     if let error { completion(nil, error); return }
                     do {

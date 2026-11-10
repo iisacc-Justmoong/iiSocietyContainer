@@ -1,10 +1,17 @@
 @PACKAGE_INIT@
+if(EMSCRIPTEN)
+    # Emscripten supports side modules although its CMake toolchain defaults
+    # the shared-library capability to false.
+    set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+endif()
 set(iiSocietyContainer_HAS_APPLICATION_STORAGE @IISOCIETYCONTAINER_BUILD_QT@)
+set(iiSocietyContainer_HAS_RELOCATION_PARTICIPANT @IISOCIETYCONTAINER_BUILD_QT@)
 set(iiSocietyContainer_HAS_LOGICAL_DISKS TRUE)
 
 include(CMakeFindDependencyMacro)
 file(TO_CMAKE_PATH "$ENV{USERPROFILE}/.local/SDK/iiFileProvider" _iisociety_user_provider)
 find_dependency(iiFileProviderNative 0.7 CONFIG HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider")
+find_dependency(iiJson 0.1 CONFIG)
 
 
 
@@ -12,6 +19,7 @@ find_dependency(iiFileProviderNative 0.7 CONFIG HINTS "$ENV{IIFILEPROVIDER_PREFI
 
 
 find_dependency(Threads)
+find_dependency(SQLite3)
 find_dependency(iiFileProviderObjects CONFIG)
 if(NOT iiFileProviderObjects_DOCUMENT_API_VERSION EQUAL 1)
     set(iiSocietyContainer_FOUND FALSE)
@@ -28,7 +36,7 @@ set(_iisociety_qt_free FALSE)
 if(iiSocietyContainer_FIND_COMPONENTS)
     set(_iisociety_qt_free TRUE)
     foreach(_iisociety_component IN LISTS iiSocietyContainer_FIND_COMPONENTS)
-        if(NOT _iisociety_component STREQUAL "FileTree" AND NOT _iisociety_component STREQUAL "Maintenance")
+        if(NOT _iisociety_component STREQUAL "FileTree" AND NOT _iisociety_component STREQUAL "Maintenance" AND NOT _iisociety_component STREQUAL "MobileStorage")
             set(_iisociety_qt_free FALSE)
         endif()
     endforeach()
@@ -40,6 +48,7 @@ if(NOT _iisociety_qt_free)
         return()
     endif()
     find_dependency(Qt6 6.8.3 EXACT COMPONENTS Core)
+    find_dependency(iiJob 0.1 CONFIG HINTS "$ENV{HOME}/.local/SDK/iiJob")
     find_dependency(iiFileProvider 0.7.1 CONFIG HINTS
         "${CMAKE_CURRENT_LIST_DIR}/../../../../iiFileProvider"
         "$ENV{HOME}/.local/SDK/iiFileProvider"
@@ -50,6 +59,7 @@ set(_iisociety_native_only ${_iisociety_qt_free})
 unset(_iisociety_qt_free)
 set(iiSocietyContainer_FileTree_FOUND TRUE)
 set(iiSocietyContainer_Maintenance_FOUND TRUE)
+set(iiSocietyContainer_MobileStorage_FOUND TRUE)
 if("Sharing" IN_LIST iiSocietyContainer_FIND_COMPONENTS)
     find_dependency(Qt6 6.8.3 EXACT COMPONENTS Gui Concurrent)
     set(iiSocietyContainer_Sharing_FOUND @IISOCIETYCONTAINER_BUILD_GUI@)

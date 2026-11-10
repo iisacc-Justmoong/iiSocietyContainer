@@ -1,6 +1,7 @@
 #include "SharedStorage.h"
 #include "FileOperations.h"
 #include <File.h>
+#include <iiFileProviderPresentation.h>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -20,18 +21,36 @@ int main(int argc,char**argv)try{
     const auto file=fixture.filePath("Files/original.txt");File::create(file,"original bytes");
     std::stop_source cancelled; cancelled.request_stop();
     check(!storage->recordFile(StoreSection::Files,"original.txt",&error,{},cancelled.get_token()),"cancelled recording rejected");
+    check(!storage->recordFileForUserJob(StoreSection::Files,"original.txt",&error,{},cancelled.get_token()),"cancelled cooperative recording rejected");
     check(QFileInfo(file).size()==14,"cancelled recording retains published bytes");
     check(storage->fileTracking(StoreSection::Files,"original.txt").value("status")=="pending","cancelled recording does not create history");
-    check(storage->recordFile(StoreSection::Files,"original.txt",&error),error);
+    check(storage->recordFileForUserJob(StoreSection::Files,"original.txt",&error),error);
     const auto unicodeName=QString::fromUtf8("선택한 모델.txt").normalized(QString::NormalizationForm_D);
     File::create(fixture.filePath("Files/"+unicodeName),"Unicode original");
     check(storage->recordFile(StoreSection::Files,unicodeName,&error),error);
     check(storage->fileTracking(StoreSection::Files,unicodeName,&error).value("status")=="ready","native decomposed Unicode name remains trackable");
     const auto before=storage->fileTracking(StoreSection::Files,"original.txt",&error);
     check(before.value("status")=="ready" && before.value("application")=="SocietyIntegration","tracking and app context");
+    const auto resource=before.value("resource").toObject();
+    check(resource.value("id")==before.value("objectKey") && !resource.value("contentRevision").toString().isEmpty() &&
+          resource.value("location")=="files/original.txt" && !resource.value("jobIds").toArray().isEmpty() &&
+          resource.value("entitlement").toObject().value("status")=="unassigned" &&
+          resource.value("entitlementFileStatus")=="ready" &&
+          resource.value("hashes").toObject().value("sha256")==before.value("sha256"),
+          "Society file information does not expose its indexed resource facts");
+    (void)iiFileProvider::native::Presentation::prepare(std::filesystem::path(file.toStdU16String()));
+    const auto information=storage->fileInformation(StoreSection::Files,"original.txt",&error);
+    check(information.value("managed").toObject().value("resource").toObject().value("id")==before.value("objectKey"),
+          "file information does not expose the resource identity: "+error);
     {
         auto repository=storage->fileRepository();FileMetadata metadata;metadata.title="Launch campaign";metadata.keywords={"approved"};metadata.rating=5;
         repository->observe("files/original.txt",metadata);
+        repository->setResourceAttribute("files/original.txt","workflow:campaign","aurora");
+        const auto resourceSearch=storage->searchFiles({{"resourceAttribute",QJsonObject{{"key","workflow:campaign"},{"value","aurora"}}}},&error);
+        check(error.isEmpty() && resourceSearch.value("files").toArray().size()==1,
+              "Society storage does not search indexed resource attributes: "+error);
+        (void)storage->searchFiles({{"resourceAttribute",QJsonObject{{"key","workflow:campaign"},{"value","aurora"}}},{"text","ignored"}},&error);
+        check(!error.isEmpty(),"incompatible resource search mode was silently ignored"); error.clear();
         auto search=storage->searchFiles({{"text","camp"},{"keywords",QJsonArray{"approved"}},{"minimumRating",5}},&error);
         check(error.isEmpty() && search.value("files").toArray().size()==1,"real provider FTS and filters: "+error);
         repository->ontology().apply({OntologyClass{"ProjectAsset","Project","",{FileRepository::fileClass}},OntologyTypeAssignment{OntologyResource::file(before.value("objectKey").toString().toStdString()),"ProjectAsset"},OntologyDirectory{"Projects/Launch","Launch",{"ProjectAsset"}}},repository->ontology().revision(),repository->sessionKey());

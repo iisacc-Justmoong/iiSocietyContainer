@@ -1,5 +1,14 @@
 # .societycontainer 디렉터리 패키지
 
+## 모바일 앱별 저장소
+
+모바일 제품은 Society의 시스템 저장소가 준비되지 않았을 때 각 앱 샌드박스에
+`Society.societycontainer`를 준비한다. 저장소는 Society 매니페스트와 아홉
+섹션을 사용하지만 OS 파일 제공자나 공용 저장소로 등록하지 않는다. 기존 패키지와
+식별자는 다시 사용하며 유효하지 않거나 리디렉션된 기존 항목은 수정하지 않는다.
+나중에 검증된 Society 공용 저장소가 제공되면 앱이 자기 파일을 안전하게 복사해
+마이그레이션한다. 기존 대상은 덮어쓰지 않고 실패한 원본을 보존한다.
+
 기본 Society 저장소는 디스크 이미지 없이 호스트 파일시스템의 `Society.societycontainer` 디렉터리 패키지 하나를 사용한다. Storage 화면의 9개 분류와 실제 섹션이 직접 대응한다.
 
 ```text
@@ -51,6 +60,11 @@ macOS의 Qt 어댑터는 `QFile::encodeName()`·`decodeName()`으로 QString과 
 ## macOS Finder 드라이브
 
 macOS 26 이상은 Apple FSKit 모듈로 기존 `Files/`를 실제 `societyfs` 볼륨으로 마운트할 수 있다. 저장 설정과 실제 9개 디렉터리는 그대로 보존한다. 새 이미지와 File Provider 복제본은 만들지 않는다. 마운트 루트는 공개 Files의 내용만 제공하고 원본 매니페스트의 UUID를 볼륨 UUID로 사용한다. 심볼릭 링크와 특수 파일은 공개하지 않는다.
+FSKit은 호스트와 같은 원본 검증을 사용하므로 유효한 `.societycontainer`뿐 아니라 명시적인 소유 선언이 있는 논리 디스크도 같은 방식으로 열며, 선언이 없는 일반 폴더는 거부한다.
+
+서명과 등록이 올바르더라도 macOS 파일시스템 확장은 사용자가 활성화해야 한다. 시스템 설정의 일반 → 로그인 항목 및 확장 프로그램 → 확장 프로그램 → 분류별 → 파일시스템 확장에서 Society를 켠다. 꺼져 있으면 macOS가 마운트를 `Operation not permitted`로 거부할 수 있다. 이 볼륨은 Finder에서 별도로 표시되는 `societyfs` 파일시스템이며, 별도 블록 장치나 데이터 복제본이 아니다.
+
+GUI와 백그라운드 서비스가 동시에 마운트를 요청해도 같은 컨테이너의 마운트·언마운트는 패키지 내부의 배타 잠금으로 조정한다. 별도 호스트 프로세스의 후속 요청은 최대 15초 동안 선행 요청을 기다린 후 기존 마운트를 재확인하며, 시간이 지나면 기존 볼륨을 건드리지 않고 재시도 가능한 오류를 반환한다. 앱의 GUI와 백엔드 이벤트 루프는 이 대기로 차단하지 않는다. macOS용 미서명 개발 빌드는 이전에 생성한 FSKit 확장과 프로비저닝 파일을 재사용하지 않는다. 네이티브 SDK 설치는 기존 FSKit 호스트를 권한이 없는 빌드로 덮어쓰지 않으며, 확장과 호스트 권한이 불일치하는 번들을 거부한다.
 
 FSKit의 읽기·쓰기·속성 조회와 parent lookup은 각 요청이 필요한 접근 모드의 descriptor를 소유하여, 기존 파일을 읽은 뒤 쓰거나 다른 callback이 cached item을 닫아도 진행 중인 I/O가 무효화되지 않도록 한다. 원본 사용자 파일의 inode는 읽기·쓰기 과정에서 유지한다. 같은 항목의 속성 snapshot 생성과 필드 구성은 하나의 동기화 context에서 직렬화하여 FSKit 속성 sequence의 순서를 보존한다. 동시 lookup이 같은 inode를 새로 발견하면 cache에 먼저 게시된 항목을 함께 사용하며, 과거 객체의 reclaim은 이후 객체를 제거하지 않는다. 디렉터리 목록 요청은 `openat(".")`로 독립 stream을 만들고 완료·오류·조기 종료 모두에서 정리한다. 같은 목록의 페이지 재개는 요청 간 raw 항목 개수를 cookie로 사용하며, 다른 `DIR*`의 `telldir` token을 재사용하지 않는다. 요청한 항목 속성을 확보하지 못하면 실제 오류를 반환하고 불완전한 목록을 성공으로 보고하지 않는다. `native_io`와 `native_directory` 단위 검사는 읽기 전용 cache 이후 쓰기, cached descriptor 종료 중 I/O 및 동시 속성 조회, 반복·교차 목록, 페이지 재개 및 descriptor 누수를 검증한다. 실제 마운트 회귀는 원본에서 미리 준비한 일반 파일을 반복 읽기·쓰기하고, 예약 이름 자료는 읽기와 mutation 거부 및 원본 보존을 검사하며, 동시 목록의 기존 사용자 항목 보존도 확인한다. 요청 사이에 원본 디렉터리를 외부에서 변경하는 경우의 목록 verifier 정책은 이 검사 범위에 포함하지 않는다.
 
@@ -73,6 +87,7 @@ cmake --install build
 ```
 
 네이티브 빌드는 Xcode의 정상 자동 프로비저닝으로 파일시스템 모듈의 FSKit entitlement와 호스트의 `com.apple.developer.fskit.mount` capability에 맞는 프로파일을 생성한다. 실제 사용에는 Xcode의 해당 팀 계정과 유효한 개발자 인증서가 필요하다. 기본 ad hoc 빌드는 이 파일시스템 모듈을 설치하지 않는다. 서명된 앱을 등록한 뒤 시스템 설정의 General → Login Items & Extensions → File System Extensions에서 Society를 활성화한다.
+FSKit 팀을 지정할 때는 `IISOCIETYCONTAINER_SIGNING_IDENTITY`에도 해당 팀의 유효한 서명 인증서를 지정한다. 기본 `IISOCIETYCONTAINER_FSKIT_OFFLINE=ON`은 로컬 프로파일만 사용하고 개발자 포털을 변경하지 않는다. 새 프로파일 발급이 필요한 경우에만 이를 끌 수 있다. 설치 전에는 호스트와 확장의 서명 팀·프로파일·각 FSKit 권한을 검사한다.
 
 ```sh
 native/Society.app/Contents/MacOS/SocietyContainerDrive mount '/absolute/source/Society.societycontainer'

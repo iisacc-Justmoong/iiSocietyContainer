@@ -3,6 +3,9 @@
 #include "StorageDirectoryModel.h"
 #include "FileOperations.h"
 #include "SharedStorage.h"
+#include "src/Models/ModelCompanionNames.h"
+#include "src/Models/DirectoryBackground.h"
+#include <InventoryIndex.h>
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
@@ -10,6 +13,7 @@
 #include <QSet>
 #include <QThread>
 #include <algorithm>
+#include <chrono>
 #include <type_traits>
 #include <filesystem>
 #include <mutex>
@@ -22,11 +26,7 @@
 namespace iiSocietyContainer {
 namespace {
 template<class Work, class Done> void background(QObject *owner, Work work, Done done) {
-    auto result = std::make_shared<std::invoke_result_t<Work>>();
-    auto *thread = QThread::create([result, work = std::move(work)] { *result = work(); });
-    QObject::connect(thread, &QThread::finished, owner, [result, done = std::move(done)] { done(std::move(*result)); });
-    QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
-    thread->start();
+    detail::directoryBackground(owner,std::move(work),std::move(done));
 }
 std::optional<SocietyDrive> containingDrive(QString path) {
     return FileOperations::containingDrive(path);
@@ -36,6 +36,7 @@ struct Options {
     bool dirs, files, hidden, dirsFirst, caseSensitive, sortCaseSensitive, reversed;
     StorageDirectoryModel::SortField sort;
     QStringList filters;
+    QString search;
 };
 struct Listing {
     QList<QVariantMap> rows;
@@ -43,10 +44,117 @@ struct Listing {
     QJsonArray catalog;
     QString stamp;
 };
+bool isModelsFolder(const SocietyDrive *drive, const QString &folder) {
+    if (!drive) return false;
+    const auto relative = drive->relativePath(folder);
+    return relative == QLatin1String("Models") || relative.startsWith(QLatin1String("Models/"));
+}
+bool hiddenCatalogPath(const QString &key, const QSet<QString> &tombstones) {
+    for (const auto &part : key.split('/'))
+        if (part.startsWith('.') || iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(part.toStdU16String()))) return true;
+    auto ancestor = key;
+    while (!ancestor.isEmpty()) {
+        if (tombstones.contains(ancestor)) return true;
+        const auto slash = ancestor.lastIndexOf('/');
+        if (slash < 0) break;
+        ancestor.truncate(slash);
+    }
+    return false;
+}
+void removeModelCompanions(QList<QVariantMap> &rows, const SocietyDrive *drive, const QString &folder) {
+    if (!isModelsFolder(drive, folder)) return;
+    QSet<QString> names;
+    for (const auto &row : rows) {
+        if (row.value("fileIsDir").toBool()) continue;
+        names.insert(row.value("fileName").toString());
+        names.insert(QFileInfo(row.value("filePath").toString()).fileName());
+    }
+    QSet<QString> companions;
+    for (const auto &name : names)
+        for (const auto &candidate : detail::modelCompanionNames(name))
+            if (names.contains(candidate)) companions.insert(candidate);
+    rows.erase(std::remove_if(rows.begin(), rows.end(), [&companions](const auto &row) {
+        return !row.value("fileIsDir").toBool()
+            && (companions.contains(row.value("fileName").toString())
+                || companions.contains(QFileInfo(row.value("filePath").toString()).fileName()));
+    }), rows.end());
+}
+void applyNameFilters(QList<QVariantMap> &rows, const QList<QRegularExpression> &filters) {
+    if (filters.isEmpty()) return;
+    rows.erase(std::remove_if(rows.begin(), rows.end(), [&filters](const auto &row) {
+        if (row.value("fileIsDir").toBool()) return false;
+        const auto name = row.value("fileName").toString();
+        for (const auto &filter : filters) if (filter.match(name).hasMatch()) return false;
+        return true;
+    }), rows.end());
+}
+void applySearch(QList<QVariantMap> &rows, const QString &text) {
+    if (text.isEmpty()) return;
+    rows.erase(std::remove_if(rows.begin(),rows.end(),[&](const auto &row) {
+        return !row.value("fileName").toString().contains(text,Qt::CaseInsensitive);
+    }),rows.end());
+}
+void sortRows(QList<QVariantMap> &rows, const Options &o) {
+    std::sort(rows.begin(), rows.end(), [&o](const auto &a, const auto &b) {
+        if (o.dirsFirst && a.value("fileIsDir") != b.value("fileIsDir")) return a.value("fileIsDir").toBool();
+        int comparison = 0;
+        if (o.sort == StorageDirectoryModel::Time && a.value("fileModified") != b.value("fileModified")) comparison = a.value("fileModified").toDateTime() > b.value("fileModified").toDateTime() ? -1 : 1;
+        else if (o.sort == StorageDirectoryModel::Size && a.value("fileSize") != b.value("fileSize")) comparison = a.value("fileSize").toLongLong() > b.value("fileSize").toLongLong() ? -1 : 1;
+        else if (o.sort == StorageDirectoryModel::Type) comparison = a.value("fileSuffix").toString().compare(b.value("fileSuffix").toString(), o.sortCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive);
+        if (!comparison) comparison = a.value("fileName").toString().compare(b.value("fileName").toString(), o.sortCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive);
+        if (!comparison) comparison = a.value("filePath").toString().compare(b.value("filePath").toString(), Qt::CaseSensitive);
+        return o.reversed ? comparison > 0 : comparison < 0;
+    });
+}
+std::optional<QList<QVariantMap>> restoreInventory(const Options &o, const SocietyDrive &drive) {
+    // The physical index does not represent a replica's non-resident namespace.
+    if (!StorageMap(drive).isLocalAuthority()) return {};
+    const auto root = drive.rootPath(), folder = QDir::cleanPath(o.folder.toLocalFile());
+    const auto relative = QDir(root).relativeFilePath(folder);
+    const auto cached = InventoryIndex::children(std::filesystem::path(root.toStdU16String()),
+        drive.identifier().toStdString(), std::filesystem::path(relative.toStdU16String()));
+    if (!cached) return {};
+    QList<QRegularExpression> filters;
+    for (const auto &filter : o.filters)
+        filters.append(QRegularExpression(QRegularExpression::wildcardToRegularExpression(filter),
+            o.caseSensitive ? QRegularExpression::NoPatternOption : QRegularExpression::CaseInsensitiveOption));
+    QList<QVariantMap> rows;
+    rows.reserve(qsizetype(cached->size()));
+    for (const auto &value : *cached) {
+        const auto name = QString::fromStdString(value.name), path = QDir(root).filePath(QString::fromStdString(value.path));
+        if (iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(name.toStdU16String())) ||
+            iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(QFileInfo(path).fileName().toStdU16String())) ||
+            QFileInfo(path).absolutePath() != folder || (!o.hidden && name.startsWith('.')) ||
+            (value.directory ? !o.dirs : !o.files)) continue;
+        const auto suffix = QFileInfo(name).suffix();
+        const auto logical = StorageMap::logicalPath(QString::fromStdString(value.path));
+        QUrl thumbnail;
+        if (!value.directory && !value.previewToken.empty()) {
+            const auto encoded = path.toUtf8().toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
+            thumbnail = QUrl(QStringLiteral("image://society-preview/%1/%2-%3-%4")
+                .arg(QString::fromLatin1(encoded)).arg(value.size).arg(value.modifiedTicks)
+                .arg(QString::fromStdString(value.previewToken)));
+        }
+        rows.append({{"fileName", name}, {"filePath", path}, {"fileUrl", QUrl::fromLocalFile(path)},
+            {"fileSuffix", suffix}, {"fileIsDir", value.directory}, {"fileSize", qint64(value.size)},
+            {"fileModified", QDateTime::fromMSecsSinceEpoch(value.modifiedMs)},
+            {"filePreviewUrl", QUrl::fromLocalFile(path)}, {"fileResident", true},
+            {"_inventoryContainerId", drive.identifier()},
+            {"fileInformationKey", value.directory ? QString() : logical},
+            {"fileInformationProvider", value.directory || logical.isEmpty() ? QString() : QStringLiteral("iiFileProvider")},
+            {"fileThumbnailUrl", thumbnail}});
+    }
+    removeModelCompanions(rows, &drive, folder);
+    applyNameFilters(rows, filters);
+    applySearch(rows, o.search);
+    sortRows(rows, o);
+    return rows;
+}
 QString snapshotPath(const Options &o) {
     QByteArray key; QDataStream stream(&key, QIODevice::WriteOnly);
     stream << o.folder << o.dirs << o.files << o.hidden << o.dirsFirst << o.caseSensitive
            << o.sortCaseSensitive << o.reversed << int(o.sort) << o.filters;
+    if (!o.search.isEmpty()) stream << o.search;
     const auto directory = StorageDirectoryModel::cacheDirectory(o.folder.toLocalFile());
     if (directory.isEmpty()) return {};
     return QDir(directory).filePath(
@@ -56,6 +164,10 @@ QList<QVariantMap> restoreSnapshot(const Options &o) {
     const QFileInfo folder(o.folder.toLocalFile());
     if (!folder.isDir() || folder.isSymLink()) return {};
     const auto drive = containingDrive(folder.absoluteFilePath());
+    if (drive) if (auto inventory = restoreInventory(o, *drive)) return *inventory;
+    // Older filtered snapshots can omit the model while retaining its sidecar,
+    // so do not display them before a fresh full-directory enumeration.
+    if (!o.filters.isEmpty() && isModelsFolder(drive ? &*drive : nullptr, folder.absoluteFilePath())) return {};
     const auto path = snapshotPath(o);
     if (path.isEmpty()) return {};
     iiFileProvider::FileDevice file(path);
@@ -69,8 +181,12 @@ QList<QVariantMap> restoreSnapshot(const Options &o) {
     for (const auto &row : rows)
         if (QFileInfo(row.value("filePath").toString()).absolutePath() != folder.absoluteFilePath()) return {};
     rows.erase(std::remove_if(rows.begin(), rows.end(), [](const auto &row) {
-        return row.value("fileName").toString() == ".iisacc-temporary.lock";
+        const auto name = row.value("fileName").toString();
+        const auto actual = QFileInfo(row.value("filePath").toString()).fileName();
+        return iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(name.toStdU16String()))
+            || iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(actual.toStdU16String()));
     }), rows.end());
+    removeModelCompanions(rows, drive ? &*drive : nullptr, folder.absoluteFilePath());
     return rows;
 }
 void saveSnapshot(const Options &o, const Listing &listing) {
@@ -140,26 +256,59 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
             + '\n' + QString::number(catalog.metadataChangeTime().toMSecsSinceEpoch());
         StorageMap map(*result.drive);
         const bool authority = map.isLocalAuthority();
+        const bool modelsFolder = isModelsFolder(&*result.drive, folder);
         // The host filesystem is authoritative. Parsing every remote/catalogue
         // row cannot improve its local directory listing and adds O(namespace).
         result.catalog = authority ? QJsonArray{} : result.stamp == cachedStamp ? cached : map.objects();
+        QSet<QString> tombstones;
+        QHash<QString, QString> catalogDirectories;
+        if (!authority && modelsFolder) {
+            for (const auto &value : result.catalog) {
+                const auto entry = value.toObject();
+                if (entry.value("kind") == QLatin1String("deleted")) tombstones.insert(entry.value("path").toString());
+            }
+        }
         for (const auto &value : result.catalog) {
             if (cancel->load()) return {};
             const auto e = value.toObject(); const auto key = e.value("path").toString();
             // Select immediate children before touching any payload path. A
             // Models view must not stat every photo or model in the namespace.
             const auto relative = StorageMap::physicalPath(key);
+            const auto kind = e.value("kind").toString();
+            if (!authority && modelsFolder
+                && relative.startsWith(relativeFolder + '/') && (kind == "file" || kind == "directory")) {
+                const auto remaining = relative.mid(relativeFolder.size() + 1);
+                if (hiddenCatalogPath(key, tombstones)) continue;
+                const auto slash = remaining.indexOf('/');
+                if (slash > 0) {
+                    const auto name = remaining.left(slash);
+                    auto child = catalogDirectories.constFind(name);
+                    if (child == catalogDirectories.cend()) {
+                        const auto key = StorageMap::logicalPath(relativeFolder + '/' + name);
+                        child = catalogDirectories.insert(name, map.localPath(key));
+                    }
+                    if (child->isEmpty()) continue;
+                    if (!paths.contains(*child)) {
+                        paths.insert(*child, {{"fileName", name}, {"filePath", *child},
+                            {"fileUrl", QUrl::fromLocalFile(*child)}, {"fileSuffix", QString()},
+                            {"fileIsDir", true}, {"fileSize", qint64(0)}, {"fileModified", QDateTime()},
+                            {"fileResident", false}, {"filePreviewUrl", QUrl()}});
+                    }
+                    continue;
+                }
+            }
             if (relative.isEmpty() || relative.left(relative.lastIndexOf('/')) != relativeFolder) continue;
             const auto path = map.localPath(key); if (path.isEmpty()) continue;
             // On the local host, the directory already is authoritative. An old
             // index cannot resurrect a removed path or hide a newly restored file.
             if (authority && (!paths.contains(path) || e.value("kind") == "deleted")) continue;
-            if (e.value("kind") == "deleted") { paths.remove(path); continue; }
-            const bool directory = e.value("kind") == "directory";
-            if (!directory && e.value("kind") != "file") continue;
+            if (kind == "deleted") { paths.remove(path); continue; }
+            const bool directory = kind == "directory";
+            if (!directory && kind != "file") continue;
             auto row = paths.value(path);
-            if (authority && directory != row.value("fileIsDir").toBool()) continue;
-            const bool local = authority || directory || map.isResident(e);
+            if (paths.contains(path) && directory != row.value("fileIsDir").toBool()) continue;
+            const bool local = authority || (directory
+                ? (!modelsFolder || paths.contains(path)) : map.isResident(e));
             const auto preview = map.previewPath(e);
             row.insert("fileName", key.section('/', -1)); row.insert("filePath", path);
             row.insert("fileUrl", QUrl::fromLocalFile(path)); row.insert("fileSuffix", QFileInfo(path).suffix());
@@ -180,26 +329,20 @@ Listing list(const Options &o, const QJsonArray &cached, const QString &cachedSt
         const auto name = row.value("fileName").toString(); const bool directory = row.value("fileIsDir").toBool();
         if (iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(name.toStdU16String()))) continue;
         if ((!o.hidden && name.startsWith('.')) || (directory ? !o.dirs : !o.files)) continue;
-        bool match = filters.isEmpty() || directory;
-        for (const auto &filter : filters) match |= filter.match(name).hasMatch();
-        if (match) {
-            auto entry = row;
-            const auto logical = relativeFolder.isEmpty() ? QString() : StorageMap::logicalPath(relativeFolder + '/' + name);
-            entry.insert("fileInformationKey", directory ? QString() : logical);
-            entry.insert("fileInformationProvider", directory || logical.isEmpty() ? QString() : QStringLiteral("iiFileProvider"));
-            entry.insert("fileThumbnailUrl", StorageDirectoryModel::thumbnailUrl(row.value("filePreviewUrl").toUrl().toLocalFile()));
-            result.rows.append(entry);
-        }
+        result.rows.append(row);
     }
-    std::sort(result.rows.begin(), result.rows.end(), [&o](const auto &a, const auto &b) {
-        if (o.dirsFirst && a.value("fileIsDir") != b.value("fileIsDir")) return a.value("fileIsDir").toBool();
-        int comparison;
-        if (o.sort == StorageDirectoryModel::Time && a.value("fileModified") != b.value("fileModified")) comparison = a.value("fileModified").toDateTime() > b.value("fileModified").toDateTime() ? -1 : 1;
-        else if (o.sort == StorageDirectoryModel::Size && a.value("fileSize") != b.value("fileSize")) comparison = a.value("fileSize").toLongLong() > b.value("fileSize").toLongLong() ? -1 : 1;
-        else comparison = a.value("fileName").toString().compare(b.value("fileName").toString(), o.sortCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive);
-        if (!comparison) comparison = a.value("filePath").toString().compare(b.value("filePath").toString(), Qt::CaseSensitive);
-        return o.reversed ? comparison > 0 : comparison < 0;
-    });
+    removeModelCompanions(result.rows, result.drive ? &*result.drive : nullptr, folder);
+    applyNameFilters(result.rows, filters);
+    applySearch(result.rows, o.search);
+    for (auto &entry : result.rows) {
+        const auto name = entry.value("fileName").toString();
+        const bool directory = entry.value("fileIsDir").toBool();
+        const auto logical = relativeFolder.isEmpty() ? QString() : StorageMap::logicalPath(relativeFolder + '/' + name);
+        entry.insert("fileInformationKey", directory ? QString() : logical);
+        entry.insert("fileInformationProvider", directory || logical.isEmpty() ? QString() : QStringLiteral("iiFileProvider"));
+        entry.insert("fileThumbnailUrl", StorageDirectoryModel::thumbnailUrl(entry.value("filePreviewUrl").toUrl().toLocalFile()));
+    }
+    sortRows(result.rows, o);
     return result;
 }
 struct OpenResult {
@@ -250,11 +393,101 @@ void StorageDirectoryModel::setFolder(const QUrl &folder) {
     m_poll.start(); QTimer::singleShot(0, this, &StorageDirectoryModel::refresh);
 }
 void StorageDirectoryModel::activate(int index) {
-    if (m_status != Ready) return; // Never authorize an open from provisional cached residency.
     if (index < 0 || index >= m_rows.size()) return;
     const auto row = m_rows[index]; const auto path = row.value("filePath").toString();
-    if (row.value("fileIsDir").toBool() || row.value("fileResident").toBool()) { emit activated(path, row.value("fileIsDir").toBool()); return; }
+    if (m_status == Loading) {
+        // A cached row can open early only after validating this one local item.
+        // It cannot grant access based on the stored residency flag alone.
+        const auto folder = QDir::cleanPath(m_folder.toLocalFile());
+        const bool directory = row.value("fileIsDir").toBool();
+        const auto expectedId = row.value("_inventoryContainerId").toString();
+        const auto expectedSize = row.value("fileSize").toLongLong();
+        const auto expectedTime = row.value("fileModified").toDateTime().toMSecsSinceEpoch();
+        const auto revision = m_revision, request = ++m_requestRevision;
+        background(this, [path, folder, directory, expectedId, expectedSize, expectedTime] {
+            const auto changed = tr("The file changed or is no longer available. Select it again after the folder refreshes.");
+            if (!QFileInfo(path).isAbsolute() || QFileInfo(path).absolutePath() != folder) return changed;
+            const auto drive = containingDrive(folder);
+            if (!drive || (!expectedId.isEmpty() && drive->identifier() != expectedId) ||
+                !StorageMap(*drive).isLocalAuthority()) return changed;
+            const auto root = std::filesystem::path(drive->rootPath().toStdU16String());
+            const auto relative = std::filesystem::path(drive->relativePath(path).toStdU16String());
+            const auto item = FileTree(root).entry(relative);
+            if (!item || (item.value->kind == FileTree::Kind::Directory) != directory) return changed;
+            if (!directory) {
+#ifdef _MSC_VER
+                const auto modified = std::chrono::clock_cast<std::chrono::system_clock>(item.value->lastModified);
+#else
+                const auto modified = std::filesystem::file_time_type::clock::to_sys(item.value->lastModified);
+#endif
+                const auto modifiedMs = std::chrono::duration_cast<std::chrono::milliseconds>(modified.time_since_epoch()).count();
+                if (expectedSize < 0 || item.value->size != std::uintmax_t(expectedSize) || modifiedMs != expectedTime) return changed;
+            }
+            return QString();
+        }, [this, revision, request, path, directory](QString error) {
+            if (revision != m_revision || request != m_requestRevision) return;
+            if (error.isEmpty()) emit activated(path, directory);
+            else emit downloadFailed(error);
+        });
+        return;
+    }
+    if (m_status != Ready) return;
+    if (row.value("fileIsDir").toBool()) {
+        if (row.value("fileResident").toBool()) emit activated(path, true);
+        else openCatalogDirectory(path);
+        return;
+    }
+    if (row.value("fileResident").toBool()) { emit activated(path, false); return; }
     openPath(path);
+}
+void StorageDirectoryModel::openCatalogDirectory(const QString &path) {
+    const auto revision = m_revision, request = ++m_requestRevision;
+    const auto folder = QDir::cleanPath(m_folder.toLocalFile());
+    const auto oldId = m_request; const auto oldDrive = m_requestDrive;
+    m_request.clear(); m_requestDrive.reset(); m_requestPoll.stop(); m_checkingRequest = false;
+    m_requestedPath = path;
+    if (m_downloading) { m_downloading = false; emit downloadingChanged(); }
+    background(this, [path, folder, oldId, oldDrive] {
+        if (oldDrive && !oldId.isEmpty()) StorageMap(*oldDrive).cancel(oldId);
+        const auto unavailable = tr("The model folder is unavailable or has changed.");
+        if (!QFileInfo(path).isAbsolute() || QFileInfo(path).absolutePath() != folder) return unavailable;
+        const auto drive = containingDrive(folder);
+        if (!drive || !drive->isReady() || !isModelsFolder(&*drive, folder)) return unavailable;
+        StorageMap map(*drive);
+        const auto key = StorageMap::logicalPath(drive->relativePath(path));
+        if (key.isEmpty() || map.localPath(key) != QDir::cleanPath(path) || map.isLocalAuthority()) return unavailable;
+        QString error;
+        const auto objects = map.objects(&error);
+        if (!error.isEmpty()) return error;
+        QSet<QString> tombstones;
+        for (const auto &value : objects) {
+            const auto entry = value.toObject();
+            if (entry.value("kind") == QLatin1String("deleted")) tombstones.insert(entry.value("path").toString());
+        }
+        bool present = false;
+        for (const auto &value : objects) {
+            const auto entry = value.toObject();
+            const auto entryPath = entry.value("path").toString(), kind = entry.value("kind").toString();
+            if ((entryPath == key && kind == "directory")
+                || (entryPath.startsWith(key + '/') && (kind == "file" || kind == "directory"))) {
+                if (!StorageMap::physicalPath(entryPath).isEmpty() && !hiddenCatalogPath(entryPath, tombstones)) {
+                    present = true;
+                    break;
+                }
+            }
+        }
+        if (!present) return unavailable;
+        const auto created = FileOperations(*drive).createDirectory(folder, QFileInfo(path).fileName());
+        if (created) return QString();
+        const QFileInfo existing(path);
+        if (existing.isDir() && !existing.isSymLink() && !existing.isJunction()
+            && existing.canonicalFilePath() == QDir::cleanPath(path)) return QString();
+        return created.error.isEmpty() ? unavailable : created.error;
+    }, [this, revision, request, path](QString error) {
+        if (revision != m_revision || request != m_requestRevision) return;
+        if (error.isEmpty()) emit activated(path, true);
+        else emit downloadFailed(error);
+    });
 }
 void StorageDirectoryModel::openPath(const QString &path, bool materializeDirectory) {
     if (m_downloading && path == m_requestedPath) return;
@@ -266,6 +499,11 @@ void StorageDirectoryModel::openPath(const QString &path, bool materializeDirect
         OpenResult r;
         if (oldDrive && !oldId.isEmpty()) StorageMap(*oldDrive).cancel(oldId);
         if (!QFileInfo(path).isAbsolute()) { r.error = tr("The file is outside the Society container."); return r; }
+        for (const auto &part : QDir::cleanPath(path).split('/')) {
+            if (iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(part.toStdU16String()))) {
+                r.error = tr("Provider metadata is managed with its file."); return r;
+            }
+        }
         r.drive = containingDrive(QFileInfo(path).absolutePath());
         if (!r.drive) { r.error = tr("The Society container is unavailable."); return r; }
         StorageMap map(*r.drive);
@@ -369,7 +607,7 @@ void StorageDirectoryModel::refresh() {
     const auto revision = m_revision;
     const auto optionsRevision = m_optionsRevision;
     const auto cancel = m_cancel = std::make_shared<std::atomic_bool>(false);
-    const Options options{m_folder, m_showDirs, m_showFiles, m_showHidden, m_showDirsFirst, m_caseSensitive, m_sortCaseSensitive, m_sortReversed, m_sortField, m_nameFilters};
+    const Options options{m_folder, m_showDirs, m_showFiles, m_showHidden, m_showDirsFirst, m_caseSensitive, m_sortCaseSensitive, m_sortReversed, m_sortField, m_nameFilters, m_searchText};
     if (!m_snapshotAttempted) {
         m_snapshotAttempted = true;
         background(this, [options] { return restoreSnapshot(options); },

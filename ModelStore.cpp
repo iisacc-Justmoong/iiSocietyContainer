@@ -1,17 +1,31 @@
 #include <iiFileProviderDevice.h>
 #include "ModelStore.h"
 #include "ModelLayout.h"
+#include "FileTree.h"
+#include "SharedStorage.h"
+#include "src/AssetCompanions.h"
+#include "src/ExclusiveRename.h"
+#include "src/FileTreePaths.h"
+#include <FileCatalog.h>
+#include <iiFileProviderPresentation.h>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
 #include <algorithm>
+#include <exception>
+#include <filesystem>
 
 namespace iiSocietyContainer {
 namespace {
 // This is container data, so it must not use iiSocietyHelper::Sync's local-only .society- prefix.
 constexpr auto journalName = ".model-paths.json";
 void fail(QString *error, const QString &message) { if (error) *error = message; }
+bool providerControl(const QString &name)
+{
+    return iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(name.toStdU16String()));
+}
 bool safeRelative(const QString &path)
 {
     if (path.isEmpty() || iiFileProvider::Directory::isAbsolutePath(path) || path.contains('\\') || path.contains(':') || path.contains(QChar::Null)) return false;
@@ -37,6 +51,16 @@ QString confined(const QString &root, const QString &relative, bool createParent
     }
     return current;
 }
+bool confinedMovePath(const QString &root, const QString &path)
+{
+    const auto relative = iiFileProvider::Directory(root).relativeFilePath(path);
+    if (!detail::isPortablePreviewPath(path)) return confined(root, relative) == path;
+    const QFileInfo info(path);
+    const auto parent = info.absolutePath();
+    const auto parentRelative = iiFileProvider::Directory(root).relativeFilePath(parent);
+    if (parent != root && confined(root, parentRelative) != parent) return false;
+    return !info.isSymLink() && !info.isJunction() && (!info.exists() || info.canonicalFilePath() == path);
+}
 QJsonObject journal(const QString &root, const QString &identifier, QString *error)
 {
     const auto path = iiFileProvider::Directory(root).filePath(QLatin1String(journalName));
@@ -55,6 +79,17 @@ QJsonObject journal(const QString &root, const QString &identifier, QString *err
     for (auto it = aliases.begin(); it != aliases.end(); ++it) {
         if (!safeRelative(it.key()) || !safeRelative(it.value().toString())) {
             fail(error, QStringLiteral("The model organization journal contains an invalid path.")); return {};
+        }
+    }
+    if (value.contains("manualCategories")) {
+        if (!value.value("manualCategories").isObject()) {
+            fail(error, QStringLiteral("The model organization journal contains invalid manual categories.")); return {};
+        }
+        const auto manual = value.value("manualCategories").toObject();
+        for (auto it = manual.begin(); it != manual.end(); ++it) {
+            if (!safeRelative(it.key()) || !it.value().isString() || !modelTypeFromName(it.value().toString())) {
+                fail(error, QStringLiteral("The model organization journal contains invalid manual categories.")); return {};
+            }
         }
     }
     return value;
@@ -101,13 +136,26 @@ QString ModelStore::categoryPath(ModelType type, QString *error) const
 }
 bool ModelStore::ensureLayout(QString *error) const
 {
+    return ensureLayout(error, {});
+}
+bool ModelStore::ensureLayout(QString *error, std::stop_token stop) const
+{
     if (error) error->clear();
     if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed or is unavailable.")); return false; }
     iiFileProvider::LockFile lock(iiFileProvider::Directory(rootPath()).filePath(".society-models.lock"));
-    if (!lock.tryLock(5000)) { fail(error, QStringLiteral("Another process is organizing Models.")); return false; }
+    QElapsedTimer timer; timer.start();
+    while (!stop.stop_requested() && !lock.tryLock(50)) {
+        if (timer.elapsed() >= 5000) { fail(error, QStringLiteral("Another process is organizing Models.")); return false; }
+    }
+    if (stop.stop_requested()) { fail(error, QStringLiteral("Model organization cancelled.")); return false; }
     return m_drive.isReady() && detail::validateModelLayout(rootPath(), error);
 }
 QList<ModelEntry> ModelStore::scanDirectory(const QString &modelsDirectory, QString *error, const std::atomic_bool *cancelled)
+{
+    return scanDirectory(modelsDirectory, error, cancelled, {});
+}
+QList<ModelEntry> ModelStore::scanDirectory(const QString &modelsDirectory, QString *error,
+                                            const std::atomic_bool *cancelled, std::stop_token stop)
 {
     if (error) error->clear();
     const QFileInfo root(modelsDirectory);
@@ -118,16 +166,16 @@ QList<ModelEntry> ModelStore::scanDirectory(const QString &modelsDirectory, QStr
     QList<ModelEntry> result;
     QStringList pending{base};
     while (!pending.isEmpty()) {
-        if (cancelled && cancelled->load()) return {};
+        if (stop.stop_requested() || (cancelled && cancelled->load())) return {};
         const iiFileProvider::Directory directory(pending.takeLast());
         const auto children = directory.entryInfoList(iiFileProvider::Directory::Files | iiFileProvider::Directory::Dirs | iiFileProvider::Directory::Readable | iiFileProvider::Directory::NoDotAndDotDot | iiFileProvider::Directory::NoSymLinks, iiFileProvider::Directory::Name);
         QSet<QString> companions;
         for (const auto &child : children)
             for (const auto &path : ModelClassifier::companionFiles(child.absoluteFilePath())) companions.insert(path);
         for (const auto &child : children) {
-            if (cancelled && cancelled->load()) return {};
+            if (stop.stop_requested() || (cancelled && cancelled->load())) return {};
             // Dot-prefixed metadata is not marked Hidden on Windows.
-            if (child.fileName().startsWith('.')) continue;
+            if (child.fileName().startsWith('.') || providerControl(child.fileName())) continue;
             const auto path = child.canonicalFilePath();
             if (child.isSymLink() || child.isJunction() || !path.startsWith(base + '/') || companions.contains(path)) continue;
             const bool categoryRoot = directory.path() == base && modelTypeFromName(child.fileName()).has_value();
@@ -155,8 +203,12 @@ QList<ModelEntry> ModelStore::scanDirectory(const QString &modelsDirectory, QStr
 }
 QList<ModelEntry> ModelStore::entries(QString *error, const std::atomic_bool *cancelled) const
 {
+    return entries(error, cancelled, {});
+}
+QList<ModelEntry> ModelStore::entries(QString *error, const std::atomic_bool *cancelled, std::stop_token stop) const
+{
     if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed or is unavailable.")); return {}; }
-    const auto result = scanDirectory(rootPath(), error, cancelled);
+    const auto result = scanDirectory(rootPath(), error, cancelled, stop);
     if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed during enumeration.")); return {}; }
     return result;
 }
@@ -177,7 +229,81 @@ QString ModelStore::resolve(const QString &relativePath, QString *error) const
     }
     fail(error, QStringLiteral("The model is missing or redirected.")); return {};
 }
+QString ModelStore::indexAsset(const QString &path, QString *error) const
+{
+    if (error) error->clear();
+    if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed or is unavailable.")); return {}; }
+    const auto base = rootPath();
+    const auto relative = iiFileProvider::Directory::isAbsolutePath(path)
+        ? iiFileProvider::Directory(base).relativeFilePath(path) : path;
+    const auto asset = confined(base, relative);
+    const QFileInfo info(asset);
+    if (asset.isEmpty() || !info.isFile() || info.isSymLink() || info.isJunction()
+        || providerControl(info.fileName())) {
+        fail(error, QStringLiteral("Choose a resident model asset inside Models.")); return {};
+    }
+    try {
+        const auto nativeRoot = detail::nativePath(base);
+        const auto entry = FileTree(nativeRoot).entry(std::filesystem::path(relative.toStdU16String()));
+        if (!entry || entry.value->kind != FileTree::Kind::File)
+            throw std::runtime_error("The native model spelling could not be verified.");
+        const auto spelling = entry.value->path.lexically_relative(nativeRoot).generic_u8string();
+        std::string key(spelling.begin(), spelling.end());
+        iiFileProvider::FileCatalog catalog(nativeRoot);
+        auto previous = catalog.lookupPath(key);
+#ifdef Q_OS_MACOS
+        if (!previous) {
+            const auto composed = QString::fromUtf8(key).normalized(QString::NormalizationForm_C).toUtf8().toStdString();
+            if (composed != key) previous = catalog.lookupPath(composed);
+        }
+#endif
+        if (previous) {
+            try { (void)catalog.read(previous->key, 0, 1); }
+            catch (const std::exception &) {
+                fail(error, QStringLiteral("A different file already has this catalog path. Resolve the existing entry before indexing."));
+                return {};
+            }
+            key = previous->path;
+        }
+        const auto indexed = catalog.registerFile(key);
+        if (!indexed.metadataWritten) {
+            fail(error, QString::fromStdString(indexed.metadataError)); return {};
+        }
+        return QString::fromStdString(indexed.file.key);
+    } catch (const std::exception &failure) {
+        fail(error, QString::fromUtf8(failure.what())); return {};
+    }
+}
+
 QString ModelStore::place(const QString &path, std::optional<ModelType> type, QString *error) const
+{
+    return relocate(path, type, {}, error);
+}
+QString ModelStore::rename(const QString &path, const QString &name, QString *error,
+                           QList<QPair<QString, QString>> *movedAssets) const
+{
+    if (error) error->clear();
+    if (movedAssets) movedAssets->clear();
+    if (name.isEmpty() || name.startsWith('.') || name.contains('/') || name.contains('\\')
+        || name.contains(':') || name.contains(QChar::Null) || providerControl(name)) {
+        fail(error, QStringLiteral("Enter a valid model file name.")); return {};
+    }
+    return relocate(path, {}, name, error, movedAssets);
+}
+QStringList ModelStore::repairCompanions(QStringList *errors, const std::atomic_bool *cancelled) const
+{
+    return repairCompanions(errors, cancelled, {});
+}
+QStringList ModelStore::repairCompanions(QStringList *errors, const std::atomic_bool *cancelled, std::stop_token stop) const
+{
+    QString error;
+    const auto storage = SharedStorage::open(m_drive.rootPath(), &error);
+    if (!storage) { if (errors) *errors = {error}; return {}; }
+    return storage->repairModelCompanions(errors, cancelled, stop);
+}
+QString ModelStore::relocate(const QString &path, std::optional<ModelType> type,
+                             const std::optional<QString> &name, QString *error,
+                             QList<QPair<QString, QString>> *movedAssets) const
 {
     if (error) error->clear();
     if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed or is unavailable.")); return {}; }
@@ -185,6 +311,11 @@ QString ModelStore::place(const QString &path, std::optional<ModelType> type, QS
     iiFileProvider::LockFile lock(iiFileProvider::Directory(base).filePath(".society-models.lock"));
     if (!lock.tryLock(5000)) { fail(error, QStringLiteral("Another process is organizing Models.")); return {}; }
     const auto relative = iiFileProvider::Directory::isAbsolutePath(path) ? iiFileProvider::Directory(base).relativeFilePath(path) : path;
+    for (const auto &part : relative.split('/')) {
+        if (providerControl(part)) {
+            fail(error, QStringLiteral("Provider metadata cannot be organized as a model.")); return {};
+        }
+    }
     const auto source = confined(base, relative);
     if (source.isEmpty() || !QFileInfo::exists(source)
         || (QFileInfo(source).isDir() && !relative.contains('/') && modelTypeFromName(relative).has_value())
@@ -192,72 +323,150 @@ QString ModelStore::place(const QString &path, std::optional<ModelType> type, QS
         fail(error, QStringLiteral("Choose an existing model file or package inside Models.")); return {};
     }
     const auto assigned = category(relative);
-    const auto resolvedType = type.value_or(assigned && *assigned != ModelType::Other ? *assigned : ModelClassifier::classify(source).type);
+    const auto resolvedType = name ? assigned.value_or(ModelType::Other)
+        : type.value_or(assigned && *assigned != ModelType::Other ? *assigned : ModelClassifier::classify(source).type);
     auto tail = relative;
     if (assigned) tail = relative.section('/', 1);
-    const auto targetRelative = modelTypeName(resolvedType) + '/' + tail;
-    if (relative == targetRelative) return source;
+    const auto parentRelative = QFileInfo(relative).path();
+    const auto targetRelative = name ? (parentRelative == "." ? *name : parentRelative + '/' + *name)
+                                     : modelTypeName(resolvedType) + '/' + tail;
     if (!m_drive.isReady() || !detail::validateModelLayout(base, error)) return {};
     QString localError;
     const auto previousJournal = journal(base, m_drive.identifier(), &localError);
     if (!localError.isEmpty()) { fail(error, localError); return {}; }
+    std::unique_ptr<iiFileProvider::FileCatalog> catalog;
+    try {
+        const auto root = std::filesystem::path(base.toStdU16String());
+        if (std::filesystem::exists(root / ".iisacc-file-provider/catalog.sqlite3"))
+            catalog = std::make_unique<iiFileProvider::FileCatalog>(root, iiFileProvider::FileCatalog::Access::ReadOnly);
+    } catch (const std::exception &failure) {
+        fail(error, QString::fromUtf8(failure.what())); return {};
+    }
+    // Recheck under the model lock: a user may have chosen Other after an
+    // organizer took its earlier directory snapshot.
+    if (!name && !type && assigned && *assigned == ModelType::Other
+        && previousJournal.value("manualCategories").toObject().value(relative).toString() == modelTypeName(*assigned))
+        return source;
+    if (relative == targetRelative) {
+        // An explicit selection of Other is meaningful even when the model is
+        // already there: automatic organization must respect that choice.
+        if (!name && type && *type == ModelType::Other) {
+            auto manual = previousJournal.value("manualCategories").toObject();
+            if (manual.value(relative).toString() != modelTypeName(*type)) {
+                manual.insert(relative, modelTypeName(*type));
+                auto updated = previousJournal; updated.insert("manualCategories", manual);
+                if (!saveJournal(base, updated, error)) return {};
+            }
+        }
+        return source;
+    }
     auto aliases = previousJournal.value("aliases").toObject();
-    const auto companions = ModelClassifier::companionFiles(source);
     const QFileInfo destinationInfo(targetRelative);
     const auto parent = destinationInfo.path();
     for (int index = 0; index < 10000; ++index) {
-        const auto name = index == 0 ? destinationInfo.fileName()
+        if (name && index > 0) { fail(error, QStringLiteral("An item with that name already exists.")); return {}; }
+        const auto candidateName = index == 0 ? destinationInfo.fileName()
             : QFileInfo(source).isDir() ? QString("%1 (%2)").arg(destinationInfo.fileName()).arg(index)
             : destinationInfo.completeBaseName() + QString(" (%1)").arg(index)
                 + (destinationInfo.suffix().isEmpty() ? QString() : '.' + destinationInfo.suffix());
-        const auto candidateRelative = iiFileProvider::Directory(parent).filePath(name);
+        const auto candidateRelative = parent == "." ? candidateName : iiFileProvider::Directory(parent).filePath(candidateName);
         const auto destination = confined(base, candidateRelative, true);
         if (destination.isEmpty()) { fail(error, QStringLiteral("The target category or parent directory is redirected.")); return {}; }
-        QList<QPair<QString, QString>> moves{{source, destination}};
-        for (const auto &companion : companions) {
-            const auto fullPrefix = companion.startsWith(source + '.');
-            const auto oldPrefix = fullPrefix ? source : iiFileProvider::Directory(QFileInfo(source).absolutePath()).filePath(QFileInfo(source).completeBaseName());
-            const auto newPrefix = fullPrefix ? destination : iiFileProvider::Directory(QFileInfo(destination).absolutePath()).filePath(QFileInfo(destination).completeBaseName());
-            moves.append({companion, newPrefix + companion.mid(oldPrefix.size())});
-        }
-        if (std::any_of(moves.cbegin(), moves.cend(), [](const auto &move) {
-                const QFileInfo target(move.second); return target.exists() || target.isSymLink() || target.isJunction();
+        const auto object = detail::AssetObject::plan(source, destination, true, true, error);
+        if (!object) return {};
+        const auto &moves = object->members;
+        const auto &assets = object->assets;
+        if (std::any_of(object->reservedTargets.cbegin(), object->reservedTargets.cend(), [](const auto &path) {
+                const QFileInfo target(path); return target.exists() || target.isSymLink() || target.isJunction();
             })) continue;
-        for (const auto &move : moves) aliases.insert(iiFileProvider::Directory(base).relativeFilePath(move.first), iiFileProvider::Directory(base).relativeFilePath(move.second));
+        if (catalog) {
+            bool reserved = false;
+            try {
+                const auto lookup = [&](const QString &relative) {
+                    auto result = catalog->lookupPath(relative.toUtf8().toStdString());
+#ifdef Q_OS_MACOS
+                    if (!result) {
+                        const auto decomposed = relative.normalized(QString::NormalizationForm_D);
+                        if (decomposed != relative) result = catalog->lookupPath(decomposed.toUtf8().toStdString());
+                    }
+#endif
+                    return result;
+                };
+                for (const auto &asset : assets) {
+                    const auto from = iiFileProvider::Directory(base).relativeFilePath(asset.first);
+                    const auto to = iiFileProvider::Directory(base).relativeFilePath(asset.second);
+                    const auto prior = lookup(from);
+                    const auto target = lookup(to);
+                    if (target && (!prior || target->key != prior->key)) { reserved = true; break; }
+                }
+            } catch (const std::exception &failure) {
+                fail(error, QString::fromUtf8(failure.what())); return {};
+            }
+            if (reserved) continue;
+        }
+        for (const auto &move : assets) aliases.insert(iiFileProvider::Directory(base).relativeFilePath(move.first), iiFileProvider::Directory(base).relativeFilePath(move.second));
         auto updated = previousJournal; updated.insert("aliases", aliases);
+        auto manual = previousJournal.value("manualCategories").toObject();
+        const auto previousCategory = manual.value(relative);
+        manual.remove(relative);
+        if (name && previousCategory.isString()) manual.insert(candidateRelative, previousCategory);
+        else if (type && *type == ModelType::Other) manual.insert(candidateRelative, modelTypeName(*type));
+        if (!manual.isEmpty() || previousJournal.contains("manualCategories")) updated.insert("manualCategories", manual);
         // Journal first: an interruption resolves the old path until its rename completes.
         if (!m_drive.isReady() || !saveJournal(base, updated, error)) return {};
         QList<QPair<QString, QString>> moved;
+        const auto rename = [&](const QString &from, const QString &to) {
+            return detail::renameWithoutCopy(from, to);
+        };
         for (const auto &move : moves) {
-            if (!m_drive.isReady() || confined(base, iiFileProvider::Directory(base).relativeFilePath(move.first)) != move.first
-                || confined(base, iiFileProvider::Directory(base).relativeFilePath(move.second)) != move.second || !iiFileProvider::Directory().rename(move.first, move.second)) {
+            if (!m_drive.isReady() || !confinedMovePath(base, move.first)
+                || !confinedMovePath(base, move.second) || !rename(move.first, move.second)) {
                 bool rolledBack = true;
-                for (auto it = moved.crbegin(); it != moved.crend(); ++it) rolledBack = iiFileProvider::Directory().rename(it->second, it->first) && rolledBack;
+                for (auto it = moved.crbegin(); it != moved.crend(); ++it) rolledBack = rename(it->second, it->first) && rolledBack;
                 if (rolledBack) saveJournal(base, previousJournal, nullptr);
-                fail(error, QStringLiteral("Could not move the complete model and its companions. Existing files were not replaced.")); return {};
+                fail(error, rolledBack
+                    ? QStringLiteral("Could not move the complete model and its companions. Existing files were not replaced.")
+                    : QStringLiteral("The model move could not be fully rolled back. Check both %1 and %2 before retrying.").arg(source, destination));
+                return {};
             }
             moved.append(move);
         }
+        if (movedAssets) *movedAssets = assets;
         return destination;
     }
     fail(error, QStringLiteral("No unused model filename is available.")); return {};
 }
 ModelOrganization ModelStore::organize(const std::atomic_bool *cancelled) const
 {
+    return organize(cancelled, {});
+}
+ModelOrganization ModelStore::organize(const std::atomic_bool *cancelled, std::stop_token stop) const
+{
     ModelOrganization report;
     QString error;
-    if (!ensureLayout(&error)) { report.errors.append(error); return report; }
-    const auto models = entries(&error, cancelled);
+    if (!ensureLayout(&error, stop)) {
+        if (stop.stop_requested() || (cancelled && cancelled->load())) report.cancelled = true;
+        else report.errors.append(error);
+        return report;
+    }
+    (void)repairCompanions(&report.errors, cancelled, stop);
+    if (stop.stop_requested() || (cancelled && cancelled->load())) { report.cancelled = true; return report; }
+    const auto models = entries(&error, cancelled, stop);
+    if (stop.stop_requested() || (cancelled && cancelled->load())) { report.cancelled = true; return report; }
     if (!error.isEmpty()) { report.errors.append(error); return report; }
+    const auto data = journal(rootPath(), m_drive.identifier(), &error);
+    if (!error.isEmpty()) { report.errors.append(error); return report; }
+    const auto manual = data.value("manualCategories").toObject();
     for (const auto &model : models) {
-        if (cancelled && cancelled->load()) { report.cancelled = true; break; }
+        if (stop.stop_requested() || (cancelled && cancelled->load())) { report.cancelled = true; break; }
         const auto assigned = category(model.relativePath);
         if (assigned && *assigned != ModelType::Other) continue;
-        const auto placed = place(model.path, model.classification.type, &error);
+        if (assigned && manual.value(model.relativePath).toString() == modelTypeName(*assigned)) continue;
+        const auto placed = place(model.path, {}, &error);
         if (placed.isEmpty()) report.errors.append(error);
         else if (placed != model.path) report.moved.append({model.path, placed, model.classification.type});
     }
-    if (cancelled && cancelled->load()) report.cancelled = true;
+    if (stop.stop_requested() || (cancelled && cancelled->load())) report.cancelled = true;
     return report;
 }
 }

@@ -2,6 +2,7 @@
 #include <ModelStore.h>
 #include <SharedStorage.h>
 #include <StorageMap.h>
+#include <iiFileProviderPresentation.h>
 
 #include <QDirIterator>
 #include <QFileInfo>
@@ -11,6 +12,7 @@
 #include <QSet>
 
 #include <algorithm>
+#include <filesystem>
 
 namespace iiSocietyContainer {
 namespace {
@@ -41,10 +43,15 @@ QString categoryForPath(const QString &relative)
     const auto type = relative.contains('/') ? modelTypeFromName(relative.section('/', 0, 0)) : std::nullopt;
     return modelTypeName(type.value_or(ModelType::Other));
 }
+bool providerControl(const QString &name)
+{
+    return iiFileProvider::native::Presentation::isControlFile(std::filesystem::path(name.toStdU16String()));
+}
 // Catalog filtering is presentation-only: leave documents in physical storage.
 // Replicas apply the same filename contract without downloading tensor payloads.
 bool catalogFile(const QString &relative)
 {
+    if (providerControl(QFileInfo(relative).fileName())) return false;
     const auto type = modelTypeFromName(categoryForPath(relative)).value_or(ModelType::Other);
     const auto suffix = QFileInfo(relative).suffix().toLower();
     // Keep unsupported files on disk, but do not present ONNX as a model candidate.
@@ -106,7 +113,7 @@ Snapshot fromMap(const SocietyDrive &drive, const QJsonArray &objects) {
         // checks existence so a filesystem move takes effect before reindexing.
         if (authority && !QFileInfo::exists(map.localPath(key))) continue;
         bool hidden = false;
-        for (const auto &part : key.mid(7).split('/')) hidden |= part.startsWith('.');
+        for (const auto &part : key.mid(7).split('/')) hidden |= part.startsWith('.') || providerControl(part);
         if (hidden) continue;
         files.insert(key, e);
         if (key.endsWith("/model_index.json") || key.endsWith("/adapter_config.json")) packages.append(key.left(key.lastIndexOf('/')));

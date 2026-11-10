@@ -1,0 +1,11 @@
+if(NOT IS_DIRECTORY "${BUILD_DIR}")
+    message(FATAL_ERROR "A configured build directory is required")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" --build "${BUILD_DIR}" --target help
+    RESULT_VARIABLE result OUTPUT_VARIABLE targets ERROR_VARIABLE error)
+if(NOT result EQUAL 0)
+    message(FATAL_ERROR "Cannot list configured targets: ${error}")
+endif()
+if(targets MATCHES "(^|[\n \t])iiSocietyContainerLogicalStorageExample([:\n \t]|$)")
+    message(FATAL_ERROR "The default target list unexpectedly contains an example application")
+endif()

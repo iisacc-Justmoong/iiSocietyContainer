@@ -10,11 +10,11 @@
   },
   "source": {
     "path": "docs/NativeBuild.md",
-    "sha256": "7e316a47751d6b67c50d5eb3d66061989a6d0b7f38ed40e622a087e4e3c98f8a",
-    "bytes": 1793,
-    "line_count": 36,
+    "sha256": "1fc83cb454df4e1bb780d7b9d24101d85063c846c2f25b9ceee1049f788cd0a7",
+    "bytes": 2812,
+    "line_count": 47,
     "encoding": "utf-8",
-    "language": "en"
+    "language": "ko"
   },
   "document": {
     "title": "Native storage components",
@@ -42,80 +42,94 @@
       "id": "b000003",
       "kind": "paragraph",
       "start_line": 3,
-      "end_line": 6,
-      "raw": "`FileTree` and `Maintenance` are C++23 components. They use the native\niiFileProvider API, temporary leases, and platform APIs. They do not discover,\nlink, or load Qt. The default build also provides the existing Qt storage and\nGUI adapters; those dependencies are scoped to their targets.\n"
+      "end_line": 12,
+      "raw": "`MobileStorage`는 Qt 없이 앱별 모바일 `.societycontainer`를 준비하는 정적\nC++23 컴포넌트다. 각 호출자가 자신의 샌드박스 경로를 제공한다. 공용 Society가\n준비된 후에는 충돌을 덮어쓰지 않는 검증된 복사로 내용을 이관하고 원본을 보존한다.\n공용 App Group 탐색은 실제 OS entitlement가 허용한 경로만 반환한다.\n데스크톱 Python API `mobile_storage.MobileStorage`는 같은 네이티브 구현의\n`iiSocietyContainerMobileStorageTool`을 호출한다. `prepare(absolute_app_directory)`는\n컨테이너 경로와 식별자를 반환하고, `migrate(container, destination)`는 복사·기존\n파일·충돌 수를 반환한다. 대상은 미리 유효성을 확인한 Society 컨테이너여야 하며,\n원본은 삭제하지 않는다. 네이티브 오류는 `MobileStorageError`로 전달한다. 모바일 앱은\n이 도구를 실행하지 않고 정적 C++ API를 직접 링크한다.\n"
     },
     {
       "id": "b000004",
       "kind": "blank",
-      "start_line": 7,
-      "end_line": 7,
+      "start_line": 13,
+      "end_line": 13,
       "raw": "\n"
     },
     {
       "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 17,
+      "raw": "`FileTree` and `Maintenance` are C++23 components. They use the native\niiFileProvider API, SQLite, temporary leases, and platform APIs. They do not discover,\nlink, or load Qt. The default build also provides the existing Qt storage and\nGUI adapters; those dependencies are scoped to their targets.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
       "kind": "fenced_code",
-      "start_line": 8,
-      "end_line": 15,
+      "start_line": 19,
+      "end_line": 26,
       "raw": "```sh\ncmake -S . -B build/qt-free -DIISOCIETYCONTAINER_BUILD_QT=OFF \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=TRUE \\\n  -DCMAKE_INSTALL_PREFIX=\"$PWD/build/qt-free/install\"\ncmake --build build/qt-free --parallel 4\nctest --test-dir build/qt-free --output-on-failure\ncmake --install build/qt-free\n```\n",
       "language": "sh",
       "code": "cmake -S . -B build/qt-free -DIISOCIETYCONTAINER_BUILD_QT=OFF \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=TRUE \\\n  -DCMAKE_INSTALL_PREFIX=\"$PWD/build/qt-free/install\"\ncmake --build build/qt-free --parallel 4\nctest --test-dir build/qt-free --output-on-failure\ncmake --install build/qt-free\n",
       "closed": true
     },
     {
-      "id": "b000006",
-      "kind": "blank",
-      "start_line": 16,
-      "end_line": 16,
-      "raw": "\n"
-    },
-    {
-      "id": "b000007",
-      "kind": "paragraph",
-      "start_line": 17,
-      "end_line": 22,
-      "raw": "Select the installed native iiFileProvider and Temporary packages through\n`CMAKE_PREFIX_PATH` when they are not in the standard SDK installation.\nConsumers request `find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS\nFileTree Maintenance)` and link `iiSocietyContainer::FileTree` or\n`iiSocietyContainer::Maintenance`. The same component selection avoids Qt\ndiscovery when consuming a complete SDK installation.\n"
-    },
-    {
       "id": "b000008",
-      "kind": "blank",
-      "start_line": 23,
-      "end_line": 23,
-      "raw": "\n"
-    },
-    {
-      "id": "b000009",
-      "kind": "paragraph",
-      "start_line": 24,
-      "end_line": 26,
-      "raw": "The native build tests directory preparation, file-tree confinement, and\nmaintenance preservation against isolated fixtures. It never operates on the\nuser's selected Society container.\n"
-    },
-    {
-      "id": "b000010",
       "kind": "blank",
       "start_line": 27,
       "end_line": 27,
       "raw": "\n"
     },
     {
-      "id": "b000011",
+      "id": "b000009",
       "kind": "paragraph",
       "start_line": 28,
-      "end_line": 30,
-      "raw": "`tests/native_consumer` independently configures against the installed package\nwith Qt discovery disabled, then repeats file-tree and preservation checks\nthrough the installed public targets.\n"
+      "end_line": 33,
+      "raw": "Select the installed native iiFileProvider and Temporary packages through\n`CMAKE_PREFIX_PATH` when they are not in the standard SDK installation.\nConsumers request `find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS\nFileTree Maintenance MobileStorage)` and link the components they use, including\n`iiSocietyContainer::MobileStorage`. The same component selection avoids Qt\ndiscovery when consuming a complete SDK installation.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 37,
+      "raw": "The native build tests directory preparation, file-tree confinement, and\nmaintenance preservation against isolated fixtures. It never operates on the\nuser's selected Society container.\n"
     },
     {
       "id": "b000012",
       "kind": "blank",
-      "start_line": 31,
-      "end_line": 31,
+      "start_line": 38,
+      "end_line": 38,
       "raw": "\n"
     },
     {
       "id": "b000013",
       "kind": "paragraph",
-      "start_line": 32,
-      "end_line": 36,
+      "start_line": 39,
+      "end_line": 41,
+      "raw": "`tests/native_consumer` independently configures against the installed package\nwith Qt discovery disabled, then repeats file-tree, mobile migration and preservation checks\nthrough the installed public targets.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 43,
+      "end_line": 47,
       "raw": "The complete installation also separates `Sharing` from `Gui`. Applications\nthat only need clipboard/native sharing actions request `COMPONENTS Sharing`\nand link `iiSocietyContainer::Sharing`. It uses Qt Gui and Concurrent but does\nnot import QML or Qt Quick. `Gui` retains the asynchronous image provider,\ndashboard adapters, and application/window integration, and links Sharing.\n"
     }
   ],
@@ -133,21 +147,28 @@
     "directive_candidates": [
       {
         "block_id": "b000003",
-        "line": 4,
-        "text": "iiFileProvider API, temporary leases, and platform APIs. They do not discover,",
+        "line": 11,
+        "text": "원본은 삭제하지 않는다. 네이티브 오류는 `MobileStorageError`로 전달한다. 모바일 앱은",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000007",
-        "line": 19,
-        "text": "Consumers request `find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS",
+        "block_id": "b000005",
+        "line": 15,
+        "text": "iiFileProvider API, SQLite, temporary leases, and platform APIs. They do not discover,",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000009",
-        "line": 25,
+        "line": 30,
+        "text": "Consumers request `find_package(iiSocietyContainer CONFIG REQUIRED COMPONENTS",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 36,
         "text": "maintenance preservation against isolated fixtures. It never operates on the",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -155,7 +176,7 @@
     ],
     "commands": [
       {
-        "block_id": "b000005",
+        "block_id": "b000007",
         "language": "sh",
         "code": "cmake -S . -B build/qt-free -DIISOCIETYCONTAINER_BUILD_QT=OFF \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=TRUE \\\n  -DCMAKE_INSTALL_PREFIX=\"$PWD/build/qt-free/install\"\ncmake --build build/qt-free --parallel 4\nctest --test-dir build/qt-free --output-on-failure\ncmake --install build/qt-free\n"
       }

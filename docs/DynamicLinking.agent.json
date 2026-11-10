@@ -1,0 +1,100 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:0f8ba8a7f440074a720e3e034e2e6b95dae0d56e4419a41c311b9d13183a4e44",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiSocietyContainer",
+    "name": "iiSocietyContainer",
+    "root": "SDK/iiSocietyContainer",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/DynamicLinking.md",
+    "sha256": "b6cc28d7c7168d3e5a979f2da927eaaa0ce98b72cae3fda804e24177dd13f1fd",
+    "bytes": 505,
+    "line_count": 8,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Dynamic linking",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Dynamic linking\n",
+      "level": 1,
+      "title": "Dynamic linking"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "FileTree, Maintenance and the optional Qt facade and presentation libraries are\nshared targets. iOS configurations use frameworks and WebAssembly uses side\nmodules. FileTree explicitly links the file provider's temporary lease library;\napplications bundle it together with the other required provider libraries.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "The Emscripten package configuration enables CMake shared-library imports for side modules. The builder or application must supply the main-module compile and link options.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Dynamic linking",
+      "anchor": "dynamic-linking",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 6,
+        "text": "applications bundle it together with the other required provider libraries.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 8,
+        "text": "The Emscripten package configuration enables CMake shared-library imports for side modules. The builder or application must supply the main-module compile and link options.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

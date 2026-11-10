@@ -12,8 +12,13 @@
 #include <QTest>
 #include <QScopeGuard>
 #include <QProcess>
+#include <atomic>
+#include <barrier>
+#include <dlfcn.h>
 #include <sys/mount.h>
+#include <thread>
 #include <unistd.h>
+#include <vector>
 
 using namespace iiSocietyContainer;
 namespace fs = std::filesystem;
@@ -23,6 +28,54 @@ static QString qt(const fs::path &path) { return QString::fromStdString(path.str
 class DiskImageTests : public QObject {
     Q_OBJECT
 private slots:
+    void libraryDoesNotImportSharedMountBuffer() {
+        Dl_info library{};
+        QVERIFY(dladdr(reinterpret_cast<const void *>(&DiskImage::supported), &library));
+        QVERIFY(library.dli_fname);
+        QProcess nm;
+        nm.start("/usr/bin/nm", {"-u", QString::fromUtf8(library.dli_fname)});
+        QVERIFY2(nm.waitForFinished(60000), qPrintable(nm.errorString()));
+        QCOMPARE(nm.exitStatus(), QProcess::NormalExit);
+        QCOMPARE(nm.exitCode(), 0);
+        for (const auto &line : nm.readAllStandardOutput().split('\n')) {
+            const auto symbol = line.trimmed();
+            QVERIFY2(symbol != "_getmntinfo" && symbol != "_getmntinfo$INODE64",
+                     "The container library imports getmntinfo's process-wide shared buffer.");
+        }
+    }
+    void concurrentContainerLookupCoexistsWithOtherMountQueries() {
+        constexpr int workerCount = 6;
+        constexpr int lookupsPerWorker = 40;
+        const auto expected = DiskImage::containerRoot("/");
+        std::barrier start(workerCount + 1);
+        std::atomic<bool> done{false};
+        std::atomic<int> externalQueries{0};
+        std::atomic<int> inconsistent{0};
+        std::jthread external([&] {
+            start.arrive_and_wait();
+            while (!done.load()) {
+                struct statfs *mounts = nullptr;
+                (void)getmntinfo(&mounts, MNT_NOWAIT);
+                ++externalQueries;
+                std::this_thread::yield();
+            }
+        });
+        std::vector<std::jthread> workers;
+        workers.reserve(workerCount);
+        for (int i = 0; i < workerCount; ++i) {
+            workers.emplace_back([&] {
+                start.arrive_and_wait();
+                while (externalQueries.load() == 0) std::this_thread::yield();
+                for (int n = 0; n < lookupsPerWorker; ++n)
+                    if (DiskImage::containerRoot("/") != expected) ++inconsistent;
+            });
+        }
+        workers.clear();
+        done = true;
+        external.join();
+        QVERIFY(externalQueries.load() > 0);
+        QCOMPARE(inconsistent.load(), 0);
+    }
     void ordinaryPackageLookupsDoNotPollDiskImages() {
         QTemporaryDir fixture(QStringLiteral(SOCIETY_TEST_DIRECTORY "/disk-lookup-XXXXXX"));
         QVERIFY(fixture.isValid());

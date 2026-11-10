@@ -11,7 +11,6 @@ import FSKit
 extension Logger {
     static let societyfs = Logger(subsystem: "com.iisacc.society.filesystem", category: "default")
 }
-
 /// Returns the current `errno` value as a `POSIXError`.
 var posixErrno: POSIXError {
     POSIXError(POSIXError.Code(rawValue: errno) ?? .EINVAL)
@@ -133,46 +132,4 @@ class SocietyFileSystem: FSUnaryFileSystem & FSUnaryFileSystemOperations {
         let probeResult = FSProbeResult.usable(name: name.string ?? "", containerID: containerIdentifier)
         return replyHandler(probeResult, nil)
     }
-
-}
-
-// FSKit grants access only to the user-selected source. Expose the existing Files
-// section while preserving the package layout and its manifest UUID.
-func societyFilesRoot(_ source: URL) throws -> URL {
-    let root = source.resolvingSymlinksInPath()
-    guard root.pathExtension == "societycontainer" else { throw POSIXError(.EINVAL) }
-    for marker in ["Info.plist", "bands", ".society-disk.plist"] {
-        var attributes = stat()
-        guard lstat(root.appendingPathComponent(marker).path, &attributes) != 0, errno == ENOENT else {
-            throw POSIXError(.EINVAL)
-        }
-    }
-    let manifestURL = root.appendingPathComponent(".society-drive.json")
-    var manifestAttributes = stat()
-    guard lstat(manifestURL.path, &manifestAttributes) == 0,
-          manifestAttributes.st_mode & S_IFMT == S_IFREG,
-          manifestAttributes.st_size <= 65536 else { throw POSIXError(.EINVAL) }
-    let data = try Data(contentsOf: manifestURL)
-    guard let manifest = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-          manifest["type"] as? String == "SocietyDrive",
-          manifest["schemaVersion"] as? Int == 1,
-          let id = manifest["identifier"] as? String, UUID(uuidString: id) != nil else {
-        throw POSIXError(.EINVAL)
-    }
-    let files = root.appendingPathComponent("Files", isDirectory: true)
-    var attributes = stat()
-    guard lstat(files.path, &attributes) == 0, attributes.st_mode & S_IFMT == S_IFDIR else {
-        throw POSIXError(.ENOTDIR)
-    }
-    return files
-}
-
-func societyVolumeIdentifier(_ filesPath: String) throws -> UUID {
-    let root = URL(fileURLWithPath: filesPath).deletingLastPathComponent()
-    let data = try Data(contentsOf: root.appendingPathComponent(".society-drive.json"))
-    guard let manifest = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-          let identifier = manifest["identifier"] as? String, let uuid = UUID(uuidString: identifier) else {
-        throw POSIXError(.EINVAL)
-    }
-    return uuid
 }

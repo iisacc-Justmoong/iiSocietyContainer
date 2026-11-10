@@ -1,12 +1,20 @@
 #pragma once
 #include "SocietyDrive.h"
+#include <functional>
 
 namespace iiSocietyContainer {
-// Blocking filesystem work for a worker thread. Every destination is confined
-// to the same drive and is published without replacing an existing entry.
+// Container-owned asset operations for a worker thread. Metadata and previews
+// are internal members of an asset; they cannot be independently selected or
+// mutated through this API. Existing destination members are never replaced.
 class IISOCIETYCONTAINER_EXPORT FileOperations final {
 public:
-    enum class Action { Duplicate, Copy, Rename, Trash, Remove, Move };
+    enum class Action { Duplicate, Copy, Rename, Trash, Remove, Move, Restore, RestoreTo };
+    enum class RelocationPhase { Prepare, Commit, Cancel };
+    // The host may compose another storage owner with a native move. The
+    // handler runs synchronously on the operation worker and must be thread-safe.
+    using RelocationHandler = std::function<void(const QString &container, const QString &source,
+                                                  const QString &destination, RelocationPhase phase)>;
+    static void setRelocationHandler(RelocationHandler handler);
     struct Result { QString path; QString error; explicit operator bool() const { return error.isEmpty() && !path.isEmpty(); } };
     explicit FileOperations(SocietyDrive drive);
     Result perform(Action action, const QString &source, const QString &argument = {}) const;

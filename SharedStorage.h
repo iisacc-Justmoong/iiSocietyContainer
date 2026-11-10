@@ -3,6 +3,7 @@
 #include "SocietyDrive.h"
 #include "FileRepository.h"
 #include <QJsonObject>
+#include <atomic>
 
 namespace iiSocietyContainer {
 
@@ -42,6 +43,8 @@ public:
     /// Construction does not scan files. Use only on an I/O worker for ingestion.
     std::unique_ptr<FileRepository> fileRepository(FileRepositoryContext context = {},
         FileRepository::Access access = FileRepository::Access::ReadWrite) const;
+    std::unique_ptr<FileRepository> fileRepository(FileRepositoryContext context,
+        FileRepository::Access access, FileRepository::Intent intent) const;
     /// Logical key using the filesystem's actual Unicode spelling. Existing
     /// paths reject redirected ancestors; only a missing final leaf is allowed.
     std::string managedFilePath(StoreSection section, const QString &relativePath) const;
@@ -49,7 +52,16 @@ public:
         FileRepositoryContext context = {}) const;
     bool recordFile(StoreSection section, const QString &relativePath, QString *error,
         FileRepositoryContext context, std::stop_token stop) const;
+    /// Record a user-requested large result without blocking foreground edits.
+    /// The cooperative capture yields to edits and retries until completed,
+    /// cancelled, or a non-contention failure occurs.
+    bool recordFileForUserJob(StoreSection section, const QString &relativePath, QString *error,
+        FileRepositoryContext context = {}, std::stop_token stop = {}) const;
     bool reconcileFiles(QString *error = nullptr, std::stop_token stop = {}) const;
+    /// Recover only provider companions whose moved asset identity is verified.
+    /// Conflicts remain untouched and are returned to the caller.
+    QStringList repairModelCompanions(QStringList *errors = nullptr, const std::atomic_bool *cancelled = nullptr) const;
+    QStringList repairModelCompanions(QStringList *errors, const std::atomic_bool *cancelled, std::stop_token stop) const;
     /// Bounded provider search. Text/classification uses Catalog; classKey,
     /// conditions or directory uses Ontology. Returned paths are logical only.
     /// Cursor and next are JSON objects; counters are exact decimal strings.

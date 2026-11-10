@@ -11,9 +11,11 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`FileLoading.md`](../FileLoading.md) | [JSON](entrypoints/FileLoading.agent.json) |
 | [`README.md`](../README.md) | [JSON](entrypoints/README.agent.json) |
 | [`docs/APPLE_TEST_LIFETIME.md`](APPLE_TEST_LIFETIME.md) | [JSON](APPLE_TEST_LIFETIME.agent.json) |
+| [`docs/BuildLayout.md`](BuildLayout.md) | [JSON](BuildLayout.agent.json) |
 | [`docs/ContainerAliases.md`](ContainerAliases.md) | [JSON](ContainerAliases.agent.json) |
 | [`docs/DirectoryStorage.md`](DirectoryStorage.md) | [JSON](DirectoryStorage.agent.json) |
 | [`docs/DiskImage.md`](DiskImage.md) | [JSON](DiskImage.agent.json) |
+| [`docs/DynamicLinking.md`](DynamicLinking.md) | [JSON](DynamicLinking.agent.json) |
 | [`docs/FILE_PROVIDER.md`](FILE_PROVIDER.md) | [JSON](FILE_PROVIDER.agent.json) |
 | [`docs/FileActions.md`](FileActions.md) | [JSON](FileActions.agent.json) |
 | [`docs/FileLoading.md`](FileLoading.md) | [JSON](FileLoading.agent.json) |
@@ -25,6 +27,7 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/ManagedFiles.md`](ManagedFiles.md) | [JSON](ManagedFiles.agent.json) |
 | [`docs/Models.md`](Models.md) | [JSON](Models.agent.json) |
 | [`docs/NativeBuild.md`](NativeBuild.md) | [JSON](NativeBuild.agent.json) |
+| [`docs/NativeFileJobs.md`](NativeFileJobs.md) | [JSON](NativeFileJobs.agent.json) |
 | [`docs/Photos.md`](Photos.md) | [JSON](Photos.agent.json) |
 | [`docs/StorageMaintenance.md`](StorageMaintenance.md) | [JSON](StorageMaintenance.agent.json) |
 | [`docs/WindowsBuildAndRun.md`](WindowsBuildAndRun.md) | [JSON](WindowsBuildAndRun.agent.json) |

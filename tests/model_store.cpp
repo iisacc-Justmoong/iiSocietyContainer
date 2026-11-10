@@ -1,8 +1,12 @@
 #include "SymbolicLink.h"
 #include "ModelStore.h"
 #include "SharedStorage.h"
+#include <FileCatalog.h>
+#include <iiFileProviderDevice.h>
+#include <iiFileProviderPresentation.h>
 
 #include <QDataStream>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -84,9 +88,327 @@ QByteArray gguf(const QString &architecture, bool text = false, bool vision = fa
 class ModelStoreTests : public QObject {
     Q_OBJECT
 private slots:
+    void categoryMoveKeepsPortablePresentationWithTheModel() {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-presentation-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid()); QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto source = fixture.filePath("Models/Checkpoint/model.safetensors");
+        const auto target = fixture.filePath("Models/LLM/model.safetensors");
+        QVERIFY(write(source, weights({"tensor"})));
+        using Presentation = iiFileProvider::native::Presentation;
+        const auto native = [](const QString &p) { return std::filesystem::path(p.toStdU16String()); };
+        const auto oldPreview = QString::fromStdU16String(Presentation::companionPath(native(source)).u16string());
+        const auto newPreview = QString::fromStdU16String(Presentation::companionPath(native(target)).u16string());
+        Presentation::cancelPending(native(source));
+        const auto original = Presentation::prepare(native(source));
+        QVERIFY(!original.document.empty()); QVERIFY(QFileInfo::exists(oldPreview));
+        Presentation::enqueue(native(source));
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        QString error; QCOMPARE(store->place(source, ModelType::LLM, &error), target);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QVERIFY(!QFileInfo::exists(oldPreview));
+        QVERIFY(QFileInfo::exists(newPreview));
+        QVERIFY(!read(newPreview).isEmpty());
+        QVERIFY(Presentation::waitForIdle(std::chrono::seconds(10)));
+        QVERIFY(!QFileInfo::exists(oldPreview));
+    }
+
+    void renameKeepsCompanionsAliasesAndManualCategory() {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-rename-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid()); QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto base = fixture.filePath("Models");
+        const auto source = base + "/Other/old.safetensors";
+        const auto destination = base + "/Other/new.safetensors";
+        const auto oldPreview = base + "/Other/old.preview.png";
+        const auto newPreview = base + "/Other/new.preview.png";
+        const auto bytes = tensorFile(animaTensors(""));
+        QVERIFY(write(source, bytes)); QVERIFY(write(source + ".model.json", "{\"type\":\"Checkpoint\"}"));
+        QVERIFY(write(oldPreview, "preview bytes"));
+        iiFileProvider::FileCatalog catalog(std::filesystem::path(base.toStdU16String()));
+        iiFileProvider::FileMetadata metadata; metadata.title = "Original model";
+        QVERIFY(catalog.registerFile("Other/old.safetensors", metadata).metadataWritten);
+        const auto portableMetadata = read(source + ".iisacc.json"); QVERIFY(!portableMetadata.isEmpty());
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        QString error;
+        QCOMPARE(store->place(source, ModelType::Other, &error), source);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QVERIFY(write(newPreview, "existing preview"));
+        QVERIFY(store->rename(source, "new.safetensors", &error).isEmpty());
+        QVERIFY(!error.isEmpty()); QCOMPARE(read(source), bytes);
+        QCOMPARE(read(newPreview), QByteArray("existing preview"));
+        QVERIFY(QFile::remove(newPreview));
+        QList<QPair<QString, QString>> moved;
+        QCOMPARE(store->rename(source, "new.safetensors", &error, &moved), destination);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QVERIFY(moved.contains(qMakePair(source, destination)));
+        QVERIFY(!QFileInfo::exists(source)); QCOMPARE(read(destination), bytes);
+        QCOMPARE(read(destination + ".model.json"), QByteArray("{\"type\":\"Checkpoint\"}"));
+        QCOMPARE(read(destination + ".iisacc.json"), portableMetadata);
+        QCOMPARE(read(newPreview), QByteArray("preview bytes"));
+        QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(oldPreview));
+        QCOMPARE(store->resolve("Other/old.safetensors", &error), destination);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        const auto organized = store->organize();
+        QVERIFY2(organized.errors.isEmpty(), qPrintable(organized.errors.join('\n')));
+        QVERIFY(QFileInfo::exists(destination)); QVERIFY(organized.moved.isEmpty());
+        for (const auto &invalid : {QString(), QStringLiteral(".hidden"), QStringLiteral("../escape"),
+                                    QStringLiteral("a/b"), QStringLiteral("reserved.iisacc.json")}) {
+            QVERIFY(store->rename(destination, invalid, &error).isEmpty());
+            QVERIFY(!error.isEmpty()); QVERIFY(QFileInfo::exists(destination));
+        }
+    }
+
+    void providerMetadataIsNeverOrganizedAsAModel()
+    {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-controls-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid());
+        QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto base = fixture.filePath("Models");
+        const auto model = base + "/Other/unknown.safetensors";
+        const auto companion = model + ".iisacc.json";
+        const auto orphan = base + "/Other/orphan.IISACC.JSON";
+        const auto bytes = weights({"unknown.weight"});
+        QVERIFY(write(model, bytes));
+        QVERIFY(write(companion, "{\"type\":\"LoRA\"}"));
+        QVERIFY(write(orphan, "{\"type\":\"LoRA\"}"));
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        QString error;
+        const auto entries = store->entries(&error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(entries.size(), 1);
+        QCOMPARE(entries.first().relativePath, QString("Other/unknown.safetensors"));
+        const auto report = store->organize();
+        QVERIFY(report.errors.join('\n').contains("orphan.IISACC.JSON"));
+        QVERIFY(report.moved.isEmpty());
+        QVERIFY(store->place(orphan, ModelType::LLM, &error).isEmpty());
+        QVERIFY(!error.isEmpty());
+        QCOMPARE(read(model), bytes);
+        QCOMPARE(read(companion), QByteArray("{\"type\":\"LoRA\"}"));
+        QCOMPARE(read(orphan), QByteArray("{\"type\":\"LoRA\"}"));
+        QVERIFY(!QFileInfo::exists(base + "/LoRA/orphan.IISACC.JSON"));
+    }
+
+    void reconcilesLegacyMoveWithMetadataStillAtTheOldPath()
+    {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-legacy-move-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid());
+        QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto source = fixture.filePath("Models/Checkpoint/recover.safetensors");
+        const auto destination = fixture.filePath("Models/LLM/recover.safetensors");
+        const auto bytes = weights({"tensor"});
+        QVERIFY(write(source, bytes));
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        QString error;
+        QVERIFY2(storage->recordFile(StoreSection::Models, "Checkpoint/recover.safetensors", &error), qPrintable(error));
+        const auto before = storage->fileTracking(StoreSection::Models, "Checkpoint/recover.safetensors");
+        QVERIFY(!before.value("objectKey").toString().isEmpty());
+        QVERIFY(QDir().mkpath(QFileInfo(destination).absolutePath()));
+        QVERIFY(iiFileProvider::FileDevice::rename(source, destination));
+        QVERIFY(QFileInfo::exists(source + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(destination + ".iisacc.json"));
+        QVERIFY2(storage->reconcileFiles(&error), qPrintable(error));
+        const auto after = storage->fileTracking(StoreSection::Models, "LLM/recover.safetensors", &error);
+        QVERIFY2(!after.isEmpty(), qPrintable(error));
+        QCOMPARE(after.value("status").toString(), QStringLiteral("ready"));
+        QCOMPARE(after.value("objectKey"), before.value("objectKey"));
+        QCOMPARE(after.value("resource").toObject().value("contentRevision"), before.value("resource").toObject().value("contentRevision"));
+        QCOMPARE(read(destination), bytes);
+        QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(destination + ".iisacc.json"));
+    }
+
+    void repairsLegacyCategoryMoveUsingJournalAndNativeIdentity()
+    {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-repair-alias-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto source = fixture.filePath("Models/Checkpoint/model.safetensors");
+        const auto target = fixture.filePath("Models/LLM/model.safetensors");
+        const auto bytes = weights({"tensor"}); QVERIFY(write(source, bytes));
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        QString error;
+        QVERIFY2(storage->recordFile(StoreSection::Models, "Checkpoint/model.safetensors", &error), qPrintable(error));
+        const auto before = storage->fileTracking(StoreSection::Models, "Checkpoint/model.safetensors");
+        const auto metadata = read(source + ".iisacc.json"); QVERIFY(!metadata.isEmpty());
+        using Presentation = iiFileProvider::native::Presentation;
+        const auto native = [](const QString &p) { return std::filesystem::path(p.toStdU16String()); };
+        const auto oldPreview = QString::fromStdU16String(Presentation::companionPath(native(source)).u16string());
+        const auto newPreview = QString::fromStdU16String(Presentation::companionPath(native(target)).u16string());
+        Presentation::cancelPending(native(source));
+        QVERIFY(!Presentation::prepare(native(source)).document.empty());
+        const auto preview = read(oldPreview); QVERIFY(!preview.isEmpty());
+        QVERIFY(QDir().mkpath(QFileInfo(target).absolutePath()));
+        QVERIFY(QFile::rename(source, target)); // Older versions moved only the payload.
+        const auto journal = QJsonObject{{"schemaVersion", 1}, {"containerId", drive->identifier()},
+            {"aliases", QJsonObject{{"Checkpoint/model.safetensors", "LLM/model.safetensors"}}}};
+        QVERIFY(write(fixture.filePath("Models/.model-paths.json"), QJsonDocument(journal).toJson(QJsonDocument::Compact)));
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        QStringList errors;
+        Presentation::cancelPending(native(source));
+        Presentation::cancelPending(native(target));
+        QVERIFY(Presentation::waitForIdle(std::chrono::seconds(10)));
+        auto conflict = QJsonDocument::fromJson(preview).object();
+        auto conflictPreview = conflict.value("preview").toObject();
+        const QByteArray otherPreview("different preview");
+        conflictPreview.insert("data", QString::fromLatin1(otherPreview.toBase64()));
+        conflictPreview.insert("sha256", QString::fromLatin1(QCryptographicHash::hash(otherPreview, QCryptographicHash::Sha256).toHex()));
+        conflict.insert("preview", conflictPreview);
+        const auto conflictBytes = QJsonDocument(conflict).toJson(QJsonDocument::Compact);
+        QVERIFY(write(newPreview, conflictBytes));
+        QCOMPARE(read(newPreview), conflictBytes);
+        QVERIFY(store->repairCompanions(&errors).isEmpty()); QVERIFY(!errors.isEmpty());
+        QCOMPARE(read(source + ".iisacc.json"), metadata); QCOMPARE(read(oldPreview), preview);
+        const auto retained = QJsonDocument::fromJson(read(newPreview)).object().value("preview").toObject();
+        QCOMPARE(retained.value("sha256"), conflictPreview.value("sha256"));
+        QCOMPARE(retained.value("data"), conflictPreview.value("data"));
+        QVERIFY(!QFileInfo::exists(target + ".iisacc.json"));
+        QVERIFY(QFile::remove(newPreview)); errors.clear();
+        QCOMPARE(store->repairCompanions(&errors), QStringList{target});
+        QVERIFY2(errors.isEmpty(), qPrintable(errors.join('\n')));
+        QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
+        QCOMPARE(read(target + ".iisacc.json"), metadata);
+        QVERIFY(!QFileInfo::exists(oldPreview));
+        QCOMPARE(QJsonDocument::fromJson(read(newPreview)).object().value("preview"),
+                 QJsonDocument::fromJson(preview).object().value("preview"));
+        QCOMPARE(read(target), bytes);
+        QVERIFY(store->repairCompanions(&errors).isEmpty()); QVERIFY(errors.isEmpty());
+        QVERIFY2(storage->reconcileFiles(&error), qPrintable(error));
+        const auto after = storage->fileTracking(StoreSection::Models, "LLM/model.safetensors", &error);
+        QVERIFY2(!after.isEmpty(), qPrintable(error));
+        QCOMPARE(after.value("objectKey"), before.value("objectKey"));
+    }
+
+    void legacyRepairRefusesUnverifiedOrConflictingMetadata()
+    {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-repair-conflict-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid()); const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto source = fixture.filePath("Models/Checkpoint/model.safetensors");
+        const auto target = fixture.filePath("Models/LLM/model.safetensors");
+        QVERIFY(write(source, weights({"tensor"})));
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        QString error; QVERIFY2(storage->recordFile(StoreSection::Models, "Checkpoint/model.safetensors", &error), qPrintable(error));
+        const auto original = read(source + ".iisacc.json"); QVERIFY(!original.isEmpty());
+        QVERIFY(QDir().mkpath(QFileInfo(target).absolutePath()));
+        QVERIFY(QFile::rename(source, target));
+        const auto journal = QJsonObject{{"schemaVersion", 1}, {"containerId", drive->identifier()},
+            {"aliases", QJsonObject{{"Checkpoint/model.safetensors", "LLM/model.safetensors"}}}};
+        QVERIFY(write(fixture.filePath("Models/.model-paths.json"), QJsonDocument(journal).toJson(QJsonDocument::Compact)));
+        QVERIFY(write(target + ".iisacc.json", "foreign metadata"));
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        QStringList errors;
+        QVERIFY(store->repairCompanions(&errors).isEmpty()); QVERIFY(!errors.isEmpty());
+        QCOMPARE(read(source + ".iisacc.json"), original);
+        QCOMPARE(read(target + ".iisacc.json"), QByteArray("foreign metadata"));
+        QVERIFY(QFileInfo::exists(target));
+
+        QVERIFY(QFile::remove(target + ".iisacc.json"));
+        QVERIFY(QFile::rename(target, target + ".kept"));
+        QVERIFY(write(target, weights({"tensor"}))); // Equal content is not equal identity.
+        errors.clear(); QVERIFY(store->repairCompanions(&errors).isEmpty());
+        QVERIFY(!errors.isEmpty()); QCOMPARE(read(source + ".iisacc.json"), original);
+        QVERIFY(!QFileInfo::exists(target + ".iisacc.json"));
+    }
+
+    void reportsDetachedClassificationWhenCatalogIsMissing()
+    {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-repair-no-catalog-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid()); QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto sidecar = fixture.filePath("Models/Checkpoint/model.safetensors.iisacc.json");
+        const auto document = QJsonDocument(QJsonObject{{"format", "iiFileProvider.Metadata"}, {"schema", 1},
+            {"fileKey", "file-unverified"}, {"path", "Checkpoint/model.safetensors"}}).toJson(QJsonDocument::Compact);
+        QVERIFY(write(sidecar, document));
+        const auto preview = fixture.filePath("Models/Checkpoint/.other.safetensors.iisacc-preview");
+        QVERIFY(write(preview, "unverified preview"));
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store); QStringList errors;
+        QVERIFY(store->repairCompanions(&errors).isEmpty());
+        QVERIFY(errors.join('\n').contains("No model catalog"));
+        QVERIFY(errors.join('\n').contains("Detached preview"));
+        QCOMPARE(read(sidecar), document);
+        QCOMPARE(read(preview), QByteArray("unverified preview"));
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Models/.iisacc-file-provider/catalog.sqlite3")));
+    }
+
+    void movesPortableMetadataAndPreservesConflictingCompanions()
+    {
+        QTemporaryDir fixture(QDir::tempPath() + "/model-metadata-move-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid());
+        QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto base = fixture.filePath("Models");
+        const auto source = base + "/Checkpoint/style.safetensors";
+        const auto preview = base + "/Checkpoint/style.preview.png";
+        const auto target = base + "/LLM/style (1).safetensors";
+        const auto bytes = weights({"tensor"});
+        QVERIFY(write(source, bytes));
+        QVERIFY(write(preview, "preview"));
+        iiFileProvider::FileMetadata modelMetadata;
+        modelMetadata.title = "Model metadata";
+        iiFileProvider::FileMetadata previewMetadata;
+        previewMetadata.title = "Preview metadata";
+        iiFileProvider::FileCatalog catalog(std::filesystem::path(base.toStdU16String()));
+        QVERIFY(catalog.registerFile("Checkpoint/style.safetensors", modelMetadata).metadataWritten);
+        QVERIFY(catalog.registerFile("Checkpoint/style.preview.png", previewMetadata).metadataWritten);
+        const auto modelCompanion = read(source + ".iisacc.json");
+        const auto previewCompanion = read(preview + ".iisacc.json");
+        QVERIFY(!modelCompanion.isEmpty() && !previewCompanion.isEmpty());
+        const auto conflict = base + "/LLM/style.safetensors.iisacc.json";
+        QVERIFY(write(conflict, "foreign data"));
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        QString error;
+        QCOMPARE(store->place(source, ModelType::LLM, &error), target);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(read(target), bytes);
+        QCOMPARE(read(target + ".iisacc.json"), modelCompanion);
+        QCOMPARE(read(base + "/LLM/style (1).preview.png.iisacc.json"), previewCompanion);
+        QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(preview + ".iisacc.json"));
+        QCOMPARE(read(conflict), QByteArray("foreign data"));
+
+        const auto invalid = base + "/Checkpoint/invalid.safetensors";
+        QVERIFY(write(invalid, bytes));
+        QVERIFY(write(invalid + ".iisacc.json", "not provider metadata"));
+        QVERIFY(store->place(invalid, ModelType::LLM, &error).isEmpty());
+        QVERIFY(!error.isEmpty());
+        QCOMPARE(read(invalid), bytes);
+        QCOMPARE(read(invalid + ".iisacc.json"), QByteArray("not provider metadata"));
+    }
+
+    void manualOtherSurvivesOrganizationAndSubsequentMoves()
+    {
+        QTemporaryDir fixture(QDir::tempPath() + "/manual-model-XXXXXX.societycontainer");
+        QVERIFY(fixture.isValid());
+        QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto base = fixture.filePath("Models");
+        const auto bytes = weights({"layer.lora_A.weight", "layer.lora_B.weight"});
+        QVERIFY(write(base + "/Checkpoint/style.safetensors", bytes));
+        QVERIFY(write(base + "/Checkpoint/style.preview.png", "preview"));
+        QVERIFY(write(base + "/Other/already.safetensors", bytes));
+        QVERIFY(write(base + "/Checkpoint/package/model_index.json", "{}"));
+        QVERIFY(write(base + "/Checkpoint/package/unet/weights.safetensors", bytes));
+        const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
+        QString error;
+        QCOMPARE(store->place("Checkpoint/style.safetensors", ModelType::Other, &error), base + "/Other/style.safetensors");
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(store->place("Other/already.safetensors", ModelType::Other, &error), base + "/Other/already.safetensors");
+        QCOMPARE(store->place("Checkpoint/package", ModelType::Other, &error), base + "/Other/package");
+        // A stale organizer calling the automatic placement path must honor the
+        // latest manual decision while holding the model lock.
+        QCOMPARE(store->place("Other/style.safetensors", {}, &error), base + "/Other/style.safetensors");
+        const auto reopened = ModelStore::open(fixture.path()); QVERIFY(reopened);
+        const auto result = reopened->organize();
+        QVERIFY2(result.errors.isEmpty(), qPrintable(result.errors.join('\n')));
+        QVERIFY(result.moved.isEmpty());
+        QCOMPARE(read(base + "/Other/style.safetensors"), bytes);
+        QCOMPARE(read(base + "/Other/style.preview.png"), QByteArray("preview"));
+        QCOMPARE(read(base + "/Other/package/unet/weights.safetensors"), bytes);
+        QCOMPARE(reopened->resolve("Checkpoint/style.safetensors"), base + "/Other/style.safetensors");
+        QCOMPARE(reopened->place("Other/style.safetensors", ModelType::LoRA, &error), base + "/LoRA/style.safetensors");
+        QCOMPARE(reopened->resolve("Checkpoint/style.safetensors"), base + "/LoRA/style.safetensors");
+        QVERIFY(reopened->organize().moved.isEmpty());
+    }
+
     void exposesBoundedModelMetadataForCatalogs()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/catalog-metadata-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/catalog-metadata-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("model.safetensors");
         QVERIFY(write(path, weights({"tensor"}, {{"modelspec.architecture", "stable-diffusion-xl-v1-base"}})));
         auto metadata = ModelClassifier::metadata(path);
@@ -110,7 +432,7 @@ private slots:
             "Controlnet", "Upscaler", "Motion", "VAE", "Text Encoder", "UNet", "CLIP Vision", "Poses", "Wildcards",
             "Workflows", "ComfyUI Workflows", "Detection", "VLM", "CLIP", "LLM", "Other"};
         QCOMPARE(allModelTypes().size(), expected.size());
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/types-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/types-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QString error;
         const auto drive = SocietyDrive::create(fixture.path(), &error); QVERIFY2(drive, qPrintable(error));
         const auto store = ModelStore::open(fixture.path(), &error); QVERIFY2(store, qPrintable(error));
@@ -143,7 +465,7 @@ private slots:
 
     void createsOnlyWrittenCategoriesAndKeepsExistingUserContent()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/lazy-categories-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/lazy-categories-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
         const auto identifier = drive->identifier();
         const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
@@ -176,7 +498,7 @@ private slots:
 
     void explicitMetadataCoversEveryType()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/metadata-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/metadata-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("arbitrary.safetensors");
         for (const auto type : allModelTypes()) {
             QVERIFY(write(path, weights({"tensor"}, {{"society.model_type", modelTypeName(type)}})));
@@ -192,7 +514,7 @@ private slots:
 
     void validatesLargeSparseSafetensorsWithoutReadingPayload()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/large-model-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/large-model-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("large.safetensors");
         const qint64 length = (qint64(1) << 32) + 123;
         const QJsonObject header{{"tensor", QJsonObject{{"dtype", "U8"}, {"shape", QJsonArray{length}},
@@ -214,7 +536,7 @@ private slots:
     void kreaCheckpoint()
     {
         QFETCH(QString, prefix);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/krea-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/krea-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto path = fixture.filePath("Models/Other/unrelated-name.safetensors");
         QJsonObject header{
@@ -252,7 +574,7 @@ private slots:
     void animaCheckpoint()
     {
         QFETCH(QString, prefix);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/anima-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("unrelated-name.safetensors");
         auto header = animaTensors(prefix);
         if (prefix == "model.diffusion_model.net.") {
@@ -273,7 +595,7 @@ private slots:
 
     void animaRequiresConsistentBackboneAndAdapter()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-evidence-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/anima-evidence-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("anima_checkpoint.safetensors");
         QVERIFY(write(path, weights({"net.blocks.0.mlp.layer1.weight", "net.llm_adapter.blocks.0.cross_attn.q_proj.weight"})));
         QCOMPARE(ModelClassifier::classify(path).type, ModelType::Other);
@@ -334,7 +656,7 @@ private slots:
     void validatesTensorDescriptorsAndPayload()
     {
         QFETCH(QByteArray, bytes);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/tensor-validation-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/tensor-validation-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("checkpoint.safetensors"); QVERIFY(write(path, bytes));
         const auto result = ModelClassifier::classify(path);
         QVERIFY2(!result.recognized, qPrintable(result.evidence));
@@ -347,7 +669,7 @@ private slots:
 
     void acceptsScalarEmptyAndPackedTensors()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/valid-tensors-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/valid-tensors-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("model.safetensors");
         const QJsonObject header{
             {"layer.lora_A.weight", QJsonObject{{"dtype", "F32"}, {"shape", QJsonArray{}}, {"data_offsets", QJsonArray{0, 4}}}},
@@ -363,7 +685,7 @@ private slots:
 
     void reorganizesPreviouslyUnknownAnimaAndPreservesReferences()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/anima-organize-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/anima-organize-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto source = fixture.filePath("Models/Other/renamed.safetensors");
         const auto bytes = tensorFile(animaTensors("net.")); QVERIFY(write(source, bytes));
@@ -405,7 +727,7 @@ private slots:
     void tensorSignatures()
     {
         QFETCH(QStringList, keys); QFETCH(int, type);
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/tensors-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/tensors-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto path = fixture.filePath("unrelated name.safetensors");
         const auto bytes = weights(keys); QVERIFY(write(path, bytes));
         QCOMPARE(int(ModelClassifier::classify(path).type), type);
@@ -414,7 +736,7 @@ private slots:
 
     void packagesDocumentsAndGguf()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/formats-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/formats-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         const auto pipeline = fixture.filePath("pipeline");
         QVERIFY(write(pipeline + "/model_index.json", "{\"_class_name\":\"StableDiffusionPipeline\"}"));
         QVERIFY(ModelClassifier::isPackage(pipeline));
@@ -454,7 +776,7 @@ private slots:
 
     void boundedInspectionDoesNotGuessFromNamesOrExecuteLegacyFiles()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/invalid-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/invalid-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QByteArray oversized(8, '\0'); qToLittleEndian(quint64(256 * 1024 * 1024), oversized.data());
         for (const auto &bytes : {QByteArray(), QByteArray("not a tensor file"), oversized,
                 QByteArray::fromHex("1000000000000000") + QByteArray("{}")} ) {
@@ -470,7 +792,7 @@ private slots:
 
     void organizesPackagesAndCompanionsWithoutReplacingFilesOrReferences()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/organize-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/organize-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto base = fixture.filePath("Models");
         const auto source = base + "/Collection/model.safetensors";
@@ -525,8 +847,8 @@ private slots:
 
     void pathReferencesTravelWithTheContainer()
     {
-        QTemporaryDir source(SOCIETY_TEST_DIRECTORY "/source-XXXXXX.societycontainer");
-        QTemporaryDir replica(SOCIETY_TEST_DIRECTORY "/replica-XXXXXX.societycontainer");
+        QTemporaryDir source(QDir::tempPath() + "/source-XXXXXX.societycontainer");
+        QTemporaryDir replica(QDir::tempPath() + "/replica-XXXXXX.societycontainer");
         QVERIFY(source.isValid()); QVERIFY(replica.isValid());
         QVERIFY(SocietyDrive::create(source.path()));
         QVERIFY(SocietyDrive::create(replica.path()));
@@ -546,7 +868,7 @@ private slots:
 
     void rejectsRedirectedCategoriesInvalidJournalsAndOutsideMoves()
     {
-        QTemporaryDir fixture(SOCIETY_TEST_DIRECTORY "/boundaries-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::tempPath() + "/boundaries-XXXXXX.societycontainer"); QVERIFY(fixture.isValid());
         QVERIFY(SocietyDrive::create(fixture.path()));
         const auto store = ModelStore::open(fixture.path()); QVERIFY(store);
         const auto path = fixture.filePath("Models/model.safetensors");
@@ -574,7 +896,7 @@ private slots:
         const auto report = store->organize(&cancelled);
         QVERIFY(report.cancelled); QVERIFY(report.moved.isEmpty()); QCOMPARE(read(path), bytes);
 
-        QTemporaryDir conflict(SOCIETY_TEST_DIRECTORY "/type-conflict-XXXXXX.societycontainer"); QVERIFY(conflict.isValid());
+        QTemporaryDir conflict(QDir::tempPath() + "/type-conflict-XXXXXX.societycontainer"); QVERIFY(conflict.isValid());
         QVERIFY(write(conflict.filePath("Models/Checkpoint"), "do not replace"));
         QVERIFY(!SocietyDrive::create(conflict.path(), &error));
         QCOMPARE(read(conflict.filePath("Models/Checkpoint")), QByteArray("do not replace"));

@@ -6,6 +6,7 @@
 #include <SharedStorage.h>
 #include <StorageMap.h>
 #include <StorageDirectoryModel.h>
+#include <InventoryIndex.h>
 #include <StorageModelCatalog.h>
 #include <StorageMaintenance.h>
 #include <ModelStore.h>
@@ -53,6 +54,299 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void directorySearchAndTypeSortUseCurrentOptions() {
+        QTemporaryDir fixture(QDir::current().filePath("directory-search-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive=SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto folder=fixture.filePath("Files");
+        QVERIFY(QDir().mkdir(QDir(folder).filePath("Alpha folder")));
+        write(QDir(folder).filePath("alpha.png"),"image");
+        write(QDir(folder).filePath("Beta.json"),"json");
+        write(QDir(folder).filePath("Draft*.txt"),"text");
+        StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(folder));
+        QTRY_COMPARE_WITH_TIMEOUT(model.status(),StorageDirectoryModel::Ready,30000);
+        QCOMPARE(model.rowCount(),4);
+        QVERIFY(model.setProperty("searchText",QStringLiteral("ALPHA")));
+        QTRY_COMPARE_WITH_TIMEOUT(model.rowCount(),2,30000);
+        QCOMPARE(model.get(0,"fileName").toString(),QStringLiteral("Alpha folder"));
+        QCOMPARE(model.get(1,"fileName").toString(),QStringLiteral("alpha.png"));
+        QVERIFY(model.setProperty("searchText",QStringLiteral("*")));
+        QTRY_COMPARE_WITH_TIMEOUT(model.rowCount(),1,30000);
+        QCOMPARE(model.get(0,"fileName").toString(),QStringLiteral("Draft*.txt"));
+        QVERIFY(model.setProperty("searchText",QString()));
+        QVERIFY(model.setProperty("sortField",int(StorageDirectoryModel::Type)));
+        QTRY_COMPARE_WITH_TIMEOUT(model.rowCount(),4,30000);
+        QTRY_COMPARE_WITH_TIMEOUT(model.get(1,"fileName").toString(),QStringLiteral("Beta.json"),30000);
+        QCOMPARE(model.get(2,"fileName").toString(),QStringLiteral("alpha.png"));
+        QCOMPARE(model.get(3,"fileName").toString(),QStringLiteral("Draft*.txt"));
+    }
+    void modelDirectoryHidesAttachedCompanionsInLiveAndCachedRows() {
+        QTemporaryDir fixture(QDir::current().filePath("model-tree-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto folder = fixture.filePath("Models/Checkpoint");
+        QVERIFY(QDir().mkpath(folder + "/Nested"));
+        const QStringList names{"model.safetensors", "model.safetensors.model.json", "model.model.json",
+            "model.preview.png", "model.safetensors.preview.jpg", "model.safetensors.iisacc.json",
+            "orphan.model.json", "workflow.json"};
+        for (const auto &name : names) write(QDir(folder).filePath(name), "fixture");
+        const auto expected = QStringList{"Nested", "model.safetensors", "orphan.model.json", "workflow.json"};
+        const auto listing = [&](StorageDirectoryModel &model) {
+            QStringList result;
+            for (int i = 0; i < model.rowCount(); ++i) result.append(model.get(i, "fileName").toString());
+            result.sort(); return result;
+        };
+        const auto url = QUrl::fromLocalFile(folder);
+        QByteArray key; QDataStream keyStream(&key, QIODevice::WriteOnly);
+        keyStream << url << true << true << false << true << false << false << false
+                  << int(StorageDirectoryModel::Name) << QStringList{};
+        const auto cacheDir = QDir(StorageDirectoryModel::cacheDirectory(folder)).filePath("directories-v1");
+        QVERIFY(QDir().mkpath(cacheDir));
+        const auto cache = QDir(cacheDir).filePath(
+            QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex()) + ".bin");
+        QList<QVariantMap> cachedRows;
+        cachedRows.append({{"fileName", "Nested"}, {"filePath", QDir(folder).filePath("Nested")}, {"fileIsDir", true}});
+        for (const auto &name : names)
+            cachedRows.append({{"fileName", name}, {"filePath", QDir(folder).filePath(name)}, {"fileIsDir", false}});
+        QFile cached(cache); QVERIFY(cached.open(QIODevice::WriteOnly));
+        QDataStream stream(&cached); stream.setVersion(QDataStream::Qt_6_8);
+        stream << quint32(1) << drive->identifier() << cachedRows;
+        QCOMPARE(stream.status(), QDataStream::Ok); cached.close();
+        StorageDirectoryModel model;
+        QSignalSpy restored(&model, &StorageDirectoryModel::snapshotRestored);
+        connect(&model, &StorageDirectoryModel::snapshotRestored, &model, [&] { QCOMPARE(listing(model), expected); });
+        model.setFolder(url);
+        QTRY_COMPARE_WITH_TIMEOUT(model.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(restored.size(), 1);
+        QCOMPARE(listing(model), expected);
+        for (const auto &name : names) QVERIFY(QFileInfo::exists(QDir(folder).filePath(name)));
+        QVERIFY(model.setProperty("nameFilters", QStringList{"*.json"}));
+        QTRY_COMPARE_WITH_TIMEOUT(listing(model), (QStringList{"Nested", "orphan.model.json", "workflow.json"}), 30000);
+
+        const auto native = std::filesystem::path(fixture.path().toStdU16String());
+        auto tree = FileTree(native / "Models").snapshot(); QVERIFY(tree);
+        std::vector<InventorySection> sections{{"models", "Models", 1, true, std::move(*tree.value)}};
+        QVERIFY(QDir().mkpath(fixture.filePath(".society-runtime/monitor/v1")));
+        QVERIFY(InventoryIndex::publish(native, drive->identifier().toStdString(), sections));
+        StorageDirectoryModel indexed;
+        QSignalSpy indexRestored(&indexed, &StorageDirectoryModel::snapshotRestored);
+        connect(&indexed, &StorageDirectoryModel::snapshotRestored, &indexed, [&] { QCOMPARE(listing(indexed), expected); });
+        indexed.setFolder(url);
+        QTRY_COMPARE_WITH_TIMEOUT(indexed.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(indexRestored.size(), 1);
+        QCOMPARE(listing(indexed), expected);
+
+        const auto files = fixture.filePath("Files");
+        write(QDir(files).filePath("model.safetensors"), "asset");
+        write(QDir(files).filePath("model.model.json"), "ordinary document");
+        StorageDirectoryModel ordinary; ordinary.setFolder(QUrl::fromLocalFile(files));
+        QTRY_COMPARE_WITH_TIMEOUT(ordinary.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(ordinary.rowCount(), 2);
+    }
+
+    void replicaModelDirectoryHidesCompanionsWithoutDownloading() {
+        QTemporaryDir fixture(QDir::current().filePath("model-tree-replica-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        makeReadyReplica(*drive);
+        QVERIFY(QDir().mkpath(fixture.filePath("Models/Checkpoint")));
+        StorageMap map(*drive);
+        QJsonArray objects;
+        for (const auto &name : {"remote.safetensors", "remote.model.json", "remote.preview.png", "unrelated.json"})
+            objects.append(QJsonObject{{"path", QStringLiteral("models/Checkpoint/") + name},
+                {"kind", "file"}, {"size", "7"}, {"resident", false}, {"version", QString(64, 'a')}});
+        QVERIFY(map.publish(objects));
+        StorageDirectoryModel model;
+        model.setFolder(QUrl::fromLocalFile(fixture.filePath("Models/Checkpoint")));
+        QTRY_COMPARE_WITH_TIMEOUT(model.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(model.rowCount(), 2);
+        QCOMPARE(model.get(0, "fileName").toString(), QStringLiteral("remote.safetensors"));
+        QCOMPARE(model.get(1, "fileName").toString(), QStringLiteral("unrelated.json"));
+        QVERIFY(map.pendingRequests().isEmpty());
+    }
+
+    void replicaModelTreeNavigatesCatalogDirectoriesWithoutDownloading() {
+        QTemporaryDir fixture(QDir::current().filePath("model-virtual-tree-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        makeReadyReplica(*drive);
+        StorageMap map(*drive);
+        const QJsonObject selected{{"path", "models/Checkpoint/nested/remote.safetensors"}, {"kind", "file"},
+            {"size", "3"}, {"resident", false}, {"version", QString(64, 'a')}};
+        auto other = selected; other["path"] = "models/LoRA/other.safetensors";
+        const QJsonObject empty{{"path", "models/VAE"}, {"kind", "directory"}};
+        QVERIFY(map.publish({selected, other, empty}));
+        StorageDirectoryModel root;
+        root.setFolder(QUrl::fromLocalFile(fixture.filePath("Models")));
+        QTRY_COMPARE_WITH_TIMEOUT(root.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(root.rowCount(), 3);
+        QCOMPARE(root.get(0, "fileName").toString(), QStringLiteral("Checkpoint"));
+        QVERIFY(root.get(0, "fileIsDir").toBool());
+        const auto checkpoint = fixture.filePath("Models/Checkpoint");
+        QVERIFY(!QFileInfo::exists(checkpoint));
+        QSignalSpy entered(&root, &StorageDirectoryModel::activated);
+        QSignalSpy failed(&root, &StorageDirectoryModel::downloadFailed);
+        root.activate(0);
+        QTRY_COMPARE_WITH_TIMEOUT(entered.size(), 1, 30000);
+        QCOMPARE(entered.first().at(0).toString(), checkpoint);
+        QVERIFY(entered.first().at(1).toBool());
+        QVERIFY(failed.isEmpty()); QVERIFY(QFileInfo(checkpoint).isDir());
+        QVERIFY(map.pendingRequests().isEmpty());
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Models/LoRA")));
+
+        StorageDirectoryModel nested;
+        nested.setFolder(QUrl::fromLocalFile(checkpoint));
+        QTRY_COMPARE_WITH_TIMEOUT(nested.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(nested.rowCount(), 1);
+        QCOMPARE(nested.get(0, "fileName").toString(), QStringLiteral("nested"));
+        QSignalSpy nestedEntered(&nested, &StorageDirectoryModel::activated);
+        nested.activate(0);
+        QTRY_COMPARE_WITH_TIMEOUT(nestedEntered.size(), 1, 30000);
+        const auto folder = fixture.filePath("Models/Checkpoint/nested");
+        QVERIFY(QFileInfo(folder).isDir());
+        StorageDirectoryModel files; files.setFolder(QUrl::fromLocalFile(folder));
+        QTRY_COMPARE_WITH_TIMEOUT(files.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(files.rowCount(), 1);
+        QCOMPARE(files.get(0, "fileName").toString(), QStringLiteral("remote.safetensors"));
+        QVERIFY(!files.get(0, "fileResident").toBool());
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Models/Checkpoint/nested/remote.safetensors")));
+        QVERIFY(map.pendingRequests().isEmpty());
+        files.activate(0);
+        QTRY_COMPARE_WITH_TIMEOUT(map.pendingRequests().size(), 1, 30000);
+        const auto requested = map.pendingRequests().first().toObject().value("objects").toArray();
+        QCOMPARE(requested.size(), 1);
+        QCOMPARE(requested.first().toObject().value("path"), selected.value("path"));
+    }
+
+    void replicaModelTreeRejectsDeletedAndRedirectedFolders() {
+        QTemporaryDir fixture(QDir::current().filePath("model-virtual-safety-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        makeReadyReplica(*drive);
+        StorageMap map(*drive);
+        const QJsonObject deleted{{"path", "models/Checkpoint"}, {"kind", "deleted"}};
+        const QJsonObject stale{{"path", "models/Checkpoint/old.safetensors"}, {"kind", "file"},
+            {"size", "3"}, {"resident", false}, {"version", QString(64, 'a')}};
+        auto live = stale; live["path"] = "models/LoRA/live.safetensors";
+        QVERIFY(map.publish({deleted, stale, live}));
+        StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(fixture.filePath("Models")));
+        QTRY_COMPARE_WITH_TIMEOUT(model.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(model.rowCount(), 1);
+        QCOMPARE(model.get(0, "fileName").toString(), QStringLiteral("LoRA"));
+        const auto outside = fixture.filePath("outside"); QVERIFY(QDir().mkdir(outside));
+        const auto redirect = fixture.filePath("Models/LoRA");
+        if (!createTestSymbolicLink(outside, redirect)) QSKIP("Symbolic links are unavailable on this host");
+        QSignalSpy opened(&model, &StorageDirectoryModel::activated);
+        QSignalSpy failed(&model, &StorageDirectoryModel::downloadFailed);
+        model.activate(0);
+        QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 30000);
+        QVERIFY(opened.isEmpty());
+        QVERIFY(QDir(outside).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).isEmpty());
+        QVERIFY(map.pendingRequests().isEmpty());
+        QVERIFY(removeTestSymbolicLink(redirect));
+    }
+    void replicaModelTreeRechecksDeletedDescendantsBeforeOpening() {
+        QTemporaryDir fixture(QDir::current().filePath("model-virtual-stale-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        makeReadyReplica(*drive);
+        StorageMap map(*drive);
+        const QJsonObject oldFile{{"path", "models/Checkpoint/old/model.safetensors"}, {"kind", "file"},
+            {"size", "3"}, {"resident", false}, {"version", QString(64, 'a')}};
+        QVERIFY(map.publish({oldFile}));
+        StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(fixture.filePath("Models")));
+        QTRY_COMPARE_WITH_TIMEOUT(model.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(model.rowCount(), 1);
+        const QJsonObject deleted{{"path", "models/Checkpoint/old"}, {"kind", "deleted"}};
+        QVERIFY(map.publish({deleted, oldFile}));
+        QSignalSpy opened(&model, &StorageDirectoryModel::activated);
+        QSignalSpy failed(&model, &StorageDirectoryModel::downloadFailed);
+        model.activate(0);
+        QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 30000);
+        QVERIFY(opened.isEmpty());
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Models/Checkpoint")));
+        QVERIFY(map.pendingRequests().isEmpty());
+    }
+
+    void staleDirectorySnapshotNeverExposesProviderMetadata() {
+        QTemporaryDir fixture(QDir::current().filePath("old-metadata-cache-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto files = fixture.filePath("Files");
+        const auto ordinary = QDir(files).filePath("document.json");
+        const auto metadata = QDir(files).filePath("document.json.iisacc.json");
+        write(ordinary, "{}"); write(metadata, "old metadata");
+        const auto folder = QUrl::fromLocalFile(files);
+        QByteArray key; QDataStream keyStream(&key, QIODevice::WriteOnly);
+        keyStream << folder << true << true << false << true << false << false << false
+                  << int(StorageDirectoryModel::Name) << QStringList{};
+        const auto directory = QDir(StorageDirectoryModel::cacheDirectory(files)).filePath("directories-v1");
+        QVERIFY(QDir().mkpath(directory));
+        const auto cache = QDir(directory).filePath(
+            QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex()) + ".bin");
+        const QList<QVariantMap> rows{
+            {{"fileName", "document.json"}, {"filePath", ordinary}, {"fileIsDir", false}},
+            {{"fileName", "document.json.iisacc.json"}, {"filePath", metadata}, {"fileIsDir", false}},
+            {{"fileName", "misleading.txt"}, {"filePath", metadata}, {"fileIsDir", false}}};
+        QFile cached(cache); QVERIFY(cached.open(QIODevice::WriteOnly));
+        QDataStream stream(&cached); stream.setVersion(QDataStream::Qt_6_8);
+        stream << quint32(1) << drive->identifier() << rows;
+        QCOMPARE(stream.status(), QDataStream::Ok); cached.close();
+        StorageDirectoryModel model;
+        QSignalSpy restored(&model, &StorageDirectoryModel::snapshotRestored);
+        connect(&model, &StorageDirectoryModel::snapshotRestored, &model, [&] {
+            QCOMPARE(model.rowCount(), 1);
+            QCOMPARE(model.get(0, "fileName").toString(), QStringLiteral("document.json"));
+        });
+        model.setFolder(folder);
+        QTRY_COMPARE_WITH_TIMEOUT(model.status(), StorageDirectoryModel::Ready, 30000);
+        QCOMPARE(restored.size(), 1);
+        QCOMPARE(model.rowCount(), 1);
+        QCOMPARE(model.get(0, "fileName").toString(), QStringLiteral("document.json"));
+        QVERIFY(QFileInfo::exists(metadata));
+        QSignalSpy opened(&model, &StorageDirectoryModel::activated), failed(&model, &StorageDirectoryModel::downloadFailed);
+        model.openPath(metadata);
+        QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 30000);
+        QVERIFY(opened.isEmpty());
+    }
+    void daemonInventoryRestoresBeforeLiveValidation() {
+        QTemporaryDir fixture(QDir::current().filePath("daemon-index-XXXXXX.societycontainer")); QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto files = fixture.filePath("Files");
+        write(QDir(files).filePath("old.txt"), "cached");
+        write(QDir(files).filePath("replace.txt"), "before");
+        write(QDir(files).filePath("stable.txt"), "available");
+        QVERIFY(QDir().mkpath(fixture.filePath(".society-runtime/monitor/v1")));
+        const auto native = std::filesystem::path(fixture.path().toStdU16String());
+        auto tree = FileTree(native / "Files").snapshot(); QVERIFY(tree);
+        std::vector<InventorySection> sections{{"files", "Files", 1, true, std::move(*tree.value)}};
+        const auto saved = InventoryIndex::publish(native, drive->identifier().toStdString(), sections);
+        QVERIFY2(saved.has_value(), saved ? "" : saved.error().c_str());
+        QVERIFY(QFile::remove(QDir(files).filePath("old.txt")));
+        write(QDir(files).filePath("replace.txt"), "changed contents");
+        write(QDir(files).filePath("new.txt"), "current");
+        StorageDirectoryModel model;
+        QSignalSpy restored(&model, &StorageDirectoryModel::snapshotRestored);
+        QSignalSpy opened(&model, &StorageDirectoryModel::activated);
+        QSignalSpy failed(&model, &StorageDirectoryModel::downloadFailed);
+        connect(&model, &StorageDirectoryModel::snapshotRestored, &model, [&] {
+            QCOMPARE(model.status(), StorageDirectoryModel::Loading);
+            QCOMPARE(model.rowCount(), 3);
+            QCOMPARE(model.get(0, "fileName").toString(), "old.txt");
+            model.activate(0); QVERIFY(failed.wait(15000)); QCOMPARE(opened.size(), 0);
+            QCOMPARE(model.get(1, "fileName").toString(), "replace.txt");
+            model.activate(1); QVERIFY(failed.wait(15000)); QCOMPARE(opened.size(), 0);
+            QCOMPARE(model.get(2, "fileName").toString(), "stable.txt");
+            model.activate(2); QVERIFY(opened.wait(15000));
+            QCOMPARE(opened.at(0).at(0).toString(), QDir(files).filePath("stable.txt"));
+            QCOMPARE(model.status(), StorageDirectoryModel::Loading);
+        });
+        model.setFolder(QUrl::fromLocalFile(files));
+        QTRY_COMPARE_WITH_TIMEOUT(model.status(), StorageDirectoryModel::Ready, 15000);
+        QCOMPARE(restored.size(), 1);
+        QCOMPARE(model.rowCount(), 3);
+        QCOMPARE(model.get(0, "fileName").toString(), "new.txt");
+    }
     void modelInventoryExcludesOnnxAndKeepsGguf() {
         QTemporaryDir fixture(QDir::current().filePath("model-extension-XXXXXX.societycontainer"));
         QVERIFY(fixture.isValid());
@@ -422,6 +716,70 @@ private slots:
         QVERIFY(!QFileInfo::exists(fixture.filePath(".society-sync/primary.json")));
     }
 
+    void modelCatalogExcludesProviderMetadata_data() {
+        QTest::addColumn<int>("source");
+        QTest::newRow("filesystem") << 0;
+        QTest::newRow("local-authority") << 1;
+        QTest::newRow("remote-replica") << 2;
+    }
+    void modelCatalogExcludesProviderMetadata() {
+        QFETCH(int, source);
+        QTemporaryDir fixture(QDir::current().filePath("model-controls-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto base = fixture.filePath("Models");
+        QJsonArray objects;
+        const auto add = [&](const QString &relative, const QByteArray &bytes) {
+            const auto path = QDir(base).filePath(relative);
+            QVERIFY(QDir().mkpath(QFileInfo(path).absolutePath()));
+            write(path, bytes);
+            objects.append(QJsonObject{{"path", "models/" + relative}, {"kind", "file"},
+                {"size", QString::number(bytes.size())}, {"resident", false}});
+        };
+        add("Other/example.safetensors", "model bytes");
+        add("Other/standalone.json", "{\"description\":\"user asset\"}");
+        add("Workflows/graph.json", "{\"nodes\":[]}");
+        add("Poses/pose.json", "{\"people\":[]}");
+        iiFileProvider::FileCatalog provider(std::filesystem::path(base.toStdU16String()));
+        iiFileProvider::FileMetadata annotation; annotation.title = "model metadata";
+        QVERIFY(provider.registerFile("Other/example.safetensors", annotation).metadataWritten);
+        const auto metadataPath = fixture.filePath("Models/Other/example.safetensors.iisacc.json");
+        QFile metadataFile(metadataPath); QVERIFY(metadataFile.open(QIODevice::ReadOnly));
+        const auto metadataBytes = metadataFile.readAll(); metadataFile.close();
+        QVERIFY(!metadataBytes.isEmpty());
+        objects.append(QJsonObject{{"path", "models/Other/example.safetensors.iisacc.json"}, {"kind", "file"},
+            {"size", QString::number(metadataBytes.size())}, {"resident", false}});
+        add("Other/orphan.IISACC.JSON", "{\"title\":\"unlinked metadata\"}");
+        add("Workflows/graph.json.iisacc.json", "{\"title\":\"workflow metadata\"}");
+        add("Poses/pose.json.iisacc.json", "{\"title\":\"pose metadata\"}");
+        add("Other/example.safetensors.iisacc-preview", "preview metadata");
+        StorageMap map(*drive);
+        if (source == 2) makeReadyReplica(*drive);
+        if (source != 0) QVERIFY(map.publish(objects));
+        if (source == 2) QVERIFY(QFile::remove(fixture.filePath("Models/Other/example.safetensors")));
+
+        StorageModelCatalog catalog; catalog.setDirectory(base);
+        QTRY_VERIFY_WITH_TIMEOUT(!catalog.loading(), 30000);
+        QCOMPARE(catalog.count(), 4);
+        const auto groups = catalog.groups();
+        QCOMPARE(groups.value("Other").toList().size(), 2);
+        QCOMPARE(groups.value("Workflows").toList().size(), 1);
+        QCOMPARE(groups.value("Poses").toList().size(), 1);
+        for (const auto &group : groups) {
+            for (const auto &value : group.toList()) {
+                const auto relative = value.toMap().value("relativePath").toString();
+                QVERIFY2(!iiFileProvider::native::Presentation::isControlFile(
+                    std::filesystem::path(relative.toStdU16String())), qPrintable(relative));
+            }
+        }
+        QVERIFY(map.pendingRequests().isEmpty());
+        QVERIFY(metadataFile.open(QIODevice::ReadOnly));
+        QCOMPARE(metadataFile.readAll(), metadataBytes);
+        metadataFile.close();
+        QCOMPARE(QFileInfo(fixture.filePath("Models/Other/orphan.IISACC.JSON")).size(),
+            qint64(QByteArray("{\"title\":\"unlinked metadata\"}").size()));
+    }
+
     void modelCatalogIgnoresUnchangedRefreshAndDocumentation_data() {
         QTest::addColumn<bool>("synchronized");
         QTest::newRow("filesystem") << false;
@@ -672,6 +1030,24 @@ private slots:
         QCOMPARE(model.get(0, "fileName").toString(), "visible.txt");
         QVERIFY(map.pendingRequests().isEmpty());
         QVERIFY(!QFileInfo::exists(fixture.filePath("Files/Documents/visible.txt")));
+    }
+    void largeReplicaModelTreeListsOneCategoryWithoutOpeningPayloads() {
+        QTemporaryDir fixture(QDir::current().filePath("large-model-tree-XXXXXX.societycontainer"));
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        makeReadyReplica(*drive);
+        StorageMap map(*drive); QJsonArray objects;
+        for (int i = 0; i < 8000; ++i)
+            objects.append(QJsonObject{{"path", QString("models/Checkpoint/remote-%1.safetensors").arg(i)},
+                {"kind", "file"}, {"size", "9000000000"}, {"resident", false}});
+        QVERIFY(map.publish(objects));
+        StorageDirectoryModel model; model.setFolder(QUrl::fromLocalFile(fixture.filePath("Models")));
+        QElapsedTimer elapsed; elapsed.start(); model.refresh();
+        QVERIFY2(elapsed.elapsed() < 50, "Model tree refresh blocked its GUI caller on the full catalog");
+        QTRY_COMPARE_WITH_TIMEOUT(model.rowCount(), 1, 5000);
+        QCOMPARE(model.get(0, "fileName").toString(), "Checkpoint");
+        QVERIFY(model.get(0, "fileIsDir").toBool());
+        QVERIFY(map.pendingRequests().isEmpty());
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Models/Checkpoint")));
     }
     void directoryListsRemoteObjectsAndOpensOnlyCompletePayloads() {
         QTemporaryDir fixture(QDir::current().filePath("remote-directory-XXXXXX.societycontainer"));

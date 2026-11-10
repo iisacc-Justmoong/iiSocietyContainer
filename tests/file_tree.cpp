@@ -77,6 +77,10 @@ int main(int argc, char** argv)
         check(!tree.entry(fs::path(L"projects\\..\\z.txt")), "native Windows traversal rejected");
 #else
         check(!tree.entry(fs::path("projects\\empty")), "foreign separator rejected");
+        { std::ofstream file(root / "unsupported:name"); file << "unsupported"; }
+        check(bool(tree.snapshot({}, {true, 64, 100})), "ordinary snapshots continue to skip unsupported names");
+        check(!tree.snapshotForIndex({}, {true, 64, 100}), "index scans must not hide unsupported names");
+        fs::remove(root / "unsupported:name");
 #endif
         check(!tree.entry(fs::path(std::string("z.txt\0extra", 11))), "null path rejected");
         // Snapshot ownership and fresh calls must distinguish removed/added items.

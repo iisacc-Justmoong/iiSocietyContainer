@@ -47,7 +47,16 @@ enum FilesDriveStoreTests {
         process.standardOutput = Pipe()
         try process.run(); process.waitUntilExit()
         try check(process.terminationStatus == 0, "SDK drive creation failed")
-        let catalog = try JSONDecoder().decode([DriveSection].self, from: Data(contentsOf: base.appendingPathComponent("Sections.json")))
+        let catalogProcess = Process()
+        let catalogOutput = Pipe()
+        catalogProcess.executableURL = URL(fileURLWithPath: CommandLine.arguments[2])
+        catalogProcess.arguments = ["catalog"]
+        catalogProcess.standardOutput = catalogOutput
+        try catalogProcess.run()
+        let catalogData = catalogOutput.fileHandleForReading.readDataToEndOfFile()
+        catalogProcess.waitUntilExit()
+        try check(catalogProcess.terminationStatus == 0, "SDK section catalog is unavailable")
+        let catalog = try JSONDecoder().decode([DriveSection].self, from: catalogData)
         let emptyStore = try LocalDriveStore(root: root, catalog: catalog)
         try check(emptyStore.snapshot().records.count == 9 + 1, "A new store must contain only nine section roots and the drive root")
         try check(emptyStore.children("section:models").isEmpty, "Unused model categories must remain lazy")

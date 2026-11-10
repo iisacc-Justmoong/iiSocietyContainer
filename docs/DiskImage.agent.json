@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/DiskImage.md",
-    "sha256": "db1cb293a829446b77c1bee4904fbec807139619dcb51282bd56f7574ffd495d",
-    "bytes": 8346,
-    "line_count": 92,
+    "sha256": "5dfb5aec366cc053a6822a69cf0a301d674179eaf7b6e2ea8d0d347f8eaf589d",
+    "bytes": 9062,
+    "line_count": 98,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -217,49 +217,49 @@
       "id": "b000027",
       "kind": "paragraph",
       "start_line": 70,
-      "end_line": 73,
-      "raw": "`filesRoot(privateRoot)`와 `containerRoot(publicEntry)`는 실제 마운트와 볼륨 UUID를 확인한다.\n`SocietyDrive::sectionPath`, `resolvePath`, `relativePath`로 논리 `Files/...`와 공개 물리 경로를\n변환한다. 소비자는 컨테이너 루트에 `/Files`를 직접 연결하면 안 된다. StorageMap, 파일 조회,\n파일 변경 및 동기화 계층은 이 연결을 사용하며 임의의 심볼릭 링크는 허용하지 않는다.\n"
+      "end_line": 76,
+      "raw": "`filesRoot(privateRoot)`와 `containerRoot(publicEntry)`는 실제 마운트와 볼륨 UUID를 확인한다.\nmacOS에서 여러 작업 스레드가 동시에 경로를 조회하더라도 각 조회는 독립된 마운트 목록을\n사용해야 한다. 다른 라이브러리가 시스템의 공유 마운트 목록을 조회하는 경우에도 목록의\n수명과 내용이 바뀌어서는 안 되며, 조회가 끝나거나 실패하면 해당 조회의 메모리를 반환한다.\n`SocietyDrive::sectionPath`, `resolvePath`, `relativePath`로 논리 `Files/...`와 공개 물리 경로를\n변환한다. 소비자는 컨테이너 루트에 `/Files`를 직접 연결하면 안 된다. StorageMap, 파일 조회,\n파일 변경 및 동기화 계층은 이 연결을 사용하며 임의의 심볼릭 링크는 허용하지 않는다.\n"
     },
     {
       "id": "b000028",
       "kind": "blank",
-      "start_line": 74,
-      "end_line": 74,
+      "start_line": 77,
+      "end_line": 77,
       "raw": "\n"
     },
     {
       "id": "b000029",
       "kind": "paragraph",
-      "start_line": 75,
-      "end_line": 79,
+      "start_line": 78,
+      "end_line": 82,
       "raw": "기존 단일 볼륨의 Files는 공개 이미지가 숨겨진 상태에서 복사한다. 성공한 원본 트리는\n내부 `.society-legacy-files`로 옮겨 보존하고 볼륨 연결을 원자적으로 기록한 뒤 공개한다.\n실패한 복사는 원본을 삭제하지 않는다. `detach`는 공개 이미지부터 정상 추출한 후 내부 이미지를\n추출하며 열린 파일이 있으면 강제 추출하지 않는다. Finder에서 공개 볼륨만 추출할 수도 있으며\n저수준 유지보수 호출자는 해당 상태를 검사할 수 있다. Society 앱은 같은 이미지로 재연결하지 않는다.\n"
     },
     {
       "id": "b000030",
       "kind": "blank",
-      "start_line": 80,
-      "end_line": 80,
+      "start_line": 83,
+      "end_line": 83,
       "raw": "\n"
     },
     {
       "id": "b000031",
       "kind": "paragraph",
-      "start_line": 81,
-      "end_line": 81,
+      "start_line": 84,
+      "end_line": 84,
       "raw": "데이터는 이미지 패키지에 보관되며 선택한 보관 폴더의 기존 파일은 컨테이너에 포함하거나 옮기지 않는다.\n"
     },
     {
       "id": "b000032",
       "kind": "blank",
-      "start_line": 82,
-      "end_line": 82,
+      "start_line": 85,
+      "end_line": 85,
       "raw": "\n"
     },
     {
       "id": "b000033",
       "kind": "heading",
-      "start_line": 83,
-      "end_line": 83,
+      "start_line": 86,
+      "end_line": 86,
       "raw": "## 검증\n",
       "level": 2,
       "title": "검증"
@@ -267,16 +267,16 @@
     {
       "id": "b000034",
       "kind": "blank",
-      "start_line": 84,
-      "end_line": 84,
+      "start_line": 87,
+      "end_line": 87,
       "raw": "\n"
     },
     {
       "id": "b000035",
       "kind": "paragraph",
-      "start_line": 85,
-      "end_line": 92,
-      "raw": "`iiSocietyContainer.disk_image`는 과거 저장 설정을 읽어도 이미지를 마운트하거나\n패키지 이름과 설정을 변경하지 않음을 검사한다. 명시적인 테스트 이미지에서 기본 저장소 등록 거부와\n기존 일반 폴더 설정·UUID 보존을 검사하며, 저수준 유지보수 API의 Files 데이터 보존과 이름 충돌 거부도 검사한다.\n일반 패키지 경로의 128회 조회가 1.5초 안에 끝나는지도 검사하여 시스템 도구를 매번 호출하는 회귀를 방지한다.\n`iiSocietyContainer.shared_storage`는 schema 2 및 `imagePath`가 남은 schema 1의 거부,\n설정·이미지 파일 보존과 일반 폴더 재선택을 검사한다.\n`iiSocietyContainer.disk_image_header`는 Qt include 없이 C++23 공개 헤더를 컴파일한다.\n테스트의 backing image는 `build/` 아래에만 만들고 OS가 관리하는 볼륨은 종료 시 추출한다.\n"
+      "start_line": 88,
+      "end_line": 98,
+      "raw": "`iiSocietyContainer.disk_image`는 과거 저장 설정을 읽어도 이미지를 마운트하거나\n패키지 이름과 설정을 변경하지 않음을 검사한다. 명시적인 테스트 이미지에서 기본 저장소 등록 거부와\n기존 일반 폴더 설정·UUID 보존을 검사하며, 저수준 유지보수 API의 Files 데이터 보존과 이름 충돌 거부도 검사한다.\n일반 패키지 경로의 128회 조회가 1.5초 안에 끝나는지도 검사하여 시스템 도구를 매번 호출하는 회귀를 방지한다.\n마운트 목록의 비스레드 안전 시스템 호출이 컨테이너 라이브러리에 연결되지 않았는지와,\n다른 코드의 마운트 목록 조회가 계속되는 동안 복수 스레드의 경로 조회가 안정적으로\n동작하는지도 확인한다. 이 검사는 기존 볼륨을 변경하거나 추출하지 않는다.\n`iiSocietyContainer.shared_storage`는 schema 2 및 `imagePath`가 남은 schema 1의 거부,\n설정·이미지 파일 보존과 일반 폴더 재선택을 검사한다.\n`iiSocietyContainer.disk_image_header`는 Qt include 없이 C++23 공개 헤더를 컴파일한다.\n테스트의 backing image는 `build/` 아래에만 만들고 OS가 관리하는 볼륨은 종료 시 추출한다.\n"
     }
   ],
   "outline": [
@@ -310,7 +310,7 @@
       "level": 2,
       "title": "검증",
       "anchor": "검증",
-      "start_line": 83
+      "start_line": 86
     }
   ],
   "indexes": {
@@ -394,29 +394,43 @@
       },
       {
         "block_id": "b000027",
-        "line": 73,
+        "line": 72,
+        "text": "사용해야 한다. 다른 라이브러리가 시스템의 공유 마운트 목록을 조회하는 경우에도 목록의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 76,
         "text": "파일 변경 및 동기화 계층은 이 연결을 사용하며 임의의 심볼릭 링크는 허용하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000029",
-        "line": 77,
+        "line": 80,
         "text": "실패한 복사는 원본을 삭제하지 않는다. `detach`는 공개 이미지부터 정상 추출한 후 내부 이미지를",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000029",
-        "line": 78,
+        "line": 81,
         "text": "추출하며 열린 파일이 있으면 강제 추출하지 않는다. Finder에서 공개 볼륨만 추출할 수도 있으며",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000029",
-        "line": 79,
+        "line": 82,
         "text": "저수준 유지보수 호출자는 해당 상태를 검사할 수 있다. Society 앱은 같은 이미지로 재연결하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 94,
+        "text": "동작하는지도 확인한다. 이 검사는 기존 볼륨을 변경하거나 추출하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       }
