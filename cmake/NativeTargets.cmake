@@ -51,6 +51,23 @@ target_include_directories(iiSocietyContainerMaintenance PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(iiSocietyContainerFileTree PUBLIC iiFileProvider::Native iiFileProvider::Objects iiFileProvider::Catalog)
 target_link_libraries(iiSocietyContainerFileTree PRIVATE iiFileProvider::Temporary SQLite3::SQLite3 Threads::Threads)
+# Older clients link these provider symbols through FileTree. Preserve that
+# public ABI when the provider changes from static archives to shared dylibs.
+if(APPLE AND _library_type STREQUAL "SHARED")
+    foreach(provider IN ITEMS Objects Catalog Temporary)
+        get_target_property(provider_type iiFileProvider::${provider} TYPE)
+        if(provider_type STREQUAL "SHARED_LIBRARY")
+            target_link_options(iiSocietyContainerFileTree PRIVATE
+                "LINKER:-reexport_library,$<TARGET_FILE:iiFileProvider::${provider}>")
+            if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+                add_test(NAME iiSocietyContainer.reexport_${provider} COMMAND "${CMAKE_COMMAND}"
+                    "-DLIBRARY=$<TARGET_FILE:iiSocietyContainerFileTree>"
+                    "-DDEPENDENCY=$<TARGET_FILE_NAME:iiFileProvider::${provider}>"
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/reexport_dependency.cmake")
+            endif()
+        endif()
+    endforeach()
+endif()
 target_link_libraries(iiSocietyContainerMaintenance PRIVATE iiFileProvider::Native iiFileProvider::Temporary Threads::Threads)
 set_target_properties(iiSocietyContainerMaintenance PROPERTIES EXPORT_NAME Maintenance
     CXX_EXTENSIONS OFF VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR}

@@ -474,6 +474,9 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
                 for (qsizetype i = 1; i < moves.size(); ++i) {
                     const auto path = moves[i].first;
                     if (iiFileProvider::native::Presentation::isControlFile(detail::nativePath(path).filename())) continue;
+                    // A private classification subtree is not an asset in the
+                    // Deleted section and must never enter its public index.
+                    if (!path.startsWith(m_drive.sectionPath(StoreSection::Deleted) + '/')) continue;
                     const auto key = storage->managedFilePath(StoreSection::Deleted,
                         iiFileProvider::Directory(m_drive.sectionPath(StoreSection::Deleted)).relativeFilePath(path));
                     if (repository->lookup(key)) repository->removed(key);

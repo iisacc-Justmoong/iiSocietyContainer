@@ -172,7 +172,8 @@ Anima는 Cosmos 계열의 `blocks.0.mlp.layer1.weight`, `llm_adapter.blocks.0.cr
 
 `.model.json`, `.civitai.info`, `.preview.png`, `.preview.jpg`, `.preview.webp` 부속 파일은 본체와 함께 이동하며 별도 모델로 열거하지 않는다. 이름이 충돌하면 `(1)` 등을 붙여 모든 부속 파일에도 같은 이름을 적용한다. 임의의 일반 폴더를 패키지로 간주하지 않는다.
 
-유효한 iiFileProvider 분류 문서 `<파일명>.iisacc.json`과 숨김
+유효한 iiFileProvider 분류 문서는 비공개 `.society-runtime/classifications/models/`에
+주소로 연결하며 숨김
 `.파일명.iisacc-preview`도 각 본체 또는 인식된 부속 파일에 연결된 구성물이다.
 모델의 카테고리 이동과 이름 변경에서 모두 함께 이동하며, 손상·리디렉션·충돌을 발견하면
 원본을 보존하고 오류 또는 충돌 없는 다른 이름을 사용한다. 복사·휴지통·복원 등 공통
@@ -185,7 +186,7 @@ Anima는 Cosmos 계열의 `blocks.0.mlp.layer1.weight`, `llm_adapter.blocks.0.cr
 갱신된 카탈로그 경로, 실제 파일 시스템 식별자와 기록된 크기·수정 시각을 함께 확인하며 이름이나 콘텐츠 해시만으로
 자원을 합치지 않는다. 비교 가능한 현재 분류 내용이 다르거나 대상 프리뷰가 충돌하면
 원래 파일을 유지하고 오류를 반환한다. 대상에 같은 문서가 이미 있으면 이전 바이트는
-`Models/.society-recovered-companions/`에 보존한다. 원래 식별 정보를 확인할 수 없는
+`.society-runtime/classifications/recovered/`에 보존한다. 원래 식별 정보를 확인할 수 없는
 항목은 자동으로 연결하지 않고 남은 위치를 오류로 알린다. 카탈로그 자체가 없어도
 분리된 문서의 존재를 보고하며 새 카탈로그를 만들어 임의로 연결하지 않는다. 분리된
 프리뷰만 남아 원본을 식별할 수 없는 경우에도 보존하고 위치를 알린다. 이 절차는
@@ -200,7 +201,10 @@ iiFileProvider의 `<파일명>.iisacc.json` 분류 문서와 미리보기 등 �
 `modelCatalogExcludesProviderMetadata`는 세 조회 경로와 메타데이터 보존을,
 `providerMetadataIsNeverOrganizedAsAModel`은 자동 및 명시적 분류의 경계를 검사한다.
 
-일반 모델 파일과 위 부속 파일의 iiFileProvider 분류 문서 `<파일명>.iisacc.json`이 있으면 공급자 API로 형식을 검증한 후 해당 파일과 함께 이동한다. 목적지에 본체가 없더라도 분류 문서가 이미 있으면 다른 이름을 선택해 기존 문서를 보존한다. 원본 분류 문서가 손상됐거나 리디렉션된 경우에는 파일을 이동하지 않고 오류를 반환한다. 모델 패키지 내부의 파일과 분류 문서는 디렉터리와 함께 이동한다. 패키지 디렉터리 바깥의 분류 문서는 현재 검증·이동을 지원하지 않으며, 그런 문서가 있으면 이동을 거부한다.
+일반 모델 파일과 위 부속 파일의 iiFileProvider 분류 문서는 공급자 API로 형식을
+검증하고 전용 저장소에서 주소를 함께 옮긴다. 기존 인접 문서도 검증 후 이관하며,
+충돌·손상·리디렉션 시 임의 병합하거나 덮어쓰지 않는다. 패키지 내부의 문서는
+해당 패키지의 소유 규칙을 따르며 패키지와 함께 이동한다.
 
 ## 이동과 참조
 

@@ -101,6 +101,9 @@ public:
     /// Identity-scoped package location. Retired/mirror identities retain their
     /// own history without moving an open SQLite database or its WAL files.
     static std::filesystem::path packagePath(const std::filesystem::path &root, const std::string &container);
+    // Private classification documents are outside every public section.
+    static std::filesystem::path classificationDirectory(const std::filesystem::path &root,
+                                                         const std::string &section);
     static constexpr const char *fileClass = "society:File";
     static constexpr const char *rawClass = "society:Raw";
 private:

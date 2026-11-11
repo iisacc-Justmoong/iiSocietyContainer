@@ -9,6 +9,7 @@
 #include <FileCatalog.h>
 #include <iiFileProviderPresentation.h>
 #include <QElapsedTimer>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -60,6 +61,21 @@ bool confinedMovePath(const QString &root, const QString &path)
     const auto parentRelative = iiFileProvider::Directory(root).relativeFilePath(parent);
     if (parent != root && confined(root, parentRelative) != parent) return false;
     return !info.isSymLink() && !info.isJunction() && (!info.exists() || info.canonicalFilePath() == path);
+}
+bool confinedPrivateMovePath(const QString &root, const QString &path) {
+    if (!path.startsWith(root + '/') || QDir::cleanPath(path) != path) return false;
+    QString current = root;
+    const QFileInfo base(root);
+    if (!base.isDir() || base.isSymLink() || base.isJunction() || base.canonicalFilePath() != root) return false;
+    const auto parts = path.mid(root.size() + 1).split('/');
+    for (qsizetype i = 0; i < parts.size(); ++i) {
+        if (parts[i].isEmpty() || parts[i] == "." || parts[i] == "..") return false;
+        current += '/' + parts[i];
+        const QFileInfo info(current);
+        if (info.isSymLink() || info.isJunction() || (info.exists() && info.canonicalFilePath() != current)) return false;
+        if (i + 1 < parts.size() && !info.isDir()) return false;
+    }
+    return true;
 }
 QJsonObject journal(const QString &root, const QString &identifier, QString *error)
 {
@@ -249,7 +265,8 @@ QString ModelStore::indexAsset(const QString &path, QString *error) const
             throw std::runtime_error("The native model spelling could not be verified.");
         const auto spelling = entry.value->path.lexically_relative(nativeRoot).generic_u8string();
         std::string key(spelling.begin(), spelling.end());
-        iiFileProvider::FileCatalog catalog(nativeRoot);
+        iiFileProvider::FileCatalog catalog(nativeRoot, iiFileProvider::FileCatalog::Access::Create,
+            FileRepository::classificationDirectory(detail::nativePath(m_drive.rootPath()), "models"));
         auto previous = catalog.lookupPath(key);
 #ifdef Q_OS_MACOS
         if (!previous) {
@@ -418,9 +435,15 @@ QString ModelStore::relocate(const QString &path, std::optional<ModelType> type,
         const auto rename = [&](const QString &from, const QString &to) {
             return detail::renameWithoutCopy(from, to);
         };
+        const auto privateRoot = QString::fromStdU16String(FileRepository::classificationDirectory(
+            detail::nativePath(m_drive.rootPath()), "models").u16string());
         for (const auto &move : moves) {
-            if (!m_drive.isReady() || !confinedMovePath(base, move.first)
-                || !confinedMovePath(base, move.second) || !rename(move.first, move.second)) {
+            const bool publicPair = confinedMovePath(base, move.first) && confinedMovePath(base, move.second);
+            const bool privatePair = confinedPrivateMovePath(privateRoot, move.first)
+                                  && confinedPrivateMovePath(privateRoot, move.second);
+            const bool legacyMigration = move.first.endsWith(".iisacc.json", Qt::CaseInsensitive)
+                && confinedMovePath(base, move.first) && confinedPrivateMovePath(privateRoot, move.second);
+            if (!m_drive.isReady() || (!publicPair && !privatePair && !legacyMigration) || !rename(move.first, move.second)) {
                 bool rolledBack = true;
                 for (auto it = moved.crbegin(); it != moved.crend(); ++it) rolledBack = rename(it->second, it->first) && rolledBack;
                 if (rolledBack) saveJournal(base, previousJournal, nullptr);

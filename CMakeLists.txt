@@ -77,6 +77,7 @@ add_library(iiSocietyContainer ${_library_type} iiSocietyContainer.h iiSocietyCo
         src/AssetCompanions.h src/AssetCompanions.cpp
         src/AssetTransfer.h src/AssetTransfer.cpp
         src/CompanionRecovery.h src/CompanionRecovery.cpp
+        src/LegacyClassificationMigration.h src/LegacyClassificationMigration.cpp
         PhotosLayout.h PhotosLayout.cpp
         SharedStorage.h SharedStorage.cpp StorageMap.h StorageMap.cpp StorageDirectoryModel.h StorageDirectoryModel.cpp
         ManagedStorage.cpp

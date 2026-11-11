@@ -1,6 +1,7 @@
 #include "CompanionRecovery.h"
 #include "AssetCompanions.h"
 #include "ExclusiveRename.h"
+#include <SharedStorage.h>
 #include <FileCatalog.h>
 #include <iiFileProviderPresentation.h>
 #include <QDir>
@@ -75,8 +76,7 @@ QString aliasTarget(const QJsonObject &aliases, QString path) {
     }
     return visited.isEmpty() || aliases.contains(path) ? QString() : path;
 }
-bool archive(const QString &root, const QString &source, const QByteArray &observed, QString *error) {
-    const auto vault = root + "/.society-recovered-companions";
+bool archive(const QString &vault, const QString &source, const QByteArray &observed, QString *error) {
     QFileInfo info(vault);
     if (info.isSymLink() || info.isJunction() || (!info.exists() && !QDir().mkdir(vault))) {
         if (error) *error = QStringLiteral("The companion recovery folder is unavailable."); return false;
@@ -124,7 +124,8 @@ QStringList repairModelCompanions(const SocietyDrive &drive, const QJsonObject &
     const auto catalogFile = root + "/.iisacc-file-provider/catalog.sqlite3";
     std::unique_ptr<iiFileProvider::FileCatalog> catalog;
     if (QFileInfo::exists(catalogFile))
-        catalog = std::make_unique<iiFileProvider::FileCatalog>(native(root), iiFileProvider::FileCatalog::Access::ReadWrite);
+        catalog = std::make_unique<iiFileProvider::FileCatalog>(native(root), iiFileProvider::FileCatalog::Access::ReadWrite,
+            FileRepository::classificationDirectory(native(drive.rootPath()), "models"));
     QStringList pending{root}; qsizetype seen = 0;
     while (!pending.isEmpty()) {
         if (stop.stop_requested() || (cancelled && cancelled->load())) return repaired;
@@ -205,17 +206,21 @@ QStringList repairModelCompanions(const SocietyDrive &drive, const QJsonObject &
                 if (!sameClassification(oldDocument, expected)) {
                     if (errors) errors->append(QStringLiteral("The old classification differs from the current asset at %1.").arg(target)); continue;
                 }
-                const auto targetMetadata = target + ".iisacc.json";
                 QString problem;
-                const bool metadataExists = occupied(QFileInfo(targetMetadata));
-                if (metadataExists) {
-                    const auto currentDocument = QJsonDocument::fromJson(QByteArray::fromStdString(
-                        iiFileProvider::FileCatalog::classificationDocument(native(target)))).object();
-                    if (!sameClassification(oldDocument, currentDocument)) {
-                        if (errors) errors->append(QStringLiteral("Classification conflict at %1.").arg(target));
-                        continue;
-                    }
+                const auto published = catalog->registerFile(targetRelative.toStdString());
+                if (!published.metadataWritten) {
+                    if (errors) errors->append(QString::fromStdString(published.metadataError));
+                    continue;
                 }
+                const auto currentDocument = QJsonDocument::fromJson(QByteArray::fromStdString(
+                    catalog->metadataDocument(published.file.key))).object();
+                if (!sameClassification(oldDocument, currentDocument)) {
+                    if (errors) errors->append(QStringLiteral("Classification conflict at %1.").arg(target));
+                    continue;
+                }
+                const auto storage = SharedStorage::open(drive.rootPath(), &problem);
+                const auto vault = storage ? storage->ensureRuntimeDirectory("classifications/recovered", &problem) : QString();
+                if (vault.isEmpty()) { if (errors) errors->append(problem); continue; }
                 // Complete or preserve the preview first. If it conflicts or
                 // cannot move, the old classification stays in place so a
                 // later repair still discovers the entire incomplete asset.
@@ -226,9 +231,10 @@ QStringList repairModelCompanions(const SocietyDrive &drive, const QJsonObject &
                     if (!verifyPortablePreview(oldPreview, &previewError)) { if (errors) errors->append(previewError); continue; }
                     if (occupied(QFileInfo(targetPreview))) {
                         const auto currentPreview = readObject(targetPreview, 2 * 1024 * 1024);
+                        const auto previewVault = storage->ensureRuntimeDirectory("recovered-previews", &previewError);
                         if (!verifyPortablePreview(targetPreview, &previewError)
                             || oldPreviewDoc.value("preview") != currentPreview.value("preview")
-                            || !archive(root, oldPreview, oldPreviewBytes, &previewError)) {
+                            || previewVault.isEmpty() || !archive(previewVault, oldPreview, oldPreviewBytes, &previewError)) {
                             if (errors) errors->append(previewError.isEmpty() ? QStringLiteral("Preview conflict at %1.").arg(target) : previewError);
                             continue;
                         }
@@ -237,21 +243,8 @@ QStringList repairModelCompanions(const SocietyDrive &drive, const QJsonObject &
                         continue;
                     }
                 }
-                if (metadataExists) {
-                    if (!archive(root, child.absoluteFilePath(), oldBytes, &problem)) {
-                        if (errors) errors->append(problem); continue;
-                    }
-                } else {
-                    if (!renameWithoutCopy(child.absoluteFilePath(), targetMetadata)) {
-                        if (errors) errors->append(QStringLiteral("Could not recover classification for %1.").arg(target)); continue;
-                    }
-                    try { (void)iiFileProvider::FileCatalog::classificationDocument(native(target)); }
-                    catch (...) {
-                        const bool restored = renameWithoutCopy(targetMetadata, child.absoluteFilePath());
-                        if (errors) errors->append(restored ? QStringLiteral("The old classification was invalid; it was preserved.")
-                                                          : QStringLiteral("The classification requires inspection at %1.").arg(targetMetadata));
-                        continue;
-                    }
+                if (!archive(vault, child.absoluteFilePath(), oldBytes, &problem)) {
+                    if (errors) errors->append(problem); continue;
                 }
                 repaired.append(target);
             } catch (const std::exception &e) {

@@ -54,6 +54,118 @@ class SharedStorageTests : public QObject
 {
     Q_OBJECT
 private slots:
+    void legacyClassificationsAreIsolatedWithoutMergingUnknownFiles() {
+        QTemporaryDir fixture(QDir::current().filePath("classification-migration-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        const auto drive = SocietyDrive::create(fixture.path()); QVERIFY(drive);
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        write(fixture.filePath("Files/known.txt"), "known");
+        {
+            iiFileProvider::FileCatalog old(std::filesystem::path(fixture.filePath("Files").toStdU16String()));
+            iiFileProvider::FileMetadata metadata; metadata.title = "Retained title";
+            QVERIFY(old.registerFile("known.txt", metadata).metadataWritten);
+        }
+        write(fixture.filePath("Files/orphan.txt.iisacc.json"), "unrecognized legacy bytes");
+        write(fixture.filePath("Files/unindexed.txt"), "unindexed object");
+        write(fixture.filePath("Files/unindexed.txt.iisacc.json"),
+              "{\"format\":\"iiFileProvider.Metadata\",\"schema\":1,"
+              "\"fileKey\":\"file-0123456789abcdef0123456789abcdef\",\"revision\":1,"
+              "\"metadata\":{\"title\":\"Unverified title\"},\"collections\":[]}");
+        write(fixture.filePath("Files/ordinary.json"), "{\"ordinary\":true}");
+        QString error;
+        QVERIFY(!storage->reconcileFiles(&error)); // unresolved data must be reported
+        QVERIFY(!error.isEmpty());
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Files/known.txt.iisacc.json")));
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Files/orphan.txt.iisacc.json")));
+        QVERIFY(!QFileInfo::exists(fixture.filePath("Files/unindexed.txt.iisacc.json")));
+        QVERIFY(QFileInfo::exists(fixture.filePath("Files/ordinary.json")));
+        QVERIFY(QFileInfo::exists(fixture.filePath(".society-runtime/classifications/files/known.txt.iisacc.json")));
+        const auto info = storage->fileInformation(StoreSection::Files, "known.txt", &error);
+        QCOMPARE(info.value("classification").toObject().value("metadata").toObject().value("title").toString(),
+                 QStringLiteral("Retained title"));
+        const QDir unresolved(fixture.filePath(".society-runtime/classifications/unresolved"));
+        bool foundBytes = false, foundAddress = false, foundUnverified = false;
+        for (const auto &name : unresolved.entryList(QDir::Files)) {
+            QFile saved(unresolved.filePath(name)); QVERIFY(saved.open(QIODevice::ReadOnly));
+            const auto content = saved.readAll();
+            foundBytes |= content == QByteArray("unrecognized legacy bytes");
+            foundAddress |= content.contains("files/orphan.txt.iisacc.json");
+            foundUnverified |= content.contains("Unverified title");
+        }
+        QVERIFY(foundBytes); QVERIFY(foundAddress); QVERIFY(foundUnverified);
+        const auto unindexed = storage->fileInformation(StoreSection::Files, "unindexed.txt", &error);
+        QVERIFY(unindexed.value("classification").toObject().value("metadata").toObject().value("title").toString()
+                != QStringLiteral("Unverified title"));
+    }
+    void replacedExternalFileDoesNotInheritLegacyClassification() {
+        QTemporaryDir fixture(QDir::current().filePath("classification-replaced-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid());
+        QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        const auto asset = fixture.filePath("Files/asset.txt");
+        write(asset, "original");
+        {
+            iiFileProvider::FileCatalog old(std::filesystem::path(fixture.filePath("Files").toStdU16String()));
+            iiFileProvider::FileMetadata metadata; metadata.title = "Original title";
+            QVERIFY(old.registerFile("asset.txt", metadata).metadataWritten);
+        }
+        // Keep the old inode alive so the replacement cannot accidentally reuse it.
+        QVERIFY(QFile::rename(asset, fixture.filePath("outside-original.txt")));
+        write(asset, "replacement");
+        QString error;
+        QVERIFY(!storage->reconcileFiles(&error));
+        QVERIFY(!error.isEmpty());
+        QVERIFY(!QFileInfo::exists(asset + ".iisacc.json"));
+        const auto info = storage->fileInformation(StoreSection::Files, "asset.txt", &error);
+        QVERIFY(info.value("classification").toObject().value("metadata").toObject().value("title").toString()
+                != QStringLiteral("Original title"));
+        const QDir unresolved(fixture.filePath(".society-runtime/classifications/unresolved"));
+        bool savedOriginal = false;
+        for (const auto &name : unresolved.entryList(QDir::Files)) {
+            QFile saved(unresolved.filePath(name)); QVERIFY(saved.open(QIODevice::ReadOnly));
+            savedOriginal |= saved.readAll().contains("Original title");
+        }
+        QVERIFY(savedOriginal);
+
+        const auto current = fixture.filePath("Files/private.txt");
+        write(current, "private original");
+        {
+            const auto root = std::filesystem::path(fixture.filePath("Files").toStdU16String());
+            iiFileProvider::FileCatalog catalog(root, iiFileProvider::FileCatalog::Access::Create,
+                FileRepository::classificationDirectory(std::filesystem::path(fixture.path().toStdU16String()), "files"));
+            iiFileProvider::FileMetadata metadata; metadata.title = "Private original";
+            QVERIFY(catalog.registerFile("private.txt", metadata).metadataWritten);
+        }
+        QVERIFY(QFile::rename(current, fixture.filePath("outside-private-original.txt")));
+        write(current, "private replacement");
+        const auto replaced = storage->fileInformation(StoreSection::Files, "private.txt", &error);
+        QCOMPARE(replaced.value("classification").toObject().value("status").toString(), QStringLiteral("invalid"));
+    }
+    void stalePrivateClassificationDoesNotAttachToAReusedPath() {
+        QTemporaryDir fixture(QDir::current().filePath("classification-reused-XXXXXX.societycontainer"));
+        QVERIFY(fixture.isValid()); QVERIFY(SocietyDrive::create(fixture.path()));
+        const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
+        const auto oldPath = fixture.filePath("Files/old.txt");
+        const auto movedPath = fixture.filePath("Files/moved.txt");
+        write(oldPath, "original object");
+        {
+            const auto root = std::filesystem::path(fixture.filePath("Files").toStdU16String());
+            iiFileProvider::FileCatalog catalog(root, iiFileProvider::FileCatalog::Access::Create,
+                FileRepository::classificationDirectory(std::filesystem::path(fixture.path().toStdU16String()), "files"));
+            iiFileProvider::FileMetadata metadata; metadata.title = "Original private title";
+            const auto original = catalog.registerFile("old.txt", metadata); QVERIFY(original.metadataWritten);
+            QVERIFY(QFile::rename(oldPath, movedPath));
+            const auto moved = catalog.registerFile("moved.txt"); QVERIFY(moved.metadataWritten);
+            QCOMPARE(moved.file.key, original.file.key);
+        }
+        write(oldPath, "another object");
+        QString error; QVERIFY(!storage->reconcileFiles(&error)); QVERIFY(!error.isEmpty());
+        const auto info = storage->fileInformation(StoreSection::Files, "old.txt", &error);
+        QCOMPARE(info.value("classification").toObject().value("status").toString(), QStringLiteral("invalid"));
+        const auto movedInfo = storage->fileInformation(StoreSection::Files, "moved.txt", &error);
+        QCOMPARE(movedInfo.value("classification").toObject().value("metadata").toObject().value("title").toString(),
+                 QStringLiteral("Original private title"));
+    }
     void directorySearchAndTypeSortUseCurrentOptions() {
         QTemporaryDir fixture(QDir::current().filePath("directory-search-XXXXXX.societycontainer"));
         QVERIFY(fixture.isValid());

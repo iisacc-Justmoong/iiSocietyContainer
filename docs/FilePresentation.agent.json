@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/FilePresentation.md",
-    "sha256": "6d91cd5fa6bafbd78da3bca0909a870c0c4ac26ab8c0a197391497eff5a913df",
-    "bytes": 6442,
-    "line_count": 99,
+    "sha256": "6f3d1270ec269e6276849bab150b1cfbed659b40ad0f012e770eae6387748149",
+    "bytes": 6530,
+    "line_count": 100,
     "encoding": "utf-8",
     "language": "en"
   },
@@ -234,21 +234,21 @@
       "id": "b000025",
       "kind": "paragraph",
       "start_line": 86,
-      "end_line": 91,
-      "raw": "Original data forks remain byte-for-byte intact. Native attributes/streams carry\ndetails and preview bytes where supported. The hidden\n`.<filename>.iisacc-preview` companion retains the same portable asset projection\nwhen a transfer discards extended attributes. Its source change token journals\nthe post-embedding native state. Classification `.iisacc.json` documents are\nindependent and remain under Catalog revision control.\n"
+      "end_line": 92,
+      "raw": "Original data forks remain byte-for-byte intact. Native attributes/streams carry\ndetails and preview bytes where supported. The hidden\n`.<filename>.iisacc-preview` companion retains the same portable asset projection\nwhen a transfer discards extended attributes. Its source change token journals\nthe post-embedding native state. Society classification `.iisacc.json` documents\nare independent, remain under Catalog revision control, and are stored outside\nthe public sections in `.society-runtime/classifications/`.\n"
     },
     {
       "id": "b000026",
       "kind": "blank",
-      "start_line": 92,
-      "end_line": 92,
+      "start_line": 93,
+      "end_line": 93,
       "raw": "\n"
     },
     {
       "id": "b000027",
       "kind": "paragraph",
-      "start_line": 93,
-      "end_line": 99,
+      "start_line": 94,
+      "end_line": 100,
       "raw": "Full representation, codec limits, lifecycle hooks and API examples are in\n[iiFileProvider's presentation contract](../../iiFileProvider/docs/FILE_PRESENTATION.md).\nThe storage monitor is hosted by a process that owns the selected drive; a\nSociety window is not required when a storage consumer/daemon is running.\nOpening the current deployed application alone does not prove that it contains\nthese source changes; build, package-consumer and target-runtime evidence are\nreported separately.\n"
     }
   ],
@@ -317,7 +317,7 @@
       },
       {
         "block_id": "b000027",
-        "line": 96,
+        "line": 97,
         "text": "Society window is not required when a storage consumer/daemon is running.",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -337,7 +337,7 @@
         "label": "iiFileProvider's presentation contract",
         "target": "../../iiFileProvider/docs/FILE_PRESENTATION.md",
         "kind": "relative",
-        "line": 94
+        "line": 95
       }
     ],
     "tables": [

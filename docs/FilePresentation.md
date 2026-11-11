@@ -87,8 +87,9 @@ Original data forks remain byte-for-byte intact. Native attributes/streams carry
 details and preview bytes where supported. The hidden
 `.<filename>.iisacc-preview` companion retains the same portable asset projection
 when a transfer discards extended attributes. Its source change token journals
-the post-embedding native state. Classification `.iisacc.json` documents are
-independent and remain under Catalog revision control.
+the post-embedding native state. Society classification `.iisacc.json` documents
+are independent, remain under Catalog revision control, and are stored outside
+the public sections in `.society-runtime/classifications/`.
 
 Full representation, codec limits, lifecycle hooks and API examples are in
 [iiFileProvider's presentation contract](../../iiFileProvider/docs/FILE_PRESENTATION.md).

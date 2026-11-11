@@ -1,6 +1,7 @@
 #include "SharedStorage.h"
 #include "StorageMap.h"
 #include "src/CompanionRecovery.h"
+#include "src/LegacyClassificationMigration.h"
 #include "src/FileTreePaths.h"
 #include <iiFileProviderDevice.h>
 #include <ObjectSource.h>
@@ -120,11 +121,15 @@ bool SharedStorage::recordFileForUserJob(StoreSection section, const QString &re
 }
 bool SharedStorage::reconcileFiles(QString *error, std::stop_token stop) const {
     try {
-        FileRepositoryContext context; context.description = "Native file intake";
-        fileRepository(std::move(context), FileRepository::Access::ReadWrite, FileRepository::Intent::Background)->reconcile(stop);
         std::atomic_bool cancelled{stop.stop_requested()};
         std::stop_callback onStop(stop, [&] { cancelled.store(true); });
-        QStringList warnings; (void)repairModelCompanions(&warnings, &cancelled, stop);
+        QStringList warnings = detail::isolateLegacyClassifications(m_drive, stop, false);
+        FileRepositoryContext context; context.description = "Native file intake";
+        fileRepository(std::move(context), FileRepository::Access::ReadWrite, FileRepository::Intent::Background)->reconcile(stop);
+        QStringList repairWarnings; (void)repairModelCompanions(&repairWarnings, &cancelled, stop);
+        for (const auto &warning : repairWarnings)
+            if (!warning.contains(".iisacc.json", Qt::CaseInsensitive)) warnings.append(warning);
+        warnings.append(detail::isolateLegacyClassifications(m_drive, stop, true));
         if (cancelled.load()) throw std::runtime_error("file reconciliation cancelled");
         if (!warnings.isEmpty()) throw std::runtime_error(warnings.join('\n').toStdString());
         if (error) error->clear(); return true;

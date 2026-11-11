@@ -254,7 +254,8 @@ public:
     FileCatalog &catalog(const std::string &key) const {
         auto &value = catalogs[key];
         if (!value) value = std::make_unique<FileCatalog>(section(key).directory,
-            access == Access::ReadOnly ? FileCatalog::Access::ReadOnly : FileCatalog::Access::Create);
+            access == Access::ReadOnly ? FileCatalog::Access::ReadOnly : FileCatalog::Access::Create,
+            FileRepository::classificationDirectory(root, key));
         return *value;
     }
     const std::string &begin() {
@@ -481,6 +482,13 @@ FileRepository::FileRepository(fs::path root, std::string container, std::vector
     d->graph = std::make_unique<OntologyFileSystem>(*d->store);
 }
 FileRepository::~FileRepository() { try { endSession(); } catch (...) {} }
+fs::path FileRepository::classificationDirectory(const fs::path &root, const std::string &section) {
+    if (!root.is_absolute() || root.lexically_normal() != root || section.empty() || section.size() > 128
+        || !std::ranges::all_of(section, [](unsigned char c) {
+            return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
+        })) fail("invalid classification storage owner");
+    return root / ".society-runtime" / "classifications" / section;
+}
 fs::path FileRepository::packagePath(const fs::path &root, const std::string &container) {
     return root / ".society-file-provider" / iiFileProvider::native::sha256(container);
 }
@@ -636,6 +644,14 @@ FileReconciliation FileRepository::reconcile(std::stop_token stop) {
             std::ranges::transform(extension, extension.begin(), [](unsigned char c) { return char(std::tolower(c)); });
             const bool deletedModel = part.key == "deleted" &&
                 (extension == ".safetensors" || extension == ".safetensor" || extension == ".gguf" || extension == ".iildmodel");
+            const auto verifyClassification = [&] {
+                auto &catalog = d->catalog(part.key);
+                const auto ownerKey = FileCatalog::classificationOwnerAt(d->path(path), catalog.metadataPath(relative));
+                if (ownerKey.empty()) return;
+                const auto owner = catalog.lookup(ownerKey);
+                if (!owner || !catalog.matchesIdentity(ownerKey, relative))
+                    fail("private classification owner cannot be verified for " + path);
+            };
             if ((part.key == "models" || deletedModel) && !before) {
                 // Models are ordinary resident files. Their classification and
                 // stable catalog identity do not require a second copy in the
@@ -645,6 +661,7 @@ FileReconciliation FileRepository::reconcile(std::stop_token stop) {
                     if (!fs::is_regular_file(d->path(path))) return;
                     if (token.stop_requested()) fail("reconciliation cancelled");
                     auto &catalog = d->catalog(part.key);
+                    verifyClassification();
                     const auto previous = catalog.lookupPath(relative);
                     if (previous) {
                         // A different file at an old pathname must not inherit
@@ -668,7 +685,10 @@ FileReconciliation FileRepository::reconcile(std::stop_token stop) {
             perform([&](std::stop_token token) {
                 // A foreground rename can remove this candidate while intake
                 // yields. Its destination is discovered by a later pass.
-                if (fs::is_regular_file(d->path(path))) after = observe(path, {}, token);
+                if (fs::is_regular_file(d->path(path))) {
+                    verifyClassification();
+                    after = observe(path, {}, token);
+                }
             });
             if (after && (!before || before->version != after->version)) ++result.changed;
         }
@@ -718,20 +738,18 @@ void FileRepository::relocated(const std::string &from, const std::string &to, b
             const auto previous = original.metadata.annotations;
             const auto [oldSection, oldRelative] = d->split(file.path);
             const auto [newSection, newRelative] = d->split(destination);
-            if (observeContent && oldSection->key != newSection->key) {
-                const auto sourceCompanion = pathFromText(text(d->path(file.path)) + ".iisacc.json");
-                const auto targetCompanion = pathFromText(text(native) + ".iisacc.json");
-                if (!fs::exists(targetCompanion) && fs::exists(sourceCompanion))
-                    iiFileProvider::native::copyFile(sourceCompanion, targetCompanion);
-            }
             if (!observeContent) {
                 const auto moved = d->store->move(file.key, destination, file.version, d->begin());
                 const auto oldCatalog = d->catalog(oldSection->key).lookupPath(oldRelative);
                 d->project(moved, original, previous, oldCatalog ? oldCatalog->key : file.key);
                 continue;
             }
-            const auto registered = d->catalog(newSection->key).registerFile(newRelative,
-                oldSection->key == newSection->key ? std::optional<FileMetadata>(previous) : std::nullopt);
+            auto &destinationCatalog = d->catalog(newSection->key);
+            const bool hasClassification = fs::exists(destinationCatalog.metadataPath(newRelative))
+                || fs::exists(pathFromText(text(native) + ".iisacc.json"));
+            const auto registered = destinationCatalog.registerFile(newRelative,
+                oldSection->key == newSection->key || !hasClassification
+                    ? std::optional<FileMetadata>(previous) : std::nullopt);
             if (!registered.metadataWritten) fail(registered.metadataError);
             const auto stamp = ObjectSource::inspect(native);
             d->store->move(file.key, destination, file.version, d->begin(), {{}, stamp.stamp});

@@ -22,6 +22,17 @@
 #include <QtEndian>
 
 using namespace iiSocietyContainer;
+namespace {
+QString classificationPath(const QString &container, const QString &asset) {
+    for (const auto section : allStoreSections()) {
+        const auto root = container + '/' + storeSectionName(section) + '/';
+        if (asset.startsWith(root))
+            return container + "/.society-runtime/classifications/" + storeSectionKey(section)
+                + '/' + asset.mid(root.size()) + ".iisacc.json";
+    }
+    return {};
+}
+}
 
 class ModelImportServiceTests final : public QObject {
     Q_OBJECT
@@ -115,7 +126,8 @@ private slots:
             QVERIFY(tracking.value("rawKey").toString().isEmpty());
             const auto id = tracking.value("resource").toObject().value("id").toString();
             QVERIFY(!id.isEmpty()); ids.append(id);
-            QVERIFY(QFileInfo::exists(path + ".iisacc.json"));
+            QVERIFY(!QFileInfo::exists(path + ".iisacc.json"));
+            QVERIFY(QFileInfo::exists(classificationPath(drivePath, path)));
         }
         QVERIFY(ids[0] != ids[1]);
         occupied.reset(); repository.reset();
@@ -171,7 +183,8 @@ private slots:
         const auto recategorizedTracking = storage->fileTracking(StoreSection::Models,
             QDir(drivePath + "/Models").relativeFilePath(recategorizedPath));
         QCOMPARE(recategorizedTracking.value("resource").toObject().value("id").toString(), ids[0]);
-        QVERIFY(QFileInfo::exists(recategorizedPath + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(recategorizedPath + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(classificationPath(drivePath, recategorizedPath)));
         qunsetenv("SOCIETY_JOB_STATE_ROOT");
     }
 
@@ -467,25 +480,25 @@ private slots:
         QCOMPARE(QString::fromStdString(descriptionRecord->metadata.title), QStringLiteral("Creator description"));
         const auto renamed = FileOperations(*drive).perform(FileOperations::Action::Rename, imported, "renamed.safetensors");
         QVERIFY2(renamed, qPrintable(renamed.error));
-        QVERIFY(QFileInfo::exists(renamed.path + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(category + "/renamed.model.json.iisacc.json"));
+        QVERIFY(QFileInfo::exists(classificationPath(drivePath, renamed.path)));
+        QVERIFY(QFileInfo::exists(classificationPath(drivePath, category + "/renamed.model.json")));
         const auto trashed = FileOperations(*drive).perform(FileOperations::Action::Trash, renamed.path);
         QVERIFY2(trashed, qPrintable(trashed.error));
-        QVERIFY(QFileInfo::exists(trashed.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(classificationPath(drivePath, trashed.path)));
         const auto restored = FileOperations(*drive).perform(FileOperations::Action::Restore, trashed.path);
         QVERIFY2(restored, qPrintable(restored.error));
-        QVERIFY(QFileInfo::exists(restored.path + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(category + "/renamed.model.json.iisacc.json"));
+        QVERIFY(QFileInfo::exists(classificationPath(drivePath, restored.path)));
+        QVERIFY(QFileInfo::exists(classificationPath(drivePath, category + "/renamed.model.json")));
         const auto removedFromView = FileOperations(*drive).perform(FileOperations::Action::Trash, restored.path);
         QVERIFY2(removedFromView, qPrintable(removedFromView.error));
         const auto deletedDescription = QFileInfo(removedFromView.path).absolutePath() + "/renamed.model.json";
-        QVERIFY(QFileInfo::exists(deletedDescription + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(classificationPath(drivePath, deletedDescription)));
         const auto removed = FileOperations(*drive).perform(FileOperations::Action::Remove, removedFromView.path);
         QVERIFY2(removed, qPrintable(removed.error));
         QVERIFY(!QFileInfo::exists(removedFromView.path));
-        QVERIFY(!QFileInfo::exists(removedFromView.path + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(classificationPath(drivePath, removedFromView.path)));
         QVERIFY(!QFileInfo::exists(deletedDescription));
-        QVERIFY(!QFileInfo::exists(deletedDescription + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(classificationPath(drivePath, deletedDescription)));
         QVERIFY(QFileInfo::exists(source + ".iisacc.json"));
         QVERIFY(QFileInfo::exists(description + ".iisacc.json"));
         QFile untouched(unrelated); QVERIFY(untouched.open(QIODevice::ReadOnly));

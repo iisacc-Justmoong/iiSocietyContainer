@@ -21,6 +21,7 @@
 #include <QStandardPaths>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace iiSocietyContainer {
 #ifdef Q_OS_IOS
@@ -279,9 +280,21 @@ QJsonObject SharedStorage::fileInformation(StoreSection section, const QString &
     result.insert("embedded", record.value->embedded);
     QJsonObject classification{{"status", "absent"}};
     try {
-        const auto document = iiFileProvider::FileCatalog::classificationDocument(native);
+        const auto privateRoot = FileRepository::classificationDirectory(detail::nativePath(m_drive.rootPath()),
+                                                                          storeSectionKey(section).toStdString());
+        auto privateDocument = privateRoot / detail::nativePath(relativePath);
+        privateDocument += ".iisacc.json";
+        auto document = iiFileProvider::FileCatalog::classificationDocumentAt(native, privateDocument);
+        if (document.empty()) document = iiFileProvider::FileCatalog::classificationDocument(native);
         if (!document.empty()) {
-            classification = QJsonDocument::fromJson(QByteArray::fromStdString(document)).object();
+            const auto parsed = QJsonDocument::fromJson(QByteArray::fromStdString(document)).object();
+            iiFileProvider::FileCatalog catalog(detail::nativePath(m_drive.sectionPath(section)),
+                iiFileProvider::FileCatalog::Access::ReadOnly, privateRoot);
+            const auto registered = catalog.lookupPath(relativePath.toUtf8().toStdString());
+            if (!registered || registered->key != parsed.value("fileKey").toString().toStdString())
+                throw std::runtime_error("Classification ownership is not verified.");
+            (void)catalog.read(registered->key, 0, 1);
+            classification = parsed;
             classification.insert("status", "ready");
         }
     } catch (...) { classification = {{"status", "invalid"}}; }

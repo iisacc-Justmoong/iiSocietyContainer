@@ -1,0 +1,12 @@
+if(NOT LIBRARY OR NOT DEPENDENCY)
+    message(FATAL_ERROR "Library and dependency are required")
+endif()
+execute_process(COMMAND /usr/bin/otool -l "${LIBRARY}"
+    RESULT_VARIABLE result OUTPUT_VARIABLE commands ERROR_VARIABLE error)
+if(NOT result EQUAL 0)
+    message(FATAL_ERROR "Could not inspect FileTree exports: ${error}")
+endif()
+string(REGEX MATCH "cmd LC_REEXPORT_DYLIB[^\n]*\n[^\n]*\n[^\n]*${DEPENDENCY}" match "${commands}")
+if(NOT match)
+    message(FATAL_ERROR "FileTree does not re-export ${DEPENDENCY}")
+endif()

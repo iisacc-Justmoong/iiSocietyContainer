@@ -3,6 +3,7 @@
 #include "FileTreePaths.h"
 #include <ModelClassifier.h>
 #include <FileOperations.h>
+#include <SharedStorage.h>
 #include <FileCatalog.h>
 #include <ObjectSource.h>
 #include <iiFileProviderDevice.h>
@@ -29,6 +30,46 @@ QString previewPath(const QString &asset) {
     return QString::fromStdU16String(iiFileProvider::native::Presentation::companionPath(native(asset)).u16string());
 }
 bool present(const QFileInfo &info) { return info.exists() || info.isSymLink() || info.isJunction(); }
+// Empty means the asset is outside a Society container. No public asset
+// directory is used to hold private classification documents.
+QString privateClassificationPath(const QString &asset, bool createParent, QString *error) {
+    const auto drive = FileOperations::containingDrive(asset);
+    if (!drive) return {};
+    const auto logical = drive->relativePath(asset);
+    for (const auto section : allStoreSections()) {
+        const auto name = storeSectionName(section);
+        if (!logical.startsWith(name + '/')) continue;
+        const auto relative = logical.mid(name.size() + 1);
+        if (relative.isEmpty()) return {};
+        auto target = FileRepository::classificationDirectory(native(drive->rootPath()), storeSectionKey(section).toStdString()) / native(relative);
+        target += ".iisacc.json";
+        const auto result = QString::fromStdU16String(target.u16string());
+        if (createParent) {
+            QString problem;
+            const auto storage = SharedStorage::open(drive->rootPath(), &problem);
+            const auto parent = QFileInfo(relative).path();
+            auto directory = QStringLiteral("classifications/") + storeSectionKey(section);
+            if (parent != ".") directory += '/' + parent;
+            if (!storage || storage->ensureRuntimeDirectory(directory, &problem).isEmpty()) {
+                fail(error, problem.isEmpty() ? QStringLiteral("Private classification storage is unavailable.") : problem);
+                return {};
+            }
+        }
+        return result;
+    }
+    return {};
+}
+bool safePrivateTree(const QString &path) {
+    const QFileInfo info(path);
+    if (!info.isDir() || info.isSymLink() || info.isJunction() || info.canonicalFilePath() != path) return false;
+    const QDir directory(path);
+    for (const auto &child : directory.entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot)) {
+        if (child.isSymLink() || child.isJunction()) return false;
+        if (child.isDir() && !safePrivateTree(child.absoluteFilePath())) return false;
+        if (!child.isDir() && !child.isFile()) return false;
+    }
+    return true;
+}
 bool validPreview(const QString &path, QString *error) {
     const QFileInfo info(path);
     if (!info.isFile() || info.isSymLink() || info.isJunction()
@@ -109,7 +150,13 @@ bool appendAssetCompanions(const QString &source, const QString &destination,
                            QList<QPair<QString, QString>> *moves, QString *error) {
     if (!moves) { fail(error, QStringLiteral("The asset companion plan is unavailable.")); return false; }
     const QFileInfo asset(source);
-    const auto metadata = source + ".iisacc.json";
+    const auto privateSource = privateClassificationPath(source, false, error);
+    const auto legacySource = source + ".iisacc.json";
+    if (!privateSource.isEmpty() && present(QFileInfo(privateSource)) && present(QFileInfo(legacySource))) {
+        fail(error, QStringLiteral("Both private and legacy classifications exist; resolve the conflict before moving this asset."));
+        return false;
+    }
+    const auto metadata = !privateSource.isEmpty() && present(QFileInfo(privateSource)) ? privateSource : legacySource;
     if (present(QFileInfo(metadata))) {
         const QFileInfo info(metadata);
         if (!info.isFile() || info.isSymLink() || info.isJunction()
@@ -119,13 +166,26 @@ bool appendAssetCompanions(const QString &source, const QString &destination,
         if (asset.isDir()) {
             if (!validProjectClassification(source, metadata, error)) return false;
         } else try {
-            if (iiFileProvider::FileCatalog::classificationDocument(native(source)).empty()) {
+            if (iiFileProvider::FileCatalog::classificationDocumentAt(native(source), native(metadata)).empty()) {
                 fail(error, QStringLiteral("The asset classification is unavailable.")); return false;
             }
         } catch (const std::exception &e) {
             fail(error, QStringLiteral("Could not validate asset classification: %1").arg(QString::fromUtf8(e.what()))); return false;
         }
-        moves->append({metadata, destination + ".iisacc.json"});
+        const auto privateDestination = privateClassificationPath(destination, true, error);
+        if (FileOperations::containingDrive(destination) && privateDestination.isEmpty()) return false;
+        moves->append({metadata, privateDestination.isEmpty() ? destination + ".iisacc.json" : privateDestination});
+    }
+    // Directory operations carry their private descendant documents as one
+    // separate tree; the public directory still contains only user files.
+    if (asset.isDir() && !privateSource.isEmpty()) {
+        const auto sourceTree = privateSource.chopped(int(QStringLiteral(".iisacc.json").size()));
+        if (present(QFileInfo(sourceTree))) {
+            if (!safePrivateTree(sourceTree)) { fail(error, QStringLiteral("A private classification directory is redirected.")); return false; }
+            const auto privateDestination = privateClassificationPath(destination, true, error);
+            if (privateDestination.isEmpty()) { fail(error, QStringLiteral("Private classification destination is unavailable.")); return false; }
+            moves->append({sourceTree, privateDestination.chopped(int(QStringLiteral(".iisacc.json").size()))});
+        }
     }
     if (asset.isFile()) {
         const auto preview = previewPath(source);
@@ -157,6 +217,8 @@ std::optional<AssetObject::Plan> AssetObject::plan(const QString &source, const 
         // Even when the source has no sidecar, a pre-existing destination
         // sidecar must not be adopted as metadata for an unrelated asset.
         result.reservedTargets.append(asset.second + ".iisacc.json");
+        const auto privateTarget = privateClassificationPath(asset.second, false, error);
+        if (!privateTarget.isEmpty()) result.reservedTargets.append(privateTarget);
         if (QFileInfo(asset.first).isFile()) result.reservedTargets.append(previewPath(asset.second));
     }
     for (const auto &member : result.members) result.reservedTargets.append(member.second);

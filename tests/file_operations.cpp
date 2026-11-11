@@ -2,6 +2,7 @@
 #include "FileOperations.h"
 #include "StorageMap.h"
 #include "SharedStorage.h"
+#include "ModelStore.h"
 #include "../src/ExclusiveRename.h"
 #include "../src/AssetTransfer.h"
 #include "../src/DeletedOrigins.h"
@@ -16,9 +17,72 @@
 #include <QTemporaryDir>
 #include <QTest>
 using namespace iiSocietyContainer;
+namespace {
+QString privateClassification(const SocietyDrive &drive, const QString &asset) {
+    const auto logical = drive.relativePath(asset);
+    for (const auto section : allStoreSections()) {
+        const auto prefix = storeSectionName(section) + '/';
+        if (!logical.startsWith(prefix)) continue;
+        return drive.rootPath() + "/.society-runtime/classifications/" + storeSectionKey(section)
+            + '/' + logical.mid(prefix.size()) + ".iisacc.json";
+    }
+    return {};
+}
+}
 class FileOperationsTests : public QObject {
     Q_OBJECT
 private slots:
+    void classificationIsPrivateAcrossFileOperations() {
+        QTemporaryDir temp(QDir::currentPath() + "/private-classification-XXXXXX.societycontainer");
+        QVERIFY(temp.isValid());
+        const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive);
+        const auto storage = SharedStorage::open(temp.path()); QVERIFY(storage);
+        const auto source = temp.filePath("Files/asset.txt");
+        QFile file(source); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write("payload"), 7); file.close();
+        QString error; QVERIFY2(storage->recordFile(StoreSection::Files, "asset.txt", &error), qPrintable(error));
+        const auto metadata = temp.filePath(".society-runtime/classifications/files/asset.txt.iisacc.json");
+        QVERIFY(QFileInfo::exists(metadata)); QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
+        const auto identity = storage->fileTracking(StoreSection::Files, "asset.txt").value("objectKey");
+        QVERIFY(!identity.toString().isEmpty());
+        FileOperations operations(*drive);
+        const auto renamed = operations.perform(FileOperations::Action::Rename, source, "renamed.txt");
+        QVERIFY2(renamed, qPrintable(renamed.error));
+        QVERIFY(!QFileInfo::exists(renamed.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(temp.filePath(".society-runtime/classifications/files/renamed.txt.iisacc.json")));
+        QCOMPARE(storage->fileTracking(StoreSection::Files, "renamed.txt").value("objectKey"), identity);
+        const auto trashed = operations.perform(FileOperations::Action::Trash, renamed.path);
+        QVERIFY2(trashed, qPrintable(trashed.error));
+        QVERIFY(!QFileInfo::exists(trashed.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(temp.filePath(".society-runtime/classifications/deleted/renamed.txt.iisacc.json")));
+        const auto restored = operations.perform(FileOperations::Action::Restore, trashed.path);
+        QVERIFY2(restored, qPrintable(restored.error));
+        QCOMPARE(storage->fileTracking(StoreSection::Files, "renamed.txt").value("objectKey"), identity);
+        const auto copy = operations.perform(FileOperations::Action::Duplicate, restored.path);
+        QVERIFY2(copy, qPrintable(copy.error));
+        QVERIFY(!QFileInfo::exists(copy.path + ".iisacc.json"));
+        QVERIFY(storage->fileTracking(StoreSection::Files, QFileInfo(copy.path).fileName()).value("objectKey") != identity);
+    }
+    void modelCategoryKeepsPrivateClassification() {
+        QTemporaryDir temp(QDir::currentPath() + "/private-model-XXXXXX.societycontainer");
+        QVERIFY(temp.isValid());
+        const auto drive = SocietyDrive::create(temp.path()); QVERIFY(drive);
+        const auto source = temp.filePath("Models/Checkpoint/model.safetensors");
+        QVERIFY(QDir().mkpath(QFileInfo(source).absolutePath()));
+        QFile file(source); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("model"); file.close();
+        const auto base = std::filesystem::path(temp.filePath("Models").toStdU16String());
+        const auto vault = FileRepository::classificationDirectory(std::filesystem::path(temp.path().toStdU16String()), "models");
+        iiFileProvider::FileCatalog catalog(base, iiFileProvider::FileCatalog::Access::Create, vault);
+        iiFileProvider::FileMetadata metadata; metadata.title = "Model classification";
+        const auto original = catalog.registerFile("Checkpoint/model.safetensors", metadata);
+        QVERIFY(original.metadataWritten);
+        QString error; const auto store = ModelStore::open(temp.path(), &error); QVERIFY2(store, qPrintable(error));
+        const auto moved = store->place(source, ModelType::LLM, &error); QVERIFY2(!moved.isEmpty(), qPrintable(error));
+        QVERIFY(!QFileInfo::exists(moved + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(temp.filePath(".society-runtime/classifications/models/LLM/model.safetensors.iisacc.json")));
+        QCOMPARE(store->indexAsset(moved, &error), QString::fromStdString(original.file.key));
+        const auto current = catalog.lookup(original.file.key); QVERIFY(current);
+        QCOMPARE(QString::fromStdString(current->metadata.title), QStringLiteral("Model classification"));
+    }
     void movesProjectPackagesAsSingleItems() {
         QTemporaryDir temp(QDir::currentPath() + "/project-package-move-XXXXXX.societycontainer");
         QVERIFY(temp.isValid());
@@ -123,7 +187,10 @@ private slots:
         QVERIFY(!operations.perform(FileOperations::Action::Trash, metadata));
         QVERIFY(!operations.perform(FileOperations::Action::Copy, metadata, files));
         QVERIFY(!operations.perform(FileOperations::Action::Rename, asset.fileName(), "fake.iisacc.json"));
-        QVERIFY(QFileInfo::exists(metadata)); QVERIFY(QFileInfo::exists(asset.fileName()));
+        QVERIFY(!QFileInfo::exists(metadata));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, asset.fileName())));
+        QVERIFY(!operations.editable(privateClassification(*drive, asset.fileName())));
+        QVERIFY(QFileInfo::exists(asset.fileName()));
         QVERIFY(operations.editable(asset.fileName()));
     }
     void orphanedDestinationMetadataIsNeverAdopted() {
@@ -205,6 +272,18 @@ private slots:
         }
         QVERIFY(QDir(temp.filePath("from")).entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot).isEmpty());
 
+        // Private classification files live in separate directories from the
+        // public payload, including when the public volume needs a transfer.
+        QVERIFY(QDir().mkdir(temp.filePath("private-from")));
+        QVERIFY(QDir().mkdir(temp.filePath("private-to")));
+        const detail::AssetMoveList split{{temp.filePath("from/asset.txt"), temp.filePath("to/asset.txt")},
+            {temp.filePath("private-from/asset.txt.iisacc.json"), temp.filePath("private-to/asset.txt.iisacc.json")}};
+        QVERIFY(write(split[0].first, "data")); QVERIFY(write(split[1].first, "classification"));
+        const auto splitResult = detail::transferAssetGroup(split, copy, move, remove, [](QString *) { return true; });
+        QVERIFY2(splitResult.committed, qPrintable(splitResult.error));
+        QCOMPARE(read(split[0].second), QByteArray("data")); QCOMPARE(read(split[1].second), QByteArray("classification"));
+        QVERIFY(QFile::remove(split[0].second)); QVERIFY(QFile::remove(split[1].second));
+
         // A failed journal commit preserves both published copies and originals.
         for (qsizetype i = 0; i < moves.size(); ++i) {
             QVERIFY(QFile::remove(moves[i].second)); QVERIFY(write(moves[i].first, bytes[i]));
@@ -256,24 +335,27 @@ private slots:
         const auto moved = operations.perform(FileOperations::Action::Move, source, temp.filePath("Files/archive"));
         QVERIFY2(moved, qPrintable(moved.error));
         QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(moved.path + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(moved.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, moved.path)));
         QVERIFY(!QFileInfo::exists(preview(source))); QVERIFY(QFileInfo::exists(preview(moved.path)));
         QCOMPARE(storage->fileTracking(StoreSection::Files, "archive/document.txt").value("objectKey"), before);
         const auto trashed = operations.perform(FileOperations::Action::Trash, moved.path);
         QVERIFY2(trashed, qPrintable(trashed.error));
         QVERIFY(!QFileInfo::exists(moved.path + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(trashed.path + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(trashed.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, trashed.path)));
         QVERIFY(!QFileInfo::exists(preview(moved.path))); QVERIFY(QFileInfo::exists(preview(trashed.path)));
         const auto restored = operations.perform(FileOperations::Action::Restore, trashed.path);
         QVERIFY2(restored, qPrintable(restored.error)); QCOMPARE(restored.path, moved.path);
         QVERIFY(!QFileInfo::exists(trashed.path + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(restored.path + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(restored.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, restored.path)));
         QVERIFY(!QFileInfo::exists(preview(trashed.path))); QVERIFY(QFileInfo::exists(preview(restored.path)));
         QCOMPARE(storage->fileTracking(StoreSection::Files, "archive/document.txt").value("objectKey"), before);
         const auto duplicate = operations.perform(FileOperations::Action::Duplicate, restored.path);
         QVERIFY2(duplicate, qPrintable(duplicate.error));
-        QVERIFY(QFileInfo::exists(restored.path + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(duplicate.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, restored.path)));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, duplicate.path)));
         QVERIFY(QFileInfo::exists(preview(restored.path))); QVERIFY(QFileInfo::exists(preview(duplicate.path)));
         const auto duplicateRelative = QDir(temp.filePath("Files")).relativeFilePath(duplicate.path);
         const auto duplicateRecord = storage->fileTracking(StoreSection::Files, duplicateRelative);
@@ -282,19 +364,19 @@ private slots:
         const auto duplicateCatalog = catalog.lookupPath(duplicateRelative.toStdString());
         QVERIFY(duplicateCatalog); QCOMPARE(QString::fromStdString(duplicateCatalog->metadata.title), QStringLiteral("Important asset"));
         QVERIFY(duplicateCatalog->key != originalProviderKey);
-        QFile duplicateMetadata(duplicate.path + ".iisacc.json"); QVERIFY(duplicateMetadata.open(QIODevice::ReadOnly));
+        QFile duplicateMetadata(privateClassification(*drive, duplicate.path)); QVERIFY(duplicateMetadata.open(QIODevice::ReadOnly));
         QCOMPARE(QJsonDocument::fromJson(duplicateMetadata.readAll()).object().value("fileKey").toString(),
                  QString::fromStdString(duplicateCatalog->key));
         duplicateMetadata.close();
         const auto duplicateTrash = operations.perform(FileOperations::Action::Trash, duplicate.path);
         QVERIFY2(duplicateTrash, qPrintable(duplicateTrash.error));
-        QVERIFY(QFileInfo::exists(duplicateTrash.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, duplicateTrash.path)));
         const auto removed = operations.perform(FileOperations::Action::Remove, duplicateTrash.path);
         QVERIFY2(removed, qPrintable(removed.error));
         QVERIFY(!QFileInfo::exists(duplicateTrash.path));
-        QVERIFY(!QFileInfo::exists(duplicateTrash.path + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(privateClassification(*drive, duplicateTrash.path)));
         QVERIFY(!QFileInfo::exists(preview(duplicateTrash.path)));
-        QVERIFY(QFileInfo::exists(restored.path)); QVERIFY(QFileInfo::exists(restored.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(restored.path)); QVERIFY(QFileInfo::exists(privateClassification(*drive, restored.path)));
     }
 
     void duplicatesModelAndItsAssociatedAssetWithDistinctIdentity() {
@@ -318,7 +400,7 @@ private slots:
         const auto result = FileOperations(*drive).perform(FileOperations::Action::Duplicate, model);
         QVERIFY2(result, qPrintable(result.error));
         const auto copiedPreview = temp.filePath("Models/Other/model copy.preview.png");
-        QVERIFY(QFileInfo::exists(copiedPreview)); QVERIFY(QFileInfo::exists(copiedPreview + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(copiedPreview)); QVERIFY(QFileInfo::exists(privateClassification(*drive, copiedPreview)));
         const auto copiedTracking = storage->fileTracking(StoreSection::Models, "Other/model copy.preview.png");
         QCOMPARE(copiedTracking.value("resourceStatus").toString(), QStringLiteral("working-copy-only"));
         QVERIFY(copiedTracking.value("objectKey").toString().isEmpty());
@@ -326,7 +408,7 @@ private slots:
         QVERIFY(!copied.toString().isEmpty()); QVERIFY(copied != original);
         const auto copiedCatalog = catalog.lookupPath("Other/model copy.preview.png"); QVERIFY(copiedCatalog);
         QCOMPARE(QString::fromStdString(copiedCatalog->metadata.title), QStringLiteral("Model preview"));
-        QFile copiedMetadata(copiedPreview + ".iisacc.json"); QVERIFY(copiedMetadata.open(QIODevice::ReadOnly));
+        QFile copiedMetadata(privateClassification(*drive, copiedPreview)); QVERIFY(copiedMetadata.open(QIODevice::ReadOnly));
         QCOMPARE(QJsonDocument::fromJson(copiedMetadata.readAll()).object().value("fileKey").toString(),
                  QString::fromStdString(copiedCatalog->key));
         copiedMetadata.close();
@@ -336,7 +418,7 @@ private slots:
         QVERIFY(QFileInfo::exists(deletedPreview));
         const auto restored = FileOperations(*drive).perform(FileOperations::Action::Restore, trashed.path);
         QVERIFY2(restored, qPrintable(restored.error)); QCOMPARE(restored.path, result.path);
-        QVERIFY(QFileInfo::exists(copiedPreview)); QVERIFY(QFileInfo::exists(copiedPreview + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(copiedPreview)); QVERIFY(QFileInfo::exists(privateClassification(*drive, copiedPreview)));
         QVERIFY(!QFileInfo::exists(deletedPreview));
     }
 
@@ -365,8 +447,9 @@ private slots:
         QVERIFY2(result, qPrintable(result.error));
         QVERIFY(lock.locked());
         const auto copiedDescription = folder + "/model.model.json";
-        QVERIFY(QFileInfo::exists(result.path + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(copiedDescription)); QVERIFY(QFileInfo::exists(copiedDescription + ".iisacc.json"));
+        QVERIFY(!QFileInfo::exists(result.path + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(privateClassification(*drive, result.path)));
+        QVERIFY(QFileInfo::exists(copiedDescription)); QVERIFY(QFileInfo::exists(privateClassification(*drive, copiedDescription)));
         QVERIFY(QFileInfo::exists(model)); QVERIFY(QFileInfo::exists(description));
         const auto tracking = storage->fileTracking(StoreSection::Models, "Other/model.model.json");
         QCOMPARE(tracking.value("resourceStatus").toString(), QStringLiteral("working-copy-only"));

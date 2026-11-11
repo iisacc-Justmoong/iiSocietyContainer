@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/Models.md",
-    "sha256": "84a0e0fd4f9719cdcc69930fa8dcb278ad7bb02ed03ca2e2d1c9b497116dd5cd",
-    "bytes": 31102,
-    "line_count": 257,
+    "sha256": "2415e5baabbbc17d117476bb3cdf4674fc415400e2228f03a769f612fe606405",
+    "bytes": 30885,
+    "line_count": 261,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -496,63 +496,63 @@
       "id": "b000055",
       "kind": "paragraph",
       "start_line": 175,
-      "end_line": 179,
-      "raw": "유효한 iiFileProvider 분류 문서 `<파일명>.iisacc.json`과 숨김\n`.파일명.iisacc-preview`도 각 본체 또는 인식된 부속 파일에 연결된 구성물이다.\n모델의 카테고리 이동과 이름 변경에서 모두 함께 이동하며, 손상·리디렉션·충돌을 발견하면\n원본을 보존하고 오류 또는 충돌 없는 다른 이름을 사용한다. 복사·휴지통·복원 등 공통\n파일 작업은 [파일 작업 계약](FileActions.md)을 따른다.\n"
+      "end_line": 180,
+      "raw": "유효한 iiFileProvider 분류 문서는 비공개 `.society-runtime/classifications/models/`에\n주소로 연결하며 숨김\n`.파일명.iisacc-preview`도 각 본체 또는 인식된 부속 파일에 연결된 구성물이다.\n모델의 카테고리 이동과 이름 변경에서 모두 함께 이동하며, 손상·리디렉션·충돌을 발견하면\n원본을 보존하고 오류 또는 충돌 없는 다른 이름을 사용한다. 복사·휴지통·복원 등 공통\n파일 작업은 [파일 작업 계약](FileActions.md)을 따른다.\n"
     },
     {
       "id": "b000056",
       "kind": "blank",
-      "start_line": 180,
-      "end_line": 180,
+      "start_line": 181,
+      "end_line": 181,
       "raw": "\n"
     },
     {
       "id": "b000057",
       "kind": "paragraph",
-      "start_line": 181,
-      "end_line": 192,
-      "raw": "이전 버전이 본체만 옮긴 경우 `ModelStore::repairCompanions(&errors)` 또는\n`iiSocietyContainerDriveTool repair-model-companions <컨테이너>`로 기존 분류 문서와\n프리뷰를 점검할 수 있다. `organize()`도 작업 스레드에서 이 복구를 먼저 실행하고\n실패를 `report.errors`에 포함한다. 복구는 이전 카탈로그 키와 이동 기록 또는 이미\n갱신된 카탈로그 경로, 실제 파일 시스템 식별자와 기록된 크기·수정 시각을 함께 확인하며 이름이나 콘텐츠 해시만으로\n자원을 합치지 않는다. 비교 가능한 현재 분류 내용이 다르거나 대상 프리뷰가 충돌하면\n원래 파일을 유지하고 오류를 반환한다. 대상에 같은 문서가 이미 있으면 이전 바이트는\n`Models/.society-recovered-companions/`에 보존한다. 원래 식별 정보를 확인할 수 없는\n항목은 자동으로 연결하지 않고 남은 위치를 오류로 알린다. 카탈로그 자체가 없어도\n분리된 문서의 존재를 보고하며 새 카탈로그를 만들어 임의로 연결하지 않는다. 분리된\n프리뷰만 남아 원본을 식별할 수 없는 경우에도 보존하고 위치를 알린다. 이 절차는\n전체 모델 가중치를 해시하지 않는다.\n"
+      "start_line": 182,
+      "end_line": 193,
+      "raw": "이전 버전이 본체만 옮긴 경우 `ModelStore::repairCompanions(&errors)` 또는\n`iiSocietyContainerDriveTool repair-model-companions <컨테이너>`로 기존 분류 문서와\n프리뷰를 점검할 수 있다. `organize()`도 작업 스레드에서 이 복구를 먼저 실행하고\n실패를 `report.errors`에 포함한다. 복구는 이전 카탈로그 키와 이동 기록 또는 이미\n갱신된 카탈로그 경로, 실제 파일 시스템 식별자와 기록된 크기·수정 시각을 함께 확인하며 이름이나 콘텐츠 해시만으로\n자원을 합치지 않는다. 비교 가능한 현재 분류 내용이 다르거나 대상 프리뷰가 충돌하면\n원래 파일을 유지하고 오류를 반환한다. 대상에 같은 문서가 이미 있으면 이전 바이트는\n`.society-runtime/classifications/recovered/`에 보존한다. 원래 식별 정보를 확인할 수 없는\n항목은 자동으로 연결하지 않고 남은 위치를 오류로 알린다. 카탈로그 자체가 없어도\n분리된 문서의 존재를 보고하며 새 카탈로그를 만들어 임의로 연결하지 않는다. 분리된\n프리뷰만 남아 원본을 식별할 수 없는 경우에도 보존하고 위치를 알린다. 이 절차는\n전체 모델 가중치를 해시하지 않는다.\n"
     },
     {
       "id": "b000058",
       "kind": "blank",
-      "start_line": 193,
-      "end_line": 193,
+      "start_line": 194,
+      "end_line": 194,
       "raw": "\n"
     },
     {
       "id": "b000059",
       "kind": "paragraph",
-      "start_line": 194,
-      "end_line": 201,
+      "start_line": 195,
+      "end_line": 202,
       "raw": "iiFileProvider의 `<파일명>.iisacc.json` 분류 문서와 미리보기 등 공급자 내부 파일은\n`Presentation::isControlFile()`로 판별한다. 대소문자나 모델 본체의 현재 존재 여부와\n무관하게 `ModelStore` 열거·자동 정리와 `StorageModelCatalog`의 로컬·호스트·원격\n카탈로그에서 별도 모델로 표시하지 않으며, 수동 분류 대상으로도 받지 않는다. 목록\n조회는 이 파일을 삭제하거나 변경하지 않는다. 공급자가 예약하지 않은 일반 JSON,\n워크플로·포즈 JSON과 모델 패키지의 설정은 기존 계약대로 유지한다.\n`modelCatalogExcludesProviderMetadata`는 세 조회 경로와 메타데이터 보존을,\n`providerMetadataIsNeverOrganizedAsAModel`은 자동 및 명시적 분류의 경계를 검사한다.\n"
     },
     {
       "id": "b000060",
       "kind": "blank",
-      "start_line": 202,
-      "end_line": 202,
+      "start_line": 203,
+      "end_line": 203,
       "raw": "\n"
     },
     {
       "id": "b000061",
       "kind": "paragraph",
-      "start_line": 203,
-      "end_line": 203,
-      "raw": "일반 모델 파일과 위 부속 파일의 iiFileProvider 분류 문서 `<파일명>.iisacc.json`이 있으면 공급자 API로 형식을 검증한 후 해당 파일과 함께 이동한다. 목적지에 본체가 없더라도 분류 문서가 이미 있으면 다른 이름을 선택해 기존 문서를 보존한다. 원본 분류 문서가 손상됐거나 리디렉션된 경우에는 파일을 이동하지 않고 오류를 반환한다. 모델 패키지 내부의 파일과 분류 문서는 디렉터리와 함께 이동한다. 패키지 디렉터리 바깥의 분류 문서는 현재 검증·이동을 지원하지 않으며, 그런 문서가 있으면 이동을 거부한다.\n"
+      "start_line": 204,
+      "end_line": 207,
+      "raw": "일반 모델 파일과 위 부속 파일의 iiFileProvider 분류 문서는 공급자 API로 형식을\n검증하고 전용 저장소에서 주소를 함께 옮긴다. 기존 인접 문서도 검증 후 이관하며,\n충돌·손상·리디렉션 시 임의 병합하거나 덮어쓰지 않는다. 패키지 내부의 문서는\n해당 패키지의 소유 규칙을 따르며 패키지와 함께 이동한다.\n"
     },
     {
       "id": "b000062",
       "kind": "blank",
-      "start_line": 204,
-      "end_line": 204,
+      "start_line": 208,
+      "end_line": 208,
       "raw": "\n"
     },
     {
       "id": "b000063",
       "kind": "heading",
-      "start_line": 205,
-      "end_line": 205,
+      "start_line": 209,
+      "end_line": 209,
       "raw": "## 이동과 참조\n",
       "level": 2,
       "title": "이동과 참조"
@@ -560,57 +560,57 @@
     {
       "id": "b000064",
       "kind": "blank",
-      "start_line": 206,
-      "end_line": 206,
-      "raw": "\n"
-    },
-    {
-      "id": "b000065",
-      "kind": "paragraph",
-      "start_line": 207,
-      "end_line": 207,
-      "raw": "원본 바이트를 다시 기록하지 않고 같은 Models 영역 안에서 이름을 바꾼다. 기존 파일을 덮어쓰지 않으며 심볼릭 링크·junction·영역 밖 경로를 거부한다. 여러 프로세스의 분류 작업은 로컬 `Models/.society-models.lock`으로 조정한다. 부속 파일 이동 중 실패하면 완료한 이동을 되돌리며, 실패 내용은 보고서에 남는다. 여러 파일을 동시에 커밋하는 트랜잭션은 아니다.\n"
-    },
-    {
-      "id": "b000066",
-      "kind": "blank",
-      "start_line": 208,
-      "end_line": 208,
-      "raw": "\n"
-    },
-    {
-      "id": "b000067",
-      "kind": "paragraph",
-      "start_line": 209,
-      "end_line": 209,
-      "raw": "`Models/.model-paths.json`에는 컨테이너 UUID와 이전→현재 상대 경로를 원자적으로 기록한다. 일반 컨테이너 데이터이므로 iiSocietyHelper Sync가 제외하는 `.society-` 접두사를 사용하지 않는다. 잠금 파일은 기기 로컬이며 이동 기록은 모델과 함께 복제할 수 있다. 동시 오프라인 수정에 대한 충돌 처리는 기존 동기화 정책을 따른다. 모델과 기록의 전송이 완료되기 전에는 이전 참조가 일시적으로 해석되지 않을 수 있다.\n"
-    },
-    {
-      "id": "b000068",
-      "kind": "blank",
       "start_line": 210,
       "end_line": 210,
       "raw": "\n"
     },
     {
-      "id": "b000069",
+      "id": "b000065",
       "kind": "paragraph",
       "start_line": 211,
       "end_line": 211,
-      "raw": "`SharedStorage::resolveModel()`은 이 기록을 재사용하며 이전 상대 경로를 기준으로 원래 fingerprint를 재검증한다. 분류 이동만으로 기존 참조가 무효화되지 않지만 모델 내용이 바뀌면 계속 거부한다. 구버전 SDK를 로드한 소비 앱은 이 경로 해석 기능이 없으므로 SDK 갱신 뒤 재빌드·패키징해야 한다. 기록 파일을 수정하거나 제거하면 이전 참조를 잃을 수 있다.\n"
+      "raw": "원본 바이트를 다시 기록하지 않고 같은 Models 영역 안에서 이름을 바꾼다. 기존 파일을 덮어쓰지 않으며 심볼릭 링크·junction·영역 밖 경로를 거부한다. 여러 프로세스의 분류 작업은 로컬 `Models/.society-models.lock`으로 조정한다. 부속 파일 이동 중 실패하면 완료한 이동을 되돌리며, 실패 내용은 보고서에 남는다. 여러 파일을 동시에 커밋하는 트랜잭션은 아니다.\n"
     },
     {
-      "id": "b000070",
+      "id": "b000066",
       "kind": "blank",
       "start_line": 212,
       "end_line": 212,
       "raw": "\n"
     },
     {
-      "id": "b000071",
-      "kind": "heading",
+      "id": "b000067",
+      "kind": "paragraph",
       "start_line": 213,
       "end_line": 213,
+      "raw": "`Models/.model-paths.json`에는 컨테이너 UUID와 이전→현재 상대 경로를 원자적으로 기록한다. 일반 컨테이너 데이터이므로 iiSocietyHelper Sync가 제외하는 `.society-` 접두사를 사용하지 않는다. 잠금 파일은 기기 로컬이며 이동 기록은 모델과 함께 복제할 수 있다. 동시 오프라인 수정에 대한 충돌 처리는 기존 동기화 정책을 따른다. 모델과 기록의 전송이 완료되기 전에는 이전 참조가 일시적으로 해석되지 않을 수 있다.\n"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 214,
+      "end_line": 214,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "paragraph",
+      "start_line": 215,
+      "end_line": 215,
+      "raw": "`SharedStorage::resolveModel()`은 이 기록을 재사용하며 이전 상대 경로를 기준으로 원래 fingerprint를 재검증한다. 분류 이동만으로 기존 참조가 무효화되지 않지만 모델 내용이 바뀌면 계속 거부한다. 구버전 SDK를 로드한 소비 앱은 이 경로 해석 기능이 없으므로 SDK 갱신 뒤 재빌드·패키징해야 한다. 기록 파일을 수정하거나 제거하면 이전 참조를 잃을 수 있다.\n"
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 216,
+      "end_line": 216,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "heading",
+      "start_line": 217,
+      "end_line": 217,
       "raw": "## 의존성과 검증\n",
       "level": 2,
       "title": "의존성과 검증"
@@ -618,99 +618,99 @@
     {
       "id": "b000072",
       "kind": "blank",
-      "start_line": 214,
-      "end_line": 214,
-      "raw": "\n"
-    },
-    {
-      "id": "b000073",
-      "kind": "paragraph",
-      "start_line": 215,
-      "end_line": 215,
-      "raw": "기존 Qt Core의 파일·JSON API로 제한된 메타데이터만 검사한다. 공개 [Safetensors 형식](https://github.com/safetensors/safetensors), [GGUF 형식](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md), [PEFT 체크포인트 계약](https://huggingface.co/docs/peft/developer_guides/checkpoint)을 사용한다. Safetensors/GGUF 검사는 최대 16 MiB, 일반 JSON·sidecar는 1 MiB로 제한하며 텐서 데이터 로드나 Pickle 역직렬화·모델 실행을 하지 않는다. 전체 모델 로더의 Python·ML 의존성과 별도 라이선스 의존성을 추가할 필요가 없어 기존 Qt Core를 재사용했다.\n"
-    },
-    {
-      "id": "b000074",
-      "kind": "blank",
-      "start_line": 216,
-      "end_line": 216,
-      "raw": "\n"
-    },
-    {
-      "id": "b000075",
-      "kind": "paragraph",
-      "start_line": 217,
-      "end_line": 217,
-      "raw": "`iiSocietyContainer.model_store`와 설치 소비자 `installed_models`는 23개 논리 유형과 필요시 생성, 신규·재사용·빈 정리의 미사용 폴더 생성 방지, 원본·부속 파일·기존 빈 폴더·UUID·9개 영역 보존, 레거시 레이아웃, 메타데이터·텐서 키·패키지·GGUF·문서 판정, 손상·크기 제한, 충돌, 반복 실행, 이전 참조와 동일 UUID 복제본, 취소·경계 위반을 검사한다. 실제 기기 간 전송 완료나 모델 추론 품질을 대신하는 검사는 아니다.\n"
-    },
-    {
-      "id": "b000076",
-      "kind": "blank",
       "start_line": 218,
       "end_line": 218,
       "raw": "\n"
     },
     {
-      "id": "b000077",
+      "id": "b000073",
       "kind": "paragraph",
       "start_line": 219,
       "end_line": 219,
-      "raw": "모델 이동 회귀는 분류 문서의 동반 이동, 목적지 문서 충돌과 잘못된 원본 문서의 보존을 검사한다. 이전 동작처럼 본체만 이동하고 분류 문서와 관리 경로가 남은 경우에도 식별자가 유지된 파일의 재조정을 검사한다. `model_store` 테스트의 임시 컨테이너는 `resources/test-workspaces`의 격리된 작업공간을 사용하고 종료 후 정리한다.\n"
+      "raw": "기존 Qt Core의 파일·JSON API로 제한된 메타데이터만 검사한다. 공개 [Safetensors 형식](https://github.com/safetensors/safetensors), [GGUF 형식](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md), [PEFT 체크포인트 계약](https://huggingface.co/docs/peft/developer_guides/checkpoint)을 사용한다. Safetensors/GGUF 검사는 최대 16 MiB, 일반 JSON·sidecar는 1 MiB로 제한하며 텐서 데이터 로드나 Pickle 역직렬화·모델 실행을 하지 않는다. 전체 모델 로더의 Python·ML 의존성과 별도 라이선스 의존성을 추가할 필요가 없어 기존 Qt Core를 재사용했다.\n"
     },
     {
-      "id": "b000078",
+      "id": "b000074",
       "kind": "blank",
       "start_line": 220,
       "end_line": 220,
       "raw": "\n"
     },
     {
-      "id": "b000079",
+      "id": "b000075",
       "kind": "paragraph",
       "start_line": 221,
       "end_line": 221,
-      "raw": "Anima 회귀 검사는 원본·파생·통합 체크포인트, 이름 변경과 파일 공급자의 임시 확장자, 불완전하거나 차원이 충돌하는 구조, LoRA 구분, 기존 `Other` 재정리와 이전 참조·원본 바이트·부속 파일 보존을 포함한다. 이미 `LLM` 같은 명시적 유형 폴더에 있는 파일은 일반 정리에서 자동 이동하지 않으므로, 내부 판정을 확인한 뒤 `place(path, ModelType::Checkpoint)`로 수정한다.\n"
+      "raw": "`iiSocietyContainer.model_store`와 설치 소비자 `installed_models`는 23개 논리 유형과 필요시 생성, 신규·재사용·빈 정리의 미사용 폴더 생성 방지, 원본·부속 파일·기존 빈 폴더·UUID·9개 영역 보존, 레거시 레이아웃, 메타데이터·텐서 키·패키지·GGUF·문서 판정, 손상·크기 제한, 충돌, 반복 실행, 이전 참조와 동일 UUID 복제본, 취소·경계 위반을 검사한다. 실제 기기 간 전송 완료나 모델 추론 품질을 대신하는 검사는 아니다.\n"
     },
     {
-      "id": "b000080",
+      "id": "b000076",
       "kind": "blank",
       "start_line": 222,
       "end_line": 222,
       "raw": "\n"
     },
     {
-      "id": "b000081",
+      "id": "b000077",
       "kind": "paragraph",
       "start_line": 223,
       "end_line": 223,
-      "raw": "0.11.2에서는 유지보수 중인 Apache-2.0 Safetensors 구현의 [검증·자료형 계약](https://github.com/huggingface/safetensors/blob/main/safetensors/src/tensor.rs)을 참고하였다. Rust/Python 런타임을 새로 추가하는 대신 기존 Qt Core로 필요한 헤더 검증을 수행한다. 중복 JSON 키는 Qt 파서의 덮어쓰기 동작을 별도로 검사한다. 읽는 양은 헤더 크기에 비례하며 수 GB의 가중치 데이터를 읽거나 메모리에 적재하지 않는다.\n"
+      "raw": "모델 이동 회귀는 분류 문서의 동반 이동, 목적지 문서 충돌과 잘못된 원본 문서의 보존을 검사한다. 이전 동작처럼 본체만 이동하고 분류 문서와 관리 경로가 남은 경우에도 식별자가 유지된 파일의 재조정을 검사한다. `model_store` 테스트의 임시 컨테이너는 `resources/test-workspaces`의 격리된 작업공간을 사용하고 종료 후 정리한다.\n"
     },
     {
-      "id": "b000082",
+      "id": "b000078",
       "kind": "blank",
       "start_line": 224,
       "end_line": 224,
       "raw": "\n"
     },
     {
-      "id": "b000083",
+      "id": "b000079",
       "kind": "paragraph",
       "start_line": 225,
+      "end_line": 225,
+      "raw": "Anima 회귀 검사는 원본·파생·통합 체크포인트, 이름 변경과 파일 공급자의 임시 확장자, 불완전하거나 차원이 충돌하는 구조, LoRA 구분, 기존 `Other` 재정리와 이전 참조·원본 바이트·부속 파일 보존을 포함한다. 이미 `LLM` 같은 명시적 유형 폴더에 있는 파일은 일반 정리에서 자동 이동하지 않으므로, 내부 판정을 확인한 뒤 `place(path, ModelType::Checkpoint)`로 수정한다.\n"
+    },
+    {
+      "id": "b000080",
+      "kind": "blank",
+      "start_line": 226,
       "end_line": 226,
+      "raw": "\n"
+    },
+    {
+      "id": "b000081",
+      "kind": "paragraph",
+      "start_line": 227,
+      "end_line": 227,
+      "raw": "0.11.2에서는 유지보수 중인 Apache-2.0 Safetensors 구현의 [검증·자료형 계약](https://github.com/huggingface/safetensors/blob/main/safetensors/src/tensor.rs)을 참고하였다. Rust/Python 런타임을 새로 추가하는 대신 기존 Qt Core로 필요한 헤더 검증을 수행한다. 중복 JSON 키는 Qt 파서의 덮어쓰기 동작을 별도로 검사한다. 읽는 양은 헤더 크기에 비례하며 수 GB의 가중치 데이터를 읽거나 메모리에 적재하지 않는다.\n"
+    },
+    {
+      "id": "b000082",
+      "kind": "blank",
+      "start_line": 228,
+      "end_line": 228,
+      "raw": "\n"
+    },
+    {
+      "id": "b000083",
+      "kind": "paragraph",
+      "start_line": 229,
+      "end_line": 230,
       "raw": "CLI는 `iiSocietyContainerDriveTool model-types`, `models <container>`, `organize-models <container>`를 제공한다. 마지막 명령은 파일을 이동하며 JSON 결과에 성공·오류를 구분한다.\n<a id=\"unified-image-models\"></a>\n"
     },
     {
       "id": "b000084",
       "kind": "blank",
-      "start_line": 227,
-      "end_line": 227,
+      "start_line": 231,
+      "end_line": 231,
       "raw": "\n"
     },
     {
       "id": "b000085",
       "kind": "heading",
-      "start_line": 228,
-      "end_line": 228,
+      "start_line": 232,
+      "end_line": 232,
       "raw": "# 통합 이미지 모델\n",
       "level": 1,
       "title": "통합 이미지 모델"
@@ -718,29 +718,29 @@
     {
       "id": "b000086",
       "kind": "blank",
-      "start_line": 229,
-      "end_line": 229,
+      "start_line": 233,
+      "end_line": 233,
       "raw": "\n"
     },
     {
       "id": "b000087",
       "kind": "paragraph",
-      "start_line": 230,
-      "end_line": 233,
+      "start_line": 234,
+      "end_line": 237,
       "raw": "`model_index.json`에 `schema: iild-unified-model-v1`, `_class_name: IILDUnifiedCascade`가\n있는 패키지는 `SharedStorage`에서 `unified` 형식의 단일 모델로 노출한다. 내부 체크포인트는\n개별 모델로 중복 나열하지 않는다. 패키지 인벤토리의 일부가 변경되면 기존 모델 참조를 무효화한다.\n이 분류는 카탈로그 계약이며 실제 매니페스트·멤버 호환성 검사는 iiLocalDiffusion이 수행한다.\n"
     },
     {
       "id": "b000088",
       "kind": "blank",
-      "start_line": 234,
-      "end_line": 234,
+      "start_line": 238,
+      "end_line": 238,
       "raw": "\n"
     },
     {
       "id": "b000089",
       "kind": "heading",
-      "start_line": 235,
-      "end_line": 235,
+      "start_line": 239,
+      "end_line": 239,
       "raw": "## 모델 카탈로그의 유형 계약\n",
       "level": 2,
       "title": "모델 카탈로그의 유형 계약"
@@ -748,71 +748,71 @@
     {
       "id": "b000090",
       "kind": "blank",
-      "start_line": 236,
-      "end_line": 236,
-      "raw": "\n"
-    },
-    {
-      "id": "b000091",
-      "kind": "paragraph",
-      "start_line": 237,
-      "end_line": 237,
-      "raw": "`StorageModelCatalog.categories`는 `allModelTypes()`의 23개 이름과 순서를 QML에 제공한다. `groups`의 키도 실제 폴더명(Checkpoint, LoRA, Text Encoder 등)이다. 기존 image/video/audio/language 그룹은 제거되었다. 미디어 메타데이터와 파일 확장자로 유형을 다시 추정하지 않는다. 정리 전 유형 폴더 밖의 파일은 Other에 표시하고 `uncategorizedCount`는 Other에 표시된 항목 수이다.\n"
-    },
-    {
-      "id": "b000092",
-      "kind": "blank",
-      "start_line": 238,
-      "end_line": 238,
-      "raw": "\n"
-    },
-    {
-      "id": "b000093",
-      "kind": "paragraph",
-      "start_line": 239,
-      "end_line": 239,
-      "raw": "로컬·원격 카탈로그 모두 가중치, JSON 워크플로·포즈, 텍스트 와일드카드와 미확인 파일을 포함한다. 모델 부속 파일은 제외하며 Diffusers/PEFT/Transformers 패키지를 하나의 항목으로 묶는다. 원격 조회는 호스트 맵만 읽고 원본 헤더 읽기나 다운로드를 요청하지 않는다. 저장 유형 변경은 `ModelStore::place()`로 실제 파일을 이동하며 이후 조회에서 해당 유형으로 표시된다.\n"
-    },
-    {
-      "id": "b000094",
-      "kind": "blank",
       "start_line": 240,
       "end_line": 240,
       "raw": "\n"
     },
     {
-      "id": "b000095",
+      "id": "b000091",
       "kind": "paragraph",
       "start_line": 241,
       "end_line": 241,
-      "raw": "`ModelStore::rename(path, name)`은 같은 폴더에서 모델 파일이나 패키지와 인식된 `.preview.png`·`.preview.jpg`·`.preview.webp`, 모델 메타데이터 및 검증된 `.iisacc.json` 분류 문서를 함께 이름 변경한다. 기존 이름을 덮어쓰지 않고 이전 경로 별칭과 수동 Other 분류를 유지한다. 직접 호출은 파일 이동과 경로 저널만 다루며 관리 저장소 색인은 바꾸지 않는다. 관리 자원이 있거나 대소문자만 바꾸는 이름 변경을 지원하는 소비자는 `FileOperations::Action::Rename`을 사용해 저장소 잠금과 자원 ID 갱신을 함께 처리한다.\n"
+      "raw": "`StorageModelCatalog.categories`는 `allModelTypes()`의 23개 이름과 순서를 QML에 제공한다. `groups`의 키도 실제 폴더명(Checkpoint, LoRA, Text Encoder 등)이다. 기존 image/video/audio/language 그룹은 제거되었다. 미디어 메타데이터와 파일 확장자로 유형을 다시 추정하지 않는다. 정리 전 유형 폴더 밖의 파일은 Other에 표시하고 `uncategorizedCount`는 Other에 표시된 항목 수이다.\n"
     },
     {
-      "id": "b000096",
+      "id": "b000092",
       "kind": "blank",
       "start_line": 242,
       "end_line": 242,
       "raw": "\n"
     },
     {
-      "id": "b000097",
+      "id": "b000093",
       "kind": "paragraph",
       "start_line": 243,
       "end_line": 243,
-      "raw": "`shared_storage`의 `modelTypesMatchPhysicalFoldersAndRemoteCatalog`는 23개 실제 폴더의 로컬 목록과 원본이 없는 원격 목록의 유형·개수 일치, 비가중치 파일, 부속 파일 제외, 패키지 단위 처리와 다운로드 요청 부재를 검사한다.\n"
+      "raw": "로컬·원격 카탈로그 모두 가중치, JSON 워크플로·포즈, 텍스트 와일드카드와 미확인 파일을 포함한다. 모델 부속 파일은 제외하며 Diffusers/PEFT/Transformers 패키지를 하나의 항목으로 묶는다. 원격 조회는 호스트 맵만 읽고 원본 헤더 읽기나 다운로드를 요청하지 않는다. 저장 유형 변경은 `ModelStore::place()`로 실제 파일을 이동하며 이후 조회에서 해당 유형으로 표시된다.\n"
     },
     {
-      "id": "b000098",
+      "id": "b000094",
       "kind": "blank",
       "start_line": 244,
       "end_line": 244,
       "raw": "\n"
     },
     {
-      "id": "b000099",
-      "kind": "heading",
+      "id": "b000095",
+      "kind": "paragraph",
       "start_line": 245,
       "end_line": 245,
+      "raw": "`ModelStore::rename(path, name)`은 같은 폴더에서 모델 파일이나 패키지와 인식된 `.preview.png`·`.preview.jpg`·`.preview.webp`, 모델 메타데이터 및 검증된 `.iisacc.json` 분류 문서를 함께 이름 변경한다. 기존 이름을 덮어쓰지 않고 이전 경로 별칭과 수동 Other 분류를 유지한다. 직접 호출은 파일 이동과 경로 저널만 다루며 관리 저장소 색인은 바꾸지 않는다. 관리 자원이 있거나 대소문자만 바꾸는 이름 변경을 지원하는 소비자는 `FileOperations::Action::Rename`을 사용해 저장소 잠금과 자원 ID 갱신을 함께 처리한다.\n"
+    },
+    {
+      "id": "b000096",
+      "kind": "blank",
+      "start_line": 246,
+      "end_line": 246,
+      "raw": "\n"
+    },
+    {
+      "id": "b000097",
+      "kind": "paragraph",
+      "start_line": 247,
+      "end_line": 247,
+      "raw": "`shared_storage`의 `modelTypesMatchPhysicalFoldersAndRemoteCatalog`는 23개 실제 폴더의 로컬 목록과 원본이 없는 원격 목록의 유형·개수 일치, 비가중치 파일, 부속 파일 제외, 패키지 단위 처리와 다운로드 요청 부재를 검사한다.\n"
+    },
+    {
+      "id": "b000098",
+      "kind": "blank",
+      "start_line": 248,
+      "end_line": 248,
+      "raw": "\n"
+    },
+    {
+      "id": "b000099",
+      "kind": "heading",
+      "start_line": 249,
+      "end_line": 249,
       "raw": "## 변경 없는 카탈로그 재검사\n",
       "level": 2,
       "title": "변경 없는 카탈로그 재검사"
@@ -820,85 +820,85 @@
     {
       "id": "b000100",
       "kind": "blank",
-      "start_line": 246,
-      "end_line": 246,
-      "raw": "\n"
-    },
-    {
-      "id": "b000101",
-      "kind": "paragraph",
-      "start_line": 247,
-      "end_line": 247,
-      "raw": "`StorageModelCatalog::loading`은 디렉터리의 최초 조회만 나타낸다. 최초 완료 이후에는 파일 감시·폴링·명시적 `refresh()`가 백그라운드에서 실행되어도 같은 카탈로그의 `loadingChanged`, `modelsAboutToChange`, `modelsChanged`를 발생시키지 않는다. 실제 행·오류 변경은 스냅샷 비교로 게시하고 동시 요청은 하나의 후속 재검사로 합친다. 디렉터리 전환은 이전 비동기 결과를 폐기하고 새 최초 조회 상태를 시작한다.\n"
-    },
-    {
-      "id": "b000102",
-      "kind": "blank",
-      "start_line": 248,
-      "end_line": 248,
-      "raw": "\n"
-    },
-    {
-      "id": "b000103",
-      "kind": "paragraph",
-      "start_line": 249,
-      "end_line": 249,
-      "raw": "The model catalog displays safetensors/safetensor, GGUF/GGML, bin/ckpt/pt/pth, PB/TFLite, H5/HDF5/NPZ/NPY and model/mlmodel/engine files as weight candidates. ONNX files are excluded from model cards in all categories, including Other, but remain stored and accessible through ordinary file APIs. README, LICENSE, NOTICE and independent configuration JSON are not weight cards. Packages remain a single card. Wildcards use txt/wildcards; Poses and Workflows use JSON and image files. The same rules apply to local and synchronized catalogs, without moving, deleting, downloading or executing files. Candidate listing does not establish inference compatibility.\n"
-    },
-    {
-      "id": "b000104",
-      "kind": "blank",
       "start_line": 250,
       "end_line": 250,
       "raw": "\n"
     },
     {
-      "id": "b000105",
+      "id": "b000101",
       "kind": "paragraph",
       "start_line": 251,
       "end_line": 251,
-      "raw": "Krea2 가져오기는 검증된 텐서 시그니처(`txtfusion.projector.weight`, 호환되는 64-채널 `first.weight` 및 `last.linear.weight`)를 네이티브 및 ComfyUI 네임스페이스에서 사용합니다. 그들은 체크포인트로 분류되며, LoRA 탐지는 우선권을 유지합니다. 이전에 알 수 없었던 Krea2 파일을 정리하면 경로 참조를 유지하면서 Other에서 이동합니다. 잘린 텐서 페이로드는 인식된 Krea2 체크포인트에 해당되지 않습니다.\n"
+      "raw": "`StorageModelCatalog::loading`은 디렉터리의 최초 조회만 나타낸다. 최초 완료 이후에는 파일 감시·폴링·명시적 `refresh()`가 백그라운드에서 실행되어도 같은 카탈로그의 `loadingChanged`, `modelsAboutToChange`, `modelsChanged`를 발생시키지 않는다. 실제 행·오류 변경은 스냅샷 비교로 게시하고 동시 요청은 하나의 후속 재검사로 합친다. 디렉터리 전환은 이전 비동기 결과를 폐기하고 새 최초 조회 상태를 시작한다.\n"
     },
     {
-      "id": "b000106",
+      "id": "b000102",
       "kind": "blank",
       "start_line": 252,
       "end_line": 252,
       "raw": "\n"
     },
     {
-      "id": "b000107",
+      "id": "b000103",
       "kind": "paragraph",
       "start_line": 253,
       "end_line": 253,
-      "raw": "`ModelClassifier::validateSafetensors(path)`는 텐서 페이로드를 읽지 않고 불완전하거나 유효하지 않은 파일에 대한 진단을 반환합니다. 가져오기 호출자는 다중 기가바이트 복사를 수행하기 전에 잘린 다운로드를 거부할 수 있습니다.\n"
+      "raw": "The model catalog displays safetensors/safetensor, GGUF/GGML, bin/ckpt/pt/pth, PB/TFLite, H5/HDF5/NPZ/NPY and model/mlmodel/engine files as weight candidates. ONNX files are excluded from model cards in all categories, including Other, but remain stored and accessible through ordinary file APIs. README, LICENSE, NOTICE and independent configuration JSON are not weight cards. Packages remain a single card. Wildcards use txt/wildcards; Poses and Workflows use JSON and image files. The same rules apply to local and synchronized catalogs, without moving, deleting, downloading or executing files. Candidate listing does not establish inference compatibility.\n"
     },
     {
-      "id": "b000108",
+      "id": "b000104",
       "kind": "blank",
       "start_line": 254,
       "end_line": 254,
       "raw": "\n"
     },
     {
-      "id": "b000109",
+      "id": "b000105",
       "kind": "paragraph",
       "start_line": 255,
       "end_line": 255,
-      "raw": "일반 로컬 원본 패키지와 명시적으로 선언된 로컬 호스트에서는 실제 모델 유형 폴더의 얕은 파일 메타데이터를 동기화 카탈로그와 병합한다. 호스트 등록이나 `.society-sync/primary.json` 생성 전에도 사용자가 넣은 체크포인트와 LoRA가 즉시 나타나며, 다중 기가바이트 파일의 동기화 체크섬을 기다리지 않는다. 이 조회는 텐서 내용이나 패키지 내부를 읽지 않으며 카탈로그·호스트 메타데이터나 다운로드 요청을 생성하지 않는다. 복제 식별 정보를 가진 패키지는 초기 복제 완료 전후 모두 카탈로그 전용으로 조회하므로, 빈 카탈로그의 미색인 로컬 잔여 파일은 표시하지 않는다. 변경되지 않은 스냅샷은 모델/로딩 재설정 신호를 발생시키지 않는다.\n"
+      "raw": "Krea2 가져오기는 검증된 텐서 시그니처(`txtfusion.projector.weight`, 호환되는 64-채널 `first.weight` 및 `last.linear.weight`)를 네이티브 및 ComfyUI 네임스페이스에서 사용합니다. 그들은 체크포인트로 분류되며, LoRA 탐지는 우선권을 유지합니다. 이전에 알 수 없었던 Krea2 파일을 정리하면 경로 참조를 유지하면서 Other에서 이동합니다. 잘린 텐서 페이로드는 인식된 Krea2 체크포인트에 해당되지 않습니다.\n"
     },
     {
-      "id": "b000110",
+      "id": "b000106",
       "kind": "blank",
       "start_line": 256,
       "end_line": 256,
       "raw": "\n"
     },
     {
-      "id": "b000111",
+      "id": "b000107",
       "kind": "paragraph",
       "start_line": 257,
       "end_line": 257,
+      "raw": "`ModelClassifier::validateSafetensors(path)`는 텐서 페이로드를 읽지 않고 불완전하거나 유효하지 않은 파일에 대한 진단을 반환합니다. 가져오기 호출자는 다중 기가바이트 복사를 수행하기 전에 잘린 다운로드를 거부할 수 있습니다.\n"
+    },
+    {
+      "id": "b000108",
+      "kind": "blank",
+      "start_line": 258,
+      "end_line": 258,
+      "raw": "\n"
+    },
+    {
+      "id": "b000109",
+      "kind": "paragraph",
+      "start_line": 259,
+      "end_line": 259,
+      "raw": "일반 로컬 원본 패키지와 명시적으로 선언된 로컬 호스트에서는 실제 모델 유형 폴더의 얕은 파일 메타데이터를 동기화 카탈로그와 병합한다. 호스트 등록이나 `.society-sync/primary.json` 생성 전에도 사용자가 넣은 체크포인트와 LoRA가 즉시 나타나며, 다중 기가바이트 파일의 동기화 체크섬을 기다리지 않는다. 이 조회는 텐서 내용이나 패키지 내부를 읽지 않으며 카탈로그·호스트 메타데이터나 다운로드 요청을 생성하지 않는다. 복제 식별 정보를 가진 패키지는 초기 복제 완료 전후 모두 카탈로그 전용으로 조회하므로, 빈 카탈로그의 미색인 로컬 잔여 파일은 표시하지 않는다. 변경되지 않은 스냅샷은 모델/로딩 재설정 신호를 발생시키지 않는다.\n"
+    },
+    {
+      "id": "b000110",
+      "kind": "blank",
+      "start_line": 260,
+      "end_line": 260,
+      "raw": "\n"
+    },
+    {
+      "id": "b000111",
+      "kind": "paragraph",
+      "start_line": 261,
+      "end_line": 261,
       "raw": "`shared_storage`의 `originalModelFilesRemainVisibleWithAPartialCatalogAndNoRegisteredHost`는 디렉터리만 색인된 카탈로그에서도 실제 체크포인트 2개와 LoRA 6개를 UI와 공통 모델 조회에서 표시하고 원본 바이트 및 메타데이터를 보존함을 검사한다. `replicaCatalogDoesNotExposeUnindexedLocalModels`는 미완성·완료된 실제 복제본에서 빈 카탈로그가 잔여 모델을 노출하지 않음을 검사한다.\n"
     }
   ],
@@ -949,7 +949,7 @@
       "level": 2,
       "title": "이동과 참조",
       "anchor": "이동과-참조",
-      "start_line": 205
+      "start_line": 209
     },
     {
       "block_id": "b000071",
@@ -957,7 +957,7 @@
       "level": 2,
       "title": "의존성과 검증",
       "anchor": "의존성과-검증",
-      "start_line": 213
+      "start_line": 217
     },
     {
       "block_id": "b000085",
@@ -965,7 +965,7 @@
       "level": 1,
       "title": "통합 이미지 모델",
       "anchor": "통합-이미지-모델",
-      "start_line": 228
+      "start_line": 232
     },
     {
       "block_id": "b000089",
@@ -973,7 +973,7 @@
       "level": 2,
       "title": "모델 카탈로그의 유형 계약",
       "anchor": "모델-카탈로그의-유형-계약",
-      "start_line": 235
+      "start_line": 239
     },
     {
       "block_id": "b000099",
@@ -981,7 +981,7 @@
       "level": 2,
       "title": "변경 없는 카탈로그 재검사",
       "anchor": "변경-없는-카탈로그-재검사",
-      "start_line": 245
+      "start_line": 249
     }
   ],
   "indexes": {
@@ -1135,77 +1135,77 @@
       },
       {
         "block_id": "b000057",
-        "line": 190,
+        "line": 191,
         "text": "분리된 문서의 존재를 보고하며 새 카탈로그를 만들어 임의로 연결하지 않는다. 분리된",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000057",
-        "line": 192,
+        "line": 193,
         "text": "전체 모델 가중치를 해시하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000059",
-        "line": 198,
+        "line": 199,
         "text": "조회는 이 파일을 삭제하거나 변경하지 않는다. 공급자가 예약하지 않은 일반 JSON,",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000067",
-        "line": 209,
+        "line": 213,
         "text": "`Models/.model-paths.json`에는 컨테이너 UUID와 이전→현재 상대 경로를 원자적으로 기록한다. 일반 컨테이너 데이터이므로 iiSocietyHelper Sync가 제외하는 `.society-` 접두사를 사용하지 않는다. 잠금 파일은 기기 로컬이며 이동 기록은 모델과 함께 복제할 수 있다. 동시 오프라인 수정에 대한 충돌 처리는 기존 동기화 정책을 따른다. 모델과 기록의 전송이 완료되기 전에는 이전 참조가 일시적으로 해석되지 않을 수 있다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000069",
-        "line": 211,
+        "line": 215,
         "text": "`SharedStorage::resolveModel()`은 이 기록을 재사용하며 이전 상대 경로를 기준으로 원래 fingerprint를 재검증한다. 분류 이동만으로 기존 참조가 무효화되지 않지만 모델 내용이 바뀌면 계속 거부한다. 구버전 SDK를 로드한 소비 앱은 이 경로 해석 기능이 없으므로 SDK 갱신 뒤 재빌드·패키징해야 한다. 기록 파일을 수정하거나 제거하면 이전 참조를 잃을 수 있다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000073",
-        "line": 215,
+        "line": 219,
         "text": "기존 Qt Core의 파일·JSON API로 제한된 메타데이터만 검사한다. 공개 [Safetensors 형식](https://github.com/safetensors/safetensors), [GGUF 형식](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md), [PEFT 체크포인트 계약](https://huggingface.co/docs/peft/developer_guides/checkpoint)을 사용한다. Safetensors/GGUF 검사는 최대 16 MiB, 일반 JSON·sidecar는 1 MiB로 제한하며 텐서 데이터 로드나 Pickle 역직렬화·모델 실행을 하지 않는다. 전체 모델 로더의 Python·ML 의존성과 별도 라이선스 의존성을 추가할 필요가 없어 기존 Qt Core를 재사용했다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000081",
-        "line": 223,
+        "line": 227,
         "text": "0.11.2에서는 유지보수 중인 Apache-2.0 Safetensors 구현의 [검증·자료형 계약](https://github.com/huggingface/safetensors/blob/main/safetensors/src/tensor.rs)을 참고하였다. Rust/Python 런타임을 새로 추가하는 대신 기존 Qt Core로 필요한 헤더 검증을 수행한다. 중복 JSON 키는 Qt 파서의 덮어쓰기 동작을 별도로 검사한다. 읽는 양은 헤더 크기에 비례하며 수 GB의 가중치 데이터를 읽거나 메모리에 적재하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000087",
-        "line": 232,
+        "line": 236,
         "text": "개별 모델로 중복 나열하지 않는다. 패키지 인벤토리의 일부가 변경되면 기존 모델 참조를 무효화한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000091",
-        "line": 237,
+        "line": 241,
         "text": "`StorageModelCatalog.categories`는 `allModelTypes()`의 23개 이름과 순서를 QML에 제공한다. `groups`의 키도 실제 폴더명(Checkpoint, LoRA, Text Encoder 등)이다. 기존 image/video/audio/language 그룹은 제거되었다. 미디어 메타데이터와 파일 확장자로 유형을 다시 추정하지 않는다. 정리 전 유형 폴더 밖의 파일은 Other에 표시하고 `uncategorizedCount`는 Other에 표시된 항목 수이다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000093",
-        "line": 239,
+        "line": 243,
         "text": "로컬·원격 카탈로그 모두 가중치, JSON 워크플로·포즈, 텍스트 와일드카드와 미확인 파일을 포함한다. 모델 부속 파일은 제외하며 Diffusers/PEFT/Transformers 패키지를 하나의 항목으로 묶는다. 원격 조회는 호스트 맵만 읽고 원본 헤더 읽기나 다운로드를 요청하지 않는다. 저장 유형 변경은 `ModelStore::place()`로 실제 파일을 이동하며 이후 조회에서 해당 유형으로 표시된다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000109",
-        "line": 255,
+        "line": 259,
         "text": "일반 로컬 원본 패키지와 명시적으로 선언된 로컬 호스트에서는 실제 모델 유형 폴더의 얕은 파일 메타데이터를 동기화 카탈로그와 병합한다. 호스트 등록이나 `.society-sync/primary.json` 생성 전에도 사용자가 넣은 체크포인트와 LoRA가 즉시 나타나며, 다중 기가바이트 파일의 동기화 체크섬을 기다리지 않는다. 이 조회는 텐서 내용이나 패키지 내부를 읽지 않으며 카탈로그·호스트 메타데이터나 다운로드 요청을 생성하지 않는다. 복제 식별 정보를 가진 패키지는 초기 복제 완료 전후 모두 카탈로그 전용으로 조회하므로, 빈 카탈로그의 미색인 로컬 잔여 파일은 표시하지 않는다. 변경되지 않은 스냅샷은 모델/로딩 재설정 신호를 발생시키지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -1232,35 +1232,35 @@
         "label": "파일 작업 계약",
         "target": "FileActions.md",
         "kind": "relative",
-        "line": 179
+        "line": 180
       },
       {
         "block_id": "b000073",
         "label": "Safetensors 형식",
         "target": "https://github.com/safetensors/safetensors",
         "kind": "external",
-        "line": 215
+        "line": 219
       },
       {
         "block_id": "b000073",
         "label": "GGUF 형식",
         "target": "https://github.com/ggml-org/ggml/blob/master/docs/gguf.md",
         "kind": "external",
-        "line": 215
+        "line": 219
       },
       {
         "block_id": "b000073",
         "label": "PEFT 체크포인트 계약",
         "target": "https://huggingface.co/docs/peft/developer_guides/checkpoint",
         "kind": "external",
-        "line": 215
+        "line": 219
       },
       {
         "block_id": "b000081",
         "label": "검증·자료형 계약",
         "target": "https://github.com/huggingface/safetensors/blob/main/safetensors/src/tensor.rs",
         "kind": "external",
-        "line": 223
+        "line": 227
       }
     ],
     "tables": [

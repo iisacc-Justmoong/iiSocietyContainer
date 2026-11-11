@@ -142,7 +142,8 @@ private slots:
         QVERIFY(moved.contains(qMakePair(source, destination)));
         QVERIFY(!QFileInfo::exists(source)); QCOMPARE(read(destination), bytes);
         QCOMPARE(read(destination + ".model.json"), QByteArray("{\"type\":\"Checkpoint\"}"));
-        QCOMPARE(read(destination + ".iisacc.json"), portableMetadata);
+        QCOMPARE(read(fixture.filePath(".society-runtime/classifications/models/Other/new.safetensors.iisacc.json")), portableMetadata);
+        QVERIFY(!QFileInfo::exists(destination + ".iisacc.json"));
         QCOMPARE(read(newPreview), QByteArray("preview bytes"));
         QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
         QVERIFY(!QFileInfo::exists(oldPreview));
@@ -202,6 +203,8 @@ private slots:
         QVERIFY2(storage->recordFile(StoreSection::Models, "Checkpoint/recover.safetensors", &error), qPrintable(error));
         const auto before = storage->fileTracking(StoreSection::Models, "Checkpoint/recover.safetensors");
         QVERIFY(!before.value("objectKey").toString().isEmpty());
+        QVERIFY(QFile::rename(fixture.filePath(".society-runtime/classifications/models/Checkpoint/recover.safetensors.iisacc.json"),
+                              source + ".iisacc.json"));
         QVERIFY(QDir().mkpath(QFileInfo(destination).absolutePath()));
         QVERIFY(iiFileProvider::FileDevice::rename(source, destination));
         QVERIFY(QFileInfo::exists(source + ".iisacc.json"));
@@ -214,7 +217,7 @@ private slots:
         QCOMPARE(after.value("resource").toObject().value("contentRevision"), before.value("resource").toObject().value("contentRevision"));
         QCOMPARE(read(destination), bytes);
         QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
-        QVERIFY(QFileInfo::exists(destination + ".iisacc.json"));
+        QVERIFY(QFileInfo::exists(fixture.filePath(".society-runtime/classifications/models/LLM/recover.safetensors.iisacc.json")));
     }
 
     void repairsLegacyCategoryMoveUsingJournalAndNativeIdentity()
@@ -229,6 +232,8 @@ private slots:
         QString error;
         QVERIFY2(storage->recordFile(StoreSection::Models, "Checkpoint/model.safetensors", &error), qPrintable(error));
         const auto before = storage->fileTracking(StoreSection::Models, "Checkpoint/model.safetensors");
+        QVERIFY(QFile::rename(fixture.filePath(".society-runtime/classifications/models/Checkpoint/model.safetensors.iisacc.json"),
+                              source + ".iisacc.json"));
         const auto metadata = read(source + ".iisacc.json"); QVERIFY(!metadata.isEmpty());
         using Presentation = iiFileProvider::native::Presentation;
         const auto native = [](const QString &p) { return std::filesystem::path(p.toStdU16String()); };
@@ -266,7 +271,10 @@ private slots:
         QCOMPARE(store->repairCompanions(&errors), QStringList{target});
         QVERIFY2(errors.isEmpty(), qPrintable(errors.join('\n')));
         QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
-        QCOMPARE(read(target + ".iisacc.json"), metadata);
+        const auto recovered = read(fixture.filePath(".society-runtime/classifications/models/LLM/model.safetensors.iisacc.json"));
+        QVERIFY(!recovered.isEmpty());
+        QCOMPARE(QJsonDocument::fromJson(recovered).object().value("fileKey"),
+                 QJsonDocument::fromJson(metadata).object().value("fileKey"));
         QVERIFY(!QFileInfo::exists(oldPreview));
         QCOMPARE(QJsonDocument::fromJson(read(newPreview)).object().value("preview"),
                  QJsonDocument::fromJson(preview).object().value("preview"));
@@ -287,6 +295,8 @@ private slots:
         QVERIFY(write(source, weights({"tensor"})));
         const auto storage = SharedStorage::open(fixture.path()); QVERIFY(storage);
         QString error; QVERIFY2(storage->recordFile(StoreSection::Models, "Checkpoint/model.safetensors", &error), qPrintable(error));
+        QVERIFY(QFile::rename(fixture.filePath(".society-runtime/classifications/models/Checkpoint/model.safetensors.iisacc.json"),
+                              source + ".iisacc.json"));
         const auto original = read(source + ".iisacc.json"); QVERIFY(!original.isEmpty());
         QVERIFY(QDir().mkpath(QFileInfo(target).absolutePath()));
         QVERIFY(QFile::rename(source, target));
@@ -357,8 +367,8 @@ private slots:
         QCOMPARE(store->place(source, ModelType::LLM, &error), target);
         QVERIFY2(error.isEmpty(), qPrintable(error));
         QCOMPARE(read(target), bytes);
-        QCOMPARE(read(target + ".iisacc.json"), modelCompanion);
-        QCOMPARE(read(base + "/LLM/style (1).preview.png.iisacc.json"), previewCompanion);
+        QCOMPARE(read(fixture.filePath(".society-runtime/classifications/models/LLM/style (1).safetensors.iisacc.json")), modelCompanion);
+        QCOMPARE(read(fixture.filePath(".society-runtime/classifications/models/LLM/style (1).preview.png.iisacc.json")), previewCompanion);
         QVERIFY(!QFileInfo::exists(source + ".iisacc.json"));
         QVERIFY(!QFileInfo::exists(preview + ".iisacc.json"));
         QCOMPARE(read(conflict), QByteArray("foreign data"));
