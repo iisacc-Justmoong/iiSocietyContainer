@@ -23,6 +23,7 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/FileTree.md`](FileTree.md) | [JSON](FileTree.agent.json) |
 | [`docs/Files.md`](Files.md) | [JSON](Files.agent.json) |
 | [`docs/GenerationHistory.md`](GenerationHistory.md) | [JSON](GenerationHistory.agent.json) |
+| [`docs/License.md`](License.md) | [JSON](License.agent.json) |
 | [`docs/LogicalStorage.md`](LogicalStorage.md) | [JSON](LogicalStorage.agent.json) |
 | [`docs/ManagedFiles.md`](ManagedFiles.md) | [JSON](ManagedFiles.agent.json) |
 | [`docs/Models.md`](Models.md) | [JSON](Models.agent.json) |
