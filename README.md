@@ -338,6 +338,9 @@ When configuring consumers, add SDK install path and Qt path to `CMAKE_PREFIX_PA
 - `lib/`: Shared library with version; Windows runtime DLL is `bin/`
 - `lib/cmake/iiSocietyContainer/`: Config, ConfigVersion, and Targets package
 - `share/iiSocietyContainer/README.md`: This document
+- `share/iiSocietyContainer/LICENSE`: Apache License 2.0
+- `share/iiSocietyContainer/NOTICE`: Copyright and attribution notice
+- `share/iiSocietyContainer/docs/License.md`: Korean statement of the same policy
 - `bin/iiSocietyContainerDriveTool`: Drive initialization, query, and area catalog CLI
 - macOS's `share/iiSocietyContainer/Society.app`: Native host and File Provider extension
 

@@ -589,7 +589,8 @@ install(FILES src/Models/ModelImportService.h src/Models/ModelImportSource.h src
 install(FILES src/Operations/FileJobService.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
-install(FILES README.md docs/FileLoading.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer COMPONENT Documentation)
+install(FILES README.md docs/FileLoading.md LICENSE NOTICE DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer COMPONENT Documentation)
+install(FILES docs/License.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs COMPONENT Documentation)
 if(BUILD_TESTING)
     add_test(NAME iiSocietyContainer.documentation_install COMMAND "${CMAKE_COMMAND}"
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}" "-DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}"

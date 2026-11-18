@@ -16,8 +16,8 @@ install(TARGETS iiSocietyContainerFileTree iiSocietyContainerMaintenance iiSocie
 install(FILES FileTree.h DirectoryStorage.h StorageMaintenance.h FileRepository.h iiSocietyContainerExport.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Index/InventoryIndex.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
-install(FILES docs/ManagedFiles.md docs/FileTree.md docs/DirectoryStorage.md docs/StorageMaintenance.md docs/NativeBuild.md
+install(FILES README.md LICENSE NOTICE DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer)
+install(FILES docs/ManagedFiles.md docs/FileTree.md docs/DirectoryStorage.md docs/StorageMaintenance.md docs/NativeBuild.md docs/License.md
     DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs)
 install(FILES platform/ios/iiSocietyContainerIOS.cmake
     DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/platform/ios)
