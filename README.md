@@ -84,11 +84,10 @@ macOS re-invokes `register` with the existing original, updating the display nam
 
 Version 0.14.0 libraries using C++23 and Qt 6.8.3 Core (desktop·Android dynamic, iOS static) are. `DiskImage` creates a separate APFS disk image at the archive location and mounts it. The existing directory-based API is a low-level compatibility API for the logical layout. `SocietyDrive` consists of a persistent drive ID and 9 areas. macOS · iOS File Provider, Windows Dokan, Linux FUSE, Android DocumentsProvider provide the contents of `Files/` to the system drive root. Society and iisacc app use internal 9 areas, and other Android apps use the same signed URI and Helper file system API.
 
-`Models/` retains a 23-type logical taxonomy without precreating unused folders.
-New and reopened drives leave empty Models directories empty; `ensureLayout()`
-validates existing categories. A writer's `categoryPath(type)` prepares only the
-requested category, and model placement creates only its selected destination
-parents. Existing models, companions, folders, UUIDs, and the nine-section
+`Models/` contains all 23 model type directories, including empty types, on a
+new drive. `ensureLayout()` creates missing categories on existing drives, and
+Society's background model worker invokes it when a container is selected.
+Read-only `open()` does not create folders. Existing models, companions, folders, UUIDs, and the nine-section
 contract remain intact. `ModelStore` is responsible for listing,
 auto-classification, manual type modification, and path interpretation, while
 `ModelClassifier` reads limited metadata. 0.11.1's `metadata()` queries the

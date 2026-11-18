@@ -2,6 +2,7 @@
 #include <SocietyDrive.h>
 #include <ModelStore.h>
 #include <ApplicationStorage.h>
+#include <ModelCache.h>
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonArray>
@@ -16,6 +17,34 @@ int main(int argc, char** argv)
     const auto args = app.arguments();
     iiFileProvider::FileDevice output;
     output.open(stdout, QIODevice::WriteOnly);
+    if ((args.size() == 5 && (args[1] == "model-cache-primary" || args[1] == "model-cache-catalog")) ||
+        (args.size() == 8 && args[1] == "model-cache-select")) {
+        QString error;
+        const auto storage = SharedStorage::open(args[2], &error);
+        if (!storage || !storage->drive().isReady()) {
+            output.write(QJsonDocument(QJsonObject{{"error", error.isEmpty() ? QStringLiteral("The Society drive is unavailable.") : error}}).toJson()); return 1;
+        }
+        const auto drive = storage->drive();
+        ModelCache cache(std::filesystem::path(drive.rootPath().toStdU16String()), drive.identifier().toStdString(),
+            args[3].toStdString(), std::filesystem::path(args[4].toStdU16String()), [drive] { return drive.isReady(); });
+        QJsonObject result;
+        std::string failure;
+        if (args[1] == "model-cache-select") {
+            const auto status = cache.select({args[5].toStdString(), args[6].toStdString(), args[7].toStdString()});
+            if (!status) failure = status.error(); else result.insert("selected", true);
+        } else if (args[1] == "model-cache-catalog") {
+            const auto path = cache.catalog();
+            if (!path) failure = path.error(); else result.insert("path", QString::fromStdU16String(path->u16string()));
+        } else {
+            const auto primary = cache.primary();
+            if (!primary) failure = primary.error();
+            else if (*primary) result.insert("primary", QJsonObject{{"resource", QString::fromStdString((*primary)->resource)},
+                {"revision", QString::fromStdString((*primary)->revision)}, {"entry", QString::fromStdString((*primary)->entry)}});
+            else result.insert("primary", QJsonValue::Null);
+        }
+        if (!failure.empty()) { result.insert("error", QString::fromStdString(failure)); output.write(QJsonDocument(result).toJson()); return 1; }
+        output.write(QJsonDocument(result).toJson()); return 0;
+    }
     if ((args.size() == 4 && (args[1] == "application" || args[1] == "logical")) || (args.size() == 3 && args[1] == "adopt-application")) {
         QString error; std::optional<SocietyDrive> drive;
         if (args[1] == "logical") drive = SocietyDrive::createLogical(args[2], args[3], &error);
@@ -64,7 +93,7 @@ int main(int argc, char** argv)
         output.write(QJsonDocument(QJsonObject{{"models", models}, {"error", error}}).toJson()); return error.isEmpty() ? 0 : 1;
     }
     if (args.size() != 3 || (args[1] != "create" && args[1] != "open")) {
-        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <existing-absolute-parent-or-package> | open <existing-storage> | logical <path> <application> | application <shared-group> <application> | adopt-application <shared-group> | models <directory> | organize-models <directory> | repair-model-companions <directory>\n");
+        output.write("Usage: iiSocietyContainerDriveTool catalog | model-types | create <existing-absolute-parent-or-package> | open <existing-storage> | logical <path> <application> | application <shared-group> <application> | adopt-application <shared-group> | models <directory> | organize-models <directory> | repair-model-companions <directory> | model-cache-primary <storage> <app> <catalog> | model-cache-catalog <storage> <app> <catalog> | model-cache-select <storage> <app> <catalog> <resource> <revision> <entry>\n");
         return 2;
     }
     QString error;

@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/DirectoryStorage.md",
-    "sha256": "64837e9bd39c7ca319b6940b6297e2a46efa1e52068c723db7c8646c5c24ae45",
-    "bytes": 23869,
+    "sha256": "82b574ed95d5d2f7b688ef47d80dcbc6d38eca974c237f039065f294951b5e91",
+    "bytes": 23930,
     "line_count": 127,
     "encoding": "utf-8",
     "language": "ko"
@@ -118,7 +118,7 @@
       "kind": "paragraph",
       "start_line": 33,
       "end_line": 33,
-      "raw": "신규 빈 저장소의 최소 구성은 9개 섹션 디렉터리와 `.society-drive.json`이다. `Models/`는 비어 있으며, 23개 논리 유형 폴더 가운데 실제 모델을 기록하는 유형만 필요시 생성한다. 재열기와 `ensureLayout()`도 미사용 유형을 생성하지 않는다. 생성은 모델·사진·사용자 파일을 자동 복사하거나 저장 공간을 사전 할당하지 않는다. `.society-photos/`, `.society-objects/`, `.society-sync/`는 초기 필수 구성에 포함되지 않으며 해당 기능을 사용하면서 필요한 상태만 추가한다. 같은 위치에 과거 `.societycontainer` 또는 `.sparsebundle`이 남아 있으면 그 패키지의 실제 점유는 신규 일반 폴더와 별개이다. 새 저장소 생성은 이전 데이터나 복구 패키지를 자동 삭제하지 않는다.\n"
+      "raw": "신규 빈 저장소에는 9개 섹션 디렉터리와 `.society-drive.json`, `Models/` 아래의 빈 모델 유형 디렉터리 23개가 있다. 기존 저장소는 `ModelStore::ensureLayout()` 또는 Society 데몬의 백그라운드 모델 정리 작업으로 빠진 유형을 보완한다. 읽기용 드라이브 열기는 폴더를 직접 추가하지 않는다. 생성은 모델·사진·사용자 파일을 자동 복사하거나 저장 공간을 사전 할당하지 않는다. `.society-photos/`, `.society-objects/`, `.society-sync/`는 초기 필수 구성에 포함되지 않으며 해당 기능을 사용하면서 필요한 상태만 추가한다. 같은 위치에 과거 `.societycontainer` 또는 `.sparsebundle`이 남아 있으면 그 패키지의 실제 점유는 신규 일반 폴더와 별개이다. 새 저장소 생성은 이전 데이터나 복구 패키지를 자동 삭제하지 않는다.\n"
     },
     {
       "id": "b000014",
@@ -711,7 +711,7 @@
       {
         "block_id": "b000013",
         "line": 33,
-        "text": "신규 빈 저장소의 최소 구성은 9개 섹션 디렉터리와 `.society-drive.json`이다. `Models/`는 비어 있으며, 23개 논리 유형 폴더 가운데 실제 모델을 기록하는 유형만 필요시 생성한다. 재열기와 `ensureLayout()`도 미사용 유형을 생성하지 않는다. 생성은 모델·사진·사용자 파일을 자동 복사하거나 저장 공간을 사전 할당하지 않는다. `.society-photos/`, `.society-objects/`, `.society-sync/`는 초기 필수 구성에 포함되지 않으며 해당 기능을 사용하면서 필요한 상태만 추가한다. 같은 위치에 과거 `.societycontainer` 또는 `.sparsebundle`이 남아 있으면 그 패키지의 실제 점유는 신규 일반 폴더와 별개이다. 새 저장소 생성은 이전 데이터나 복구 패키지를 자동 삭제하지 않는다.",
+        "text": "신규 빈 저장소에는 9개 섹션 디렉터리와 `.society-drive.json`, `Models/` 아래의 빈 모델 유형 디렉터리 23개가 있다. 기존 저장소는 `ModelStore::ensureLayout()` 또는 Society 데몬의 백그라운드 모델 정리 작업으로 빠진 유형을 보완한다. 읽기용 드라이브 열기는 폴더를 직접 추가하지 않는다. 생성은 모델·사진·사용자 파일을 자동 복사하거나 저장 공간을 사전 할당하지 않는다. `.society-photos/`, `.society-objects/`, `.society-sync/`는 초기 필수 구성에 포함되지 않으며 해당 기능을 사용하면서 필요한 상태만 추가한다. 같은 위치에 과거 `.societycontainer` 또는 `.sparsebundle`이 남아 있으면 그 패키지의 실제 점유는 신규 일반 폴더와 별개이다. 새 저장소 생성은 이전 데이터나 복구 패키지를 자동 삭제하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },

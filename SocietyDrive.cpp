@@ -188,7 +188,7 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
         if (!modelsLock.tryLock(5000)) {
             setError(error, QStringLiteral("Another process is organizing Models.")); return {};
         }
-        if (!drive->isReady() || !detail::validateModelLayout(modelsRoot, error)) return {};
+        if (!drive->isReady() || !detail::ensureModelLayout(modelsRoot, error)) return {};
         return drive;
     }
 
@@ -222,7 +222,7 @@ std::optional<SocietyDrive> SocietyDrive::create(const QString& directoryPath, Q
             createdDirectories.append(path);
         }
     }
-    if (!detail::validateModelLayout(modelsRoot, error)) { rollback(); return {}; }
+    if (!detail::ensureModelLayout(modelsRoot, error, {}, &createdDirectories)) { rollback(); return {}; }
     if (!detail::migratePhotosLayout(root.path(), error, filesRoot)) { rollback(); return {}; }
 
     const QString identifier = QUuid::createUuid().toString(QUuid::WithoutBraces);

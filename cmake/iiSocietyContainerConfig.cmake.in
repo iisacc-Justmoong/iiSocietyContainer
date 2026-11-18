@@ -7,6 +7,8 @@ endif()
 set(iiSocietyContainer_HAS_APPLICATION_STORAGE @IISOCIETYCONTAINER_BUILD_QT@)
 set(iiSocietyContainer_HAS_RELOCATION_PARTICIPANT @IISOCIETYCONTAINER_BUILD_QT@)
 set(iiSocietyContainer_HAS_LOGICAL_DISKS TRUE)
+set(iiSocietyContainer_HAS_MODEL_CACHE TRUE)
+set(iiSocietyContainer_HAS_WAITING_FILE_JOBS @IISOCIETYCONTAINER_BUILD_QT@)
 
 include(CMakeFindDependencyMacro)
 file(TO_CMAKE_PATH "$ENV{USERPROFILE}/.local/SDK/iiFileProvider" _iisociety_user_provider)

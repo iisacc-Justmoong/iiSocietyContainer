@@ -21,6 +21,16 @@ namespace iiSocietyContainer {
 namespace {
 struct Event { bool recorded = false; QString path, error; };
 struct Inspection { QVariantMap state; QString error; };
+// Keep cancellation owned by the QObject lifetime without changing the size
+// of the public FileJobService class in an existing shared SDK ABI.
+struct StopState final : QObject {
+    using QObject::QObject;
+    std::stop_source source;
+};
+StopState *stopState(const QObject &service) {
+    for (auto *child : service.children()) if (auto *state=dynamic_cast<StopState *>(child)) return state;
+    return nullptr;
+}
 QThreadPool *pool() {
     static QPointer<QThreadPool> instance;
     if (!instance) { instance = new QThreadPool(QCoreApplication::instance()); instance->setMaxThreadCount(4); }
@@ -67,12 +77,15 @@ QString name(ii::job::JobState state) {
 }
 }
 FileJobService::FileJobService(QString jobDirectory,QObject *parent)
-    : QObject(parent),m_jobDirectory(std::move(jobDirectory)) {}
+    : QObject(parent),m_jobDirectory(std::move(jobDirectory)) { new StopState(this); }
+FileJobService::~FileJobService() { if (auto *state=stopState(*this)) state->source.request_stop(); }
 
 QString FileJobService::submit(Kind kind,const QString &container,const QString &source,
                                const QString &argument,QString *error) {
     if (error) error->clear();
     auto reject=[&](const QString &message){if(error)*error=message;return QString{};};
+    auto *lifetime=stopState(*this);
+    if (!lifetime) return reject(tr("The file job service is stopping."));
     const auto operation=operationName(kind);
     if (operation.isEmpty() || !QDir::isAbsolutePath(container) || container.size()>4096
         || (kind==Kind::Copy ? (!QDir::isAbsolutePath(source) || source.size()>4096 || source.contains(QChar::Null)
@@ -98,8 +111,8 @@ QString FileJobService::submit(Kind kind,const QString &container,const QString 
     });
     connect(watcher,&QFutureWatcher<Event>::finished,watcher,&QObject::deleteLater);
     watcher->setFuture(promise->future());
-    const auto jobDirectory=m_jobDirectory;
-    pool()->start([promise,id,operation,kind,container,source,argument,jobDirectory]{
+    const auto jobDirectory=m_jobDirectory; const auto stop=lifetime->source.get_token();
+    pool()->start([promise,id,operation,kind,container,source,argument,jobDirectory,stop]{
         auto complete=qScopeGuard([&]{promise->finish();});
         QString resultPath;
         std::unique_ptr<ii::job::Store> store;
@@ -132,12 +145,12 @@ QString FileJobService::submit(Kind kind,const QString &container,const QString 
             store->checkpoint(bytes(id),"item",claim.token,descriptor.toStdString());
             FileOperations::Result result;
             effectStarted=true;
-            if(kind==Kind::CreateDirectory) result=FileOperations(*drive).createDirectory(sourcePath,argument);
+            if(kind==Kind::CreateDirectory) result=FileOperations(*drive).createDirectory(sourcePath,argument,stop);
             else {
                 const auto action=kind==Kind::Copy?FileOperations::Action::Copy:kind==Kind::Duplicate?FileOperations::Action::Duplicate:kind==Kind::Rename?FileOperations::Action::Rename:
                     kind==Kind::Trash?FileOperations::Action::Trash:kind==Kind::Remove?FileOperations::Action::Remove:
                     kind==Kind::Restore?FileOperations::Action::Restore:FileOperations::Action::Move;
-                result=FileOperations(*drive).perform(action,sourcePath,resolvedArgument);
+                result=FileOperations(*drive).perform(action,sourcePath,resolvedArgument,stop);
             }
             resultPath=result.path.isEmpty()?QString{}:drive->relativePath(result.path);
             if (result) store->succeed(bytes(id),"item",claim.token,bytes(resultPath));
@@ -147,7 +160,9 @@ QString FileJobService::submit(Kind kind,const QString &container,const QString 
                                                                {"result",resultPath}}).toJson(QJsonDocument::Compact);
                     store->checkpoint(bytes(id),"item",claim.token,partial.toStdString());
                 }
-                store->fail(bytes(id),"item",claim.token,bytes(result.error),false);
+                const bool retryable=result.path.isEmpty() && (result.error==QStringLiteral("The operation was interrupted while waiting for the container.")
+                    || result.error==QStringLiteral("Another Society operation is in progress. Try again."));
+                store->fail(bytes(id),"item",claim.token,bytes(result.error),retryable);
             }
             store->finish(bytes(id));
             // Publish completion only after the durable writer and its lease

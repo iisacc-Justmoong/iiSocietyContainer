@@ -4,20 +4,19 @@
 #include <QFile>
 #include <QProcess>
 #include <QTemporaryDir>
-#include <QTest>
+#include "CTestSupport.h"
 #include <QThread>
 #include <memory>
 
-class DirectoryBackgroundTests final : public QObject {
-    Q_OBJECT
-private slots:
+class DirectoryBackgroundTests final {
+public:
     void applicationWaitsForDetachedViewWork() {
-        QTemporaryDir fixture(QDir::current().filePath("directory-worker-XXXXXX")); QVERIFY(fixture.isValid());
+        QTemporaryDir fixture(QDir::temp().filePath("directory-worker-XXXXXX")); CTEST_CHECK(fixture.isValid());
         const auto completed=fixture.filePath("completed"), callback=fixture.filePath("callback");
         QProcess child; child.start(QCoreApplication::applicationFilePath(),{"--child",completed,callback});
-        QVERIFY(child.waitForStarted()); QVERIFY(child.waitForFinished(15000));
-        QCOMPARE(child.exitStatus(),QProcess::NormalExit); QCOMPARE(child.exitCode(),0);
-        QVERIFY(QFile::exists(completed)); QVERIFY(!QFile::exists(callback));
+        CTEST_CHECK(child.waitForStarted()); CTEST_CHECK(child.waitForFinished(15000));
+        CTEST_COMPARE(child.exitStatus(),QProcess::NormalExit); CTEST_COMPARE(child.exitCode(),0);
+        CTEST_CHECK(QFile::exists(completed)); CTEST_CHECK(!QFile::exists(callback));
     }
 };
 
@@ -34,6 +33,8 @@ int main(int argc,char **argv) {
         owner.reset();
         return 0;
     }
-    DirectoryBackgroundTests test; return QTest::qExec(&test,argc,argv);
+    society_ctest::CTestRunner runner;
+    DirectoryBackgroundTests test;
+    runner.run("applicationWaitsForDetachedViewWork", [&] { test.applicationWaitsForDetachedViewWork(); });
+    return runner.result();
 }
-#include "directory_background.moc"

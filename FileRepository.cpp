@@ -452,6 +452,19 @@ FileRepository::FileRepository(fs::path root, std::string container, std::vector
     d->directory = packagePath(d->root, container);
     if (access != Access::ReadOnly && !fs::exists(d->directory)) iiFileProvider::native::createDirectory(d->directory);
     if (!fs::is_directory(d->directory) || fs::canonical(d->directory) != d->directory) fail("private repository redirected or unavailable");
+    // The ObjectStore creates its database exclusively and rejects a partially
+    // initialized package. Coordinate that first creation across all writers
+    // without placing a sentinel inside the initially empty package.
+    std::unique_ptr<TemporaryLease> initialization;
+    if (access != Access::ReadOnly) {
+        const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+        do {
+            auto candidate=std::make_unique<TemporaryLease>(state,TemporaryLease::Mode::TryExclusive);
+            if (candidate->locked()) { initialization=std::move(candidate); break; }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        } while (std::chrono::steady_clock::now()<until);
+        if (!initialization) fail("file repository initialization is busy");
+    }
     std::unique_ptr<TemporaryLease> openingIntent;
     const auto prepareCoordination = [&] {
         const auto operations = d->directory / "operations";
@@ -474,10 +487,12 @@ FileRepository::FileRepository(fs::path root, std::string container, std::vector
     // not create coordination directories until it has initialized the empty
     // package. For an existing store, announce intent before opening SQLite.
     const bool existingStore = fs::exists(d->directory / "objects.sqlite3");
+    if (existingStore) initialization.reset();
     if (access != Access::ReadOnly && existingStore) prepareCoordination();
     // Announce user intent before opening SQLite: its initialization can wait
     // on a background transaction before the caller reaches an operation.
     d->store = std::make_unique<ObjectStore>(d->directory, std::move(container), access == Access::ReadOnly ? access : Access::Create);
+    initialization.reset();
     if (access != Access::ReadOnly && !existingStore) prepareCoordination();
     d->graph = std::make_unique<OntologyFileSystem>(*d->store);
 }

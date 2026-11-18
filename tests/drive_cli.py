@@ -13,6 +13,12 @@ sections = {
     "Files", "Photos", "Asset Library", "Generation History", "Models",
     "Thinking Space", "Forked", "Published", "Deleted",
 }
+model_types = {
+    "Checkpoint", "Embedding", "Hypernetwork", "Aesthetic Gradient", "LoRA",
+    "LyCORIS", "DoRA", "Controlnet", "Upscaler", "Motion", "VAE",
+    "Text Encoder", "UNet", "CLIP Vision", "Poses", "Wildcards", "Workflows",
+    "ComfyUI Workflows", "Detection", "VLM", "CLIP", "LLM", "Other",
+}
 
 
 def snapshot(root):
@@ -72,10 +78,18 @@ with tempfile.TemporaryDirectory(prefix="drive-cli-", dir=str(build)) as tempora
     assert manifest["identifier"] == identifier
     assert len(manifest["sections"]) == 9
     assert {section["path"] for section in manifest["sections"]} == sections
-    assert {entry.name for entry in package.iterdir()} == sections | {".society-drive.json"}
+    # The native provider may retain a zero-byte lock inode for atomic writes.
+    # It is internal state, not a user file or a cache entry.
+    lock = package / ".iisacc-temporary.lock"
+    expected = sections | {".society-drive.json"}
+    if lock.exists():
+        assert lock.is_file() and lock.stat().st_size == 0
+        expected.add(lock.name)
+    assert {entry.name for entry in package.iterdir()} == expected
     for section in sections:
         assert (package / section).is_dir(), section
-    assert not list((package / "Models").iterdir())
+    assert {entry.name for entry in (package / "Models").iterdir()} == model_types
+    assert all((package / "Models" / name).is_dir() for name in model_types)
 
     preserved = snapshot(parent)
     for action, target in (("create", parent), ("create", package), ("open", package)):
@@ -87,7 +101,7 @@ with tempfile.TemporaryDirectory(prefix="drive-cli-", dir=str(build)) as tempora
     assert repaired == {"repaired": [], "errors": []}, repaired
     assert snapshot(parent) == preserved, "Checking an empty model store must not create a catalog"
     orphan_folder = package / "Models" / "Checkpoint"
-    orphan_folder.mkdir()
+    assert orphan_folder.is_dir()
     orphan = orphan_folder / "model.safetensors.iisacc.json"
     document = json.dumps({"format": "iiFileProvider.Metadata", "schema": 1,
                            "fileKey": "file-unverified", "path": "Checkpoint/model.safetensors"}).encode()
@@ -99,7 +113,6 @@ with tempfile.TemporaryDirectory(prefix="drive-cli-", dir=str(build)) as tempora
     assert orphan.read_bytes() == document
     assert not (package / "Models" / ".iisacc-file-provider").exists()
     orphan.unlink()
-    orphan_folder.rmdir()
 
     # Rejection must neither create a fallback package nor modify caller data.
     relative = work / "relative-parent"

@@ -36,10 +36,9 @@ public:
     static QList<ModelEntry> scanDirectory(const QString &modelsDirectory, QString *error,
         const std::atomic_bool *cancelled, std::stop_token stop);
     QString rootPath() const;
-    /// Prepare only this requested category for model publication. Other
-    /// logical categories remain absent until explicitly used by a writer.
+    /// Prepare this requested category for model publication.
     QString categoryPath(ModelType type, QString *error = nullptr) const;
-    /// Validate existing taxonomy paths; never create unused type folders.
+    /// Validate taxonomy paths and create all missing model type directories.
     bool ensureLayout(QString *error = nullptr) const;
     bool ensureLayout(QString *error, std::stop_token stop) const;
     QList<ModelEntry> entries(QString *error = nullptr, const std::atomic_bool *cancelled = nullptr) const;

@@ -30,7 +30,7 @@ Society.societycontainer/
 
 숨김 상태 디렉터리는 해당 기능을 사용하면 생성된다. 객체 버전 이력과 동기화 인덱스는 보존하며, 사용자 파일의 실제 경로는 각 섹션 아래이다. `Models/`는 기존 Checkpoint, Embedding, Hypernetwork, VAE, LLM 등의 유형별 하위 디렉터리를 유지한다. 기존 Photos 레코드·미리보기와 Generation History 파일도 경로를 변경하지 않는다.
 
-신규 빈 저장소의 최소 구성은 9개 섹션 디렉터리와 `.society-drive.json`이다. `Models/`는 비어 있으며, 23개 논리 유형 폴더 가운데 실제 모델을 기록하는 유형만 필요시 생성한다. 재열기와 `ensureLayout()`도 미사용 유형을 생성하지 않는다. 생성은 모델·사진·사용자 파일을 자동 복사하거나 저장 공간을 사전 할당하지 않는다. `.society-photos/`, `.society-objects/`, `.society-sync/`는 초기 필수 구성에 포함되지 않으며 해당 기능을 사용하면서 필요한 상태만 추가한다. 같은 위치에 과거 `.societycontainer` 또는 `.sparsebundle`이 남아 있으면 그 패키지의 실제 점유는 신규 일반 폴더와 별개이다. 새 저장소 생성은 이전 데이터나 복구 패키지를 자동 삭제하지 않는다.
+신규 빈 저장소에는 9개 섹션 디렉터리와 `.society-drive.json`, `Models/` 아래의 빈 모델 유형 디렉터리 23개가 있다. 기존 저장소는 `ModelStore::ensureLayout()` 또는 Society 데몬의 백그라운드 모델 정리 작업으로 빠진 유형을 보완한다. 읽기용 드라이브 열기는 폴더를 직접 추가하지 않는다. 생성은 모델·사진·사용자 파일을 자동 복사하거나 저장 공간을 사전 할당하지 않는다. `.society-photos/`, `.society-objects/`, `.society-sync/`는 초기 필수 구성에 포함되지 않으며 해당 기능을 사용하면서 필요한 상태만 추가한다. 같은 위치에 과거 `.societycontainer` 또는 `.sparsebundle`이 남아 있으면 그 패키지의 실제 점유는 신규 일반 폴더와 별개이다. 새 저장소 생성은 이전 데이터나 복구 패키지를 자동 삭제하지 않는다.
 
 Finder 볼륨 정보의 전체 용량·여유 공간·사용 중인 공간은 원본 디렉터리가 있는 호스트 파일시스템의 통계이다. `Files/`를 투영한 볼륨은 같은 물리 공간을 공유하므로 이 값에 다른 호스트 파일이 포함될 수 있다. Society 자체의 점유는 원본 저장소의 파일 할당량으로 확인한다. macOS에서는 `du -sk '/absolute/source/Society.societycontainer'`를 사용하며, 논리 파일 크기와 실제 할당량은 희소 파일이나 APFS 복제본에서 다를 수 있다. FSKit 파일의 할당 바이트는 Darwin `stat(2)`의 `st_blocks × 512`이며, `st_blksize`는 권장 입출력 크기이므로 점유 계산에 사용하지 않는다.
 

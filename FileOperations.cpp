@@ -17,6 +17,7 @@
 #include <QScopeGuard>
 #include <QUuid>
 #include <cerrno>
+#include <chrono>
 #include <mutex>
 #if defined(Q_OS_WIN)
 #include <qt_windows.h>
@@ -213,6 +214,26 @@ bool moveAssets(const QList<QPair<QString, QString>> &moves, QString *error, boo
     }
     return true;
 }
+bool acquireOperationLock(iiFileProvider::LockFile &lock, const std::stop_token *stop) {
+    if (!stop) return lock.tryLock(2000);
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::minutes(2);
+    while (!stop->stop_requested() && std::chrono::steady_clock::now()<deadline) {
+        if (lock.tryLock(50)) return true;
+        if (lock.error()!=QLockFile::LockFailedError) return false;
+        const QFileInfo path(lock.fileName());
+        if (path.isSymLink() || path.isJunction() || (path.exists() && !path.isFile())) return false;
+    }
+    return false;
+}
+QString operationLockError(const iiFileProvider::LockFile &lock, const std::stop_token *stop) {
+    if (stop && stop->stop_requested()) return QStringLiteral("The operation was interrupted while waiting for the container.");
+    if (stop) {
+        const QFileInfo path(lock.fileName());
+        if (lock.error()!=QLockFile::LockFailedError || path.isSymLink() || path.isJunction() || (path.exists() && !path.isFile()))
+            return QStringLiteral("The container operation lock is unavailable or redirected.");
+    }
+    return QStringLiteral("Another Society operation is in progress. Try again.");
+}
 }
 void FileOperations::setRelocationHandler(RelocationHandler handler) {
     std::lock_guard lock(relocationMutex);
@@ -235,6 +256,12 @@ bool FileOperations::editable(const QString &path) const {
     return confined(m_drive, path);
 }
 FileOperations::Result FileOperations::createDirectory(const QString &parent, const QString &name) const {
+    return createDirectoryImpl(parent, name, nullptr);
+}
+FileOperations::Result FileOperations::createDirectory(const QString &parent, const QString &name, std::stop_token stop) const {
+    return createDirectoryImpl(parent, name, &stop);
+}
+FileOperations::Result FileOperations::createDirectoryImpl(const QString &parent, const QString &name, const std::stop_token *stop) const {
     auto failed = [](const QString &error) { return Result{{}, error}; };
     if (!m_drive.isReady() || !confined(m_drive, parent, true) || !QFileInfo(parent).isDir())
         return failed("Choose an available folder in this Society container.");
@@ -246,7 +273,7 @@ FileOperations::Result FileOperations::createDirectory(const QString &parent, co
     if (QFileInfo(syncDirectory).isSymLink() || !iiFileProvider::Directory().mkpath(syncDirectory))
         return failed("The Society operation directory is unavailable.");
     iiFileProvider::LockFile lock(syncDirectory + "/operation.lock"); lock.setStaleLockTime(0);
-    if (!lock.tryLock(2000)) return failed("Another Society operation is in progress. Try again.");
+    if (!acquireOperationLock(lock, stop)) return failed(operationLockError(lock, stop));
     if (!m_drive.isReady() || !confined(m_drive, parent, true) || !QFileInfo(parent).isDir() || !editable(destination))
         return failed("The selected folder changed. Try again.");
     std::error_code error;
@@ -255,6 +282,12 @@ FileOperations::Result FileOperations::createDirectory(const QString &parent, co
     return {destination, {}};
 }
 FileOperations::Result FileOperations::perform(Action action, const QString &source, const QString &argument) const {
+    return performImpl(action, source, argument, nullptr);
+}
+FileOperations::Result FileOperations::perform(Action action, const QString &source, const QString &argument, std::stop_token stop) const {
+    return performImpl(action, source, argument, &stop);
+}
+FileOperations::Result FileOperations::performImpl(Action action, const QString &source, const QString &argument, const std::stop_token *stop) const {
     auto failed = [](const QString &error) { return Result{{}, error}; };
     try {
     if ((action == Action::Move || action == Action::Restore || action == Action::RestoreTo) && !m_drive.isReady()) return failed("The Society drive is not ready.");
@@ -292,9 +325,9 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
         const auto suffix = sourceInfo.suffix();
         const auto temporaryName = QStringLiteral("SocietyRename-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces))
             + (suffix.isEmpty() ? QString() : '.' + suffix);
-        const auto first = perform(Action::Rename, source, temporaryName);
+        const auto first = performImpl(Action::Rename, source, temporaryName, stop);
         if (!first) return first;
-        const auto second = perform(Action::Rename, first.path, argument);
+        const auto second = performImpl(Action::Rename, first.path, argument, stop);
         if (second) return second;
         return {first.path, QStringLiteral("The item is temporarily named %1 because the case change could not finish: %2")
             .arg(first.path, second.error)};
@@ -690,7 +723,7 @@ FileOperations::Result FileOperations::perform(Action action, const QString &sou
             if (!copyTree(asset.first, stage, &error)) return failed(error);
         }
     }
-    if (!lock.tryLock(2000)) return failed("Another Society operation is in progress. Try again.");
+    if (!acquireOperationLock(lock, stop)) return failed(operationLockError(lock, stop));
     if ((importing ? QFileInfo(source).canonicalFilePath() != source : !editable(source)) || !QFileInfo::exists(source)) return failed("The selected item changed. Try again.");
     if (!editable(destination) || QFileInfo::exists(destination) || QFileInfo(destination).isSymLink()) return failed("An item with that name already exists.");
     if (copy) for (const auto &path : reservedTargets) {

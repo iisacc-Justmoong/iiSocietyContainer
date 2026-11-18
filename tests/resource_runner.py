@@ -1,12 +1,18 @@
 """Run one contract test in a disposable project resource workspace."""
 from pathlib import Path
 import os
+import signal
 import shutil
 import subprocess
 import sys
 import uuid
 
 _issued = set()
+
+
+def terminate_requested(signum, _frame):
+    # Unwind through run() so an ordinary CTest termination cleans its workspace.
+    raise SystemExit(128 + signum)
 
 
 def run(resources, command, *, execute=subprocess.run):
@@ -35,6 +41,7 @@ def run(resources, command, *, execute=subprocess.run):
     else:
         raise FileExistsError("Cannot reserve a test workspace")
     try:
+        print(f"CTest resource workspace: {owner}", file=sys.stderr, flush=True)
         expanded = [part.replace("@WORK@", str(owner)) for part in command]
         env = dict(os.environ, TMPDIR=str(owner), TMP=str(owner), TEMP=str(owner),
                    PYTHONDONTWRITEBYTECODE="1")
@@ -53,7 +60,11 @@ def main(argv):
     sys.path.insert(0, provider_dir)
     inherited = os.environ.get("PYTHONPATH", "")
     os.environ["PYTHONPATH"] = provider_dir + (os.pathsep + inherited if inherited else "")
-    return run(argv[1], argv[2:])
+    previous = signal.signal(signal.SIGTERM, terminate_requested)
+    try:
+        return run(argv[1], argv[2:])
+    finally:
+        signal.signal(signal.SIGTERM, previous)
 
 
 if __name__ == "__main__":

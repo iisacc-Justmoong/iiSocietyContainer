@@ -9,6 +9,7 @@ find_package(iiFileProviderCatalog 0.7.3 CONFIG REQUIRED)
 find_package(SQLite3 REQUIRED)
 add_library(iiSocietyContainerFileTree ${_library_type} FileTree.h FileTree.cpp DirectoryStorage.h DirectoryStorage.cpp FileRepository.h FileRepository.cpp src/ManagedOntologyProperties.h src/Index/InventoryIndex.h src/Index/InventoryIndex.cpp iiSocietyContainerExport.h)
 target_sources(iiSocietyContainerFileTree PRIVATE src/Storage/LogicalDisk.h src/Storage/LogicalDisk.cpp)
+target_sources(iiSocietyContainerFileTree PRIVATE src/Cache/ModelCache.h src/Cache/ModelCache.cpp)
 add_library(iiSocietyContainer::FileTree ALIAS iiSocietyContainerFileTree)
 target_compile_features(iiSocietyContainerFileTree PUBLIC cxx_std_23)
 target_compile_definitions(iiSocietyContainerFileTree PRIVATE IISOCIETYCONTAINER_FILETREE_BUILD)
@@ -16,12 +17,14 @@ target_include_directories(iiSocietyContainerFileTree PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/Storage>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/Index>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/Cache>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 set_target_properties(iiSocietyContainerFileTree PROPERTIES EXPORT_NAME FileTree
     CXX_EXTENSIONS OFF VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR}
     CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)
 install(FILES src/Storage/LogicalDisk.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Storage/MobileStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES src/Cache/ModelCache.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if(NOT CMAKE_CROSSCOMPILING)
     add_executable(iiSocietyContainerMobileStorageTool src/Storage/MobileStorageTool.cpp)
@@ -40,6 +43,13 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(iiSocietyContainerMobileStorageTests PRIVATE iiSocietyContainer::MobileStorage)
     add_test(NAME iiSocietyContainer.mobile_storage COMMAND ${_society_test_runner}
         $<TARGET_FILE:iiSocietyContainerMobileStorageTests> @WORK@)
+endif()
+
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+    add_executable(iiSocietyContainerModelCacheTests tests/model_cache.cpp)
+    target_link_libraries(iiSocietyContainerModelCacheTests PRIVATE iiSocietyContainer::FileTree)
+    add_test(NAME iiSocietyContainer.model_cache COMMAND ${_society_test_runner}
+        $<TARGET_FILE:iiSocietyContainerModelCacheTests> @WORK@)
 endif()
 
 add_library(iiSocietyContainerMaintenance ${_library_type} StorageMaintenance.h StorageMaintenance.cpp iiSocietyContainerExport.h)

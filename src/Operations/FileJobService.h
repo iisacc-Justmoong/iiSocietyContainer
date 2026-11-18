@@ -13,6 +13,7 @@ class IISOCIETYCONTAINER_EXPORT FileJobService final : public QObject {
 public:
     enum class Kind { Duplicate, Rename, Trash, Remove, Restore, Move, CreateDirectory, Copy };
     explicit FileJobService(QString jobDirectory = {}, QObject *parent = nullptr);
+    ~FileJobService() override;
     QString submit(Kind kind, const QString &container, const QString &source,
                    const QString &argument = {}, QString *error = nullptr);
     void inspect(const QString &ticket, const QString &jobId);

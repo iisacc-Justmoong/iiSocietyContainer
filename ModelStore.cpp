@@ -158,13 +158,17 @@ bool ModelStore::ensureLayout(QString *error, std::stop_token stop) const
 {
     if (error) error->clear();
     if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed or is unavailable.")); return false; }
-    iiFileProvider::LockFile lock(iiFileProvider::Directory(rootPath()).filePath(".society-models.lock"));
+    const auto base = rootPath();
+    iiFileProvider::LockFile lock(iiFileProvider::Directory(base).filePath(".society-models.lock"));
     QElapsedTimer timer; timer.start();
     while (!stop.stop_requested() && !lock.tryLock(50)) {
         if (timer.elapsed() >= 5000) { fail(error, QStringLiteral("Another process is organizing Models.")); return false; }
     }
     if (stop.stop_requested()) { fail(error, QStringLiteral("Model organization cancelled.")); return false; }
-    return m_drive.isReady() && detail::validateModelLayout(rootPath(), error);
+    if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed or is unavailable.")); return false; }
+    if (!detail::ensureModelLayout(base, error, stop)) return false;
+    if (!m_drive.isReady()) { fail(error, QStringLiteral("The Society drive changed or is unavailable.")); return false; }
+    return true;
 }
 QList<ModelEntry> ModelStore::scanDirectory(const QString &modelsDirectory, QString *error, const std::atomic_bool *cancelled)
 {

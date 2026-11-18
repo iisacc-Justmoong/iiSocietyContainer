@@ -83,7 +83,7 @@ Catalog의 파일 키는 파일의 논리 식별자이며 파일명·경로·해
 복사 종료 시 원본 경로의 수정 시각과 복사 바이트 수를 다시 비교한다. 파일 장치는
 `QFileDevice` 상속에 의존하지 않으며 공급자가 노출하는 파일명으로 상태를 조회한다.
 
-`ModelStore`는 Society 컨테이너 내부 `Models/`의 분류·목록·이동·이전 경로 해석을 담당한다. 다음 23개 유형은 논리적 분류 계약이다. `SocietyDrive::create()`와 재열기, `ModelStore::ensureLayout()`은 미사용 분류 폴더를 미리 생성하지 않는다. 실제 모델을 가져오거나 분류 이동할 때 필요한 유형 폴더만 생성한다. 기존 파일을 정리하려면 `ModelStore::organize()`를 호출한다. 컨테이너 UUID와 9개 최상위 영역, 시스템 파일 공급자의 `Files/` 공개 범위는 유지한다.
+`ModelStore`는 Society 컨테이너 내부 `Models/`의 분류·목록·이동·이전 경로 해석을 담당한다. 다음 23개 유형은 파일이 없어도 실제 디렉터리로 존재한다. 새 드라이브 생성과 `ModelStore::ensureLayout()`은 빠진 유형 폴더를 만들고, Society 데몬은 기존 컨테이너를 선택할 때 백그라운드 모델 정리 작업에서 이를 보완한다. 읽기용 `SocietyDrive::open()`은 이 폴더를 직접 만들지 않는다. 기존 파일을 정리하려면 `ModelStore::organize()`를 호출한다. 컨테이너 UUID와 9개 최상위 영역, 시스템 파일 공급자의 `Files/` 공개 범위는 유지한다.
 
 `SharedStorage::models()` lists `.safetensors`, legacy `.safetensor` and `.gguf` files, case-insensitively, and reports GGUF as its own format. ONNX files are excluded from model candidates. The same rules apply to local and synchronized catalogs; existing files and legacy references are preserved. This is a filename-based inventory, not proof of valid weights or executable architecture. Directory packages containing `model_index.json` retain their existing contract.
 
@@ -118,7 +118,7 @@ Models/
 
 `ModelType.h`의 `allModelTypes()`, `modelTypeName()`, `modelTypeFromName()`이 이 목록의 공통 계약이다. 열거형 `ControlNet`의 실제 디렉터리 표기는 이미지와 같은 `Controlnet`이다.
 
-기존 분류 디렉터리의 충돌 검사는 내부 `ModelLayout`에 모아 `SocietyDrive`와 `ModelStore`가 공유한다. `ModelStore::categoryPath(type)`는 모델 발행 전에 요청한 유형 한 개만 준비하며, `place()`는 선택된 목적 경로의 부모만 생성한다. `ModelStore`가 드라이브 식별·준비 상태에 의존하며 `SocietyDrive`는 관리 객체를 참조하지 않는다. 이미 존재하는 모델·부속 파일·사용자 디렉터리는 유지하며, 기존 빈 분류 폴더를 SDK가 자동 삭제하지 않는다.
+기존 분류 디렉터리의 충돌 검사는 내부 `ModelLayout`에 모아 `SocietyDrive`와 `ModelStore`가 공유한다. `ModelStore::categoryPath(type)`도 요청한 유형을 안전하게 준비한다. 전체 보완 전 동명 파일·심볼릭 링크·junction의 충돌을 검사하며, 충돌이 있으면 이를 덮어쓰지 않고 오류를 반환한다. 이미 존재하는 모델·부속 파일·사용자 디렉터리는 유지하며, 기존 빈 분류 폴더를 SDK가 자동 삭제하지 않는다.
 
 ## 관리 API
 
@@ -141,7 +141,7 @@ if (auto models = ModelStore::open(containerPath, &error)) {
 }
 ```
 
-- `ensureLayout()`은 기존 유형 경로를 검증하며 미사용 유형 폴더를 생성하지 않는다. 동명 파일·리디렉션 충돌은 오류로 반환한다.
+- `ensureLayout()`은 기존 유형 경로를 검증하고 빠진 23개 유형 폴더를 생성한다. 반복 호출은 안전하며, 동명 파일·리디렉션 충돌과 취소는 오류로 반환한다.
 - `categoryPath(type)`는 요청한 유형 디렉터리만 잠금 아래 생성하여 가져오기 목적 경로를 반환한다. 드라이브 변경·경로 충돌은 오류로 반환한다.
 - `entries()`와 독립 `scanDirectory()`는 읽기 전용이다. 항목에는 파일명, 절대/상대 경로, 저장 형식, 패키지 종류, 분류 근거가 있다. `ModelClassifier::classify()`로 파일 하나의 판정도 조회할 수 있다.
 - 0.11.1의 `ModelClassifier::metadata(path)`는 safetensors 헤더의 메타데이터와 `tensor_dtypes`, GGUF의 `general.architecture`·`general.name`·`general.file_type`, 패키지 설정과 모델 부속 JSON을 반환한다. 파일 헤더는 최대 16 MiB, JSON은 최대 1 MiB이며 텐서를 로드하거나 레거시 가중치를 역직렬화하지 않는다. 패키지의 `society.model.json` 또는 파일의 `.model.json`에서 `society.modality`를 `image`, `video`, `audio`, `language`로 명시할 수 있다. 이 표시는 기존 23개 저장 유형과 독립적이다. `model_store` 테스트가 정상 헤더·패키지·GGUF·부속 메타데이터·손상 및 링크 입력을 검증한다.
@@ -259,3 +259,44 @@ Krea2 가져오기는 검증된 텐서 시그니처(`txtfusion.projector.weight`
 일반 로컬 원본 패키지와 명시적으로 선언된 로컬 호스트에서는 실제 모델 유형 폴더의 얕은 파일 메타데이터를 동기화 카탈로그와 병합한다. 호스트 등록이나 `.society-sync/primary.json` 생성 전에도 사용자가 넣은 체크포인트와 LoRA가 즉시 나타나며, 다중 기가바이트 파일의 동기화 체크섬을 기다리지 않는다. 이 조회는 텐서 내용이나 패키지 내부를 읽지 않으며 카탈로그·호스트 메타데이터나 다운로드 요청을 생성하지 않는다. 복제 식별 정보를 가진 패키지는 초기 복제 완료 전후 모두 카탈로그 전용으로 조회하므로, 빈 카탈로그의 미색인 로컬 잔여 파일은 표시하지 않는다. 변경되지 않은 스냅샷은 모델/로딩 재설정 신호를 발생시키지 않는다.
 
 `shared_storage`의 `originalModelFilesRemainVisibleWithAPartialCatalogAndNoRegisteredHost`는 디렉터리만 색인된 카탈로그에서도 실제 체크포인트 2개와 LoRA 6개를 UI와 공통 모델 조회에서 표시하고 원본 바이트 및 메타데이터를 보존함을 검사한다. `replicaCatalogDoesNotExposeUnindexedLocalModels`는 미완성·완료된 실제 복제본에서 빈 카탈로그가 잔여 모델을 노출하지 않음을 검사한다.
+
+## 앱 기본 모델 캐시
+
+iiSocietyContainer는 앱별 기본 모델의 선택과 재생성 가능한 준비 결과를
+컨테이너의 비공개 런타임에 보관한다. 모델 원본과 자원 식별자, 내용 판본은
+캐시와 별개다. 같은 내용의 자원이더라도 선택 레코드는 앱과 자원 참조를
+따로 기록한다. 캐시가 존재한다는 사실은 원본의 소유권, 백업 또는 다른
+기기의 가용성을 뜻하지 않는다.
+
+캐시 키는 앱이 지정한 자원 참조, 준비 결과의 버전과 카탈로그 항목을 함께
+포함한다. 선택은 원자적으로 기록하며, 앱과 컨테이너가 다르면 읽지 않는다.
+캐시 준비는 호출자가 제공하는 변환기와 검증기를 사용한다. 기존 결과가
+검증되면 다시 만들지 않고, 새 결과는 같은 파일시스템의 전용 임시 디렉터리에
+준비해 검증과 취소·컨테이너 신원 검사를 마친 다음 덮어쓰기 없이 게시한다.
+충돌하거나 손상된 기존 항목은 지우거나 유효한 것으로 취급하지 않는다.
+
+이전 Society 에이전트가 사용한 `agent/models` 카탈로그는 계속 사용할 수
+있다. 기본 모델 선택 기록은 `.society-runtime/cache/model-cache-v1/`에 둔다.
+이 레이아웃은 모델 전체를 메모리에 고정하지 않는다. 준비·검증은 호출자의
+백그라운드 작업으로 실행하며, 같은 디스크에 있는 캐시가 항상 더 빠른 장치를
+의미하지 않는다. 모델 해석·실행과 실행 시 무결성 검사는 추론 SDK의 책임이다.
+기존 항목의 자동 삭제나 저장 공간 한도는 제공하지 않으며, 원본 파일과
+사용자가 추가한 카탈로그 항목은 정리하지 않는다.
+
+`ModelCache`는 Qt 없이 사용할 수 있는 C++23 API다. 호출자는 이미 검증한
+컨테이너의 경로와 식별자, 앱 ID, 런타임 내부 카탈로그 상대 경로 및
+컨테이너 신원·준비 상태를 다시 확인하는 콜백을 전달한다. `select()`와
+`primary()`는 앱의 기본 선택을 기록·조회하고 `ensure()`는 준비와 검증을
+통해 결과 경로와 캐시 적중 여부를 반환한다. 준비 함수는 중단 토큰을
+주기적으로 확인해야 한다. 동시에 같은 항목을 준비하면 먼저 게시된 유효한
+결과를 사용하고 나머지 임시 결과만 정리한다.
+
+Qt 어댑터를 포함해 설치한 경우 `iiSocietyContainerDriveTool`은
+`model-cache-primary`, `model-cache-select`, `model-cache-catalog`을 제공한다.
+설치된 `share/iiSocietyContainer/python/model_cache.py`의 `ModelCache`와
+`PrimaryModel`은 이 명령을 통해 선택을 조회·변경한다. 변환 콜백과 검증기는
+C++ API의 책임이며 Python 선택 API가 모델을 실행하지는 않는다.
+
+CMake 패키지의 `iiSocietyContainer_HAS_MODEL_CACHE`는 이 API를 포함한
+SDK인지 확인하는 기능 플래그다. 해당 API를 사용하는 앱은 같은 빌드의
+헤더와 라이브러리를 함께 사용해야 한다.

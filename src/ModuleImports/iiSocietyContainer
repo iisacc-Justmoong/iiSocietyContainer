@@ -1,0 +1,68 @@
+#pragma once
+
+// C++ public entry for iiSocietyContainer; the linked components select the API.
+
+#if defined(IISDK_IMPORT_IISOCIETYCONTAINER_CORE)
+#include <LogicalDisk.h>
+#include <ModelCache.h>
+#include <ApplicationStorage.h>
+#include <FileActions.h>
+#include <iiSocietyContainer.h>
+#include <iiSocietyContainerExport.h>
+#include <Container.h>
+#include <SocietyDrive.h>
+#include <DiskImage.h>
+#include <ModelType.h>
+#include <FileOperations.h>
+#include <FileDirectory.h>
+// CMake exposes the source tree to build-tree consumers and the public
+// header names to installed consumers.
+#if __has_include(<src/Models/ModelImportService.h>)
+#include <src/Index/InventoryIndex.h>
+#include <src/Models/ModelImportService.h>
+#include <src/Models/ModelImportSource.h>
+#include <src/Models/ContainerJobStorage.h>
+#include <src/Operations/FileJobService.h>
+#else
+#include <InventoryIndex.h>
+#include <ModelImportService.h>
+#include <ModelImportSource.h>
+#include <ContainerJobStorage.h>
+#include <FileJobService.h>
+#endif
+#include <src/Store/StoreSection.h>
+#endif
+
+#if defined(IISDK_IMPORT_IISOCIETYCONTAINER_FILETREE)
+#include <FileTree.h>
+#include <DirectoryStorage.h>
+#include <FileRepository.h>
+#endif
+
+#if defined(IISDK_IMPORT_IISOCIETYCONTAINER_GUI)
+#include <iiSocietyContainer/DashboardFiles.h>
+#include <iiSocietyContainer/SocietyApplication.h>
+#include <iiSocietyContainer/PreviewCache.h>
+#include <FilesView.h>
+#include <ModelClassifier.h>
+#include <ModelStore.h>
+#include <StorageMap.h>
+#include <StorageDirectoryModel.h>
+#include <StorageModelCatalog.h>
+#endif
+
+#if defined(IISDK_IMPORT_IISOCIETYCONTAINER_MAINTENANCE)
+#include <StorageMaintenance.h>
+#endif
+
+#if defined(IISDK_IMPORT_IISOCIETYCONTAINER_MOBILE)
+#include <MobileStorage.h>
+#endif
+
+#if defined(IISDK_IMPORT_IISOCIETYCONTAINER_MOBILE) && defined(__ANDROID__)
+#include <AndroidStorage.h>
+#endif
+
+#if defined(IISDK_IMPORT_IISOCIETYCONTAINER_SHARING)
+#include <SharedStorage.h>
+#endif
