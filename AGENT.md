@@ -14,6 +14,14 @@
 - 새 SDK 소스와 같은 이름의 헤더는 `src/` 아래에 함께 두고 공개 인터페이스는 설치 소비자로 검증한다.
 - 소스 변경에는 테스트와 한국어 `docs/` 문서를 갱신하고 `README.md`는 영어로 작성한다. 모든 빌드·검증 산출물은 `build/` 아래에 둔다.
 
+## 라이선스
+
+이 저장소의 iiSocietyContainer는 Apache License 2.0이다. 자사 코드, 문서, 도구, 테스트가 포함된다. 저작권 표시는 `Copyright (c) 2026 iisacc`이고 고지는 루트 `NOTICE`에 있다. 사람용 한국어 설명은 [docs/License.md](docs/License.md)이다.
+
+`SDK` 아래의 모든 iiSDK 모듈은 Apache-2.0이다. `Product` 아래의 iisacc 제품은 GNU Affero General Public License(AGPL-3.0-or-later)이다.
+
+제3자와 벤더 코드는 원래 라이선스를 유지한다. 문서 재편 중에도 그 라이선스와 외부 원본은 보존한다.
+
 <!-- workspace-docs:agent:start -->
 ## 문서 구조와 에이전트 탐색
 

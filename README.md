@@ -338,6 +338,9 @@ When configuring consumers, add SDK install path and Qt path to `CMAKE_PREFIX_PA
 - `lib/`: Shared library with version; Windows runtime DLL is `bin/`
 - `lib/cmake/iiSocietyContainer/`: Config, ConfigVersion, and Targets package
 - `share/iiSocietyContainer/README.md`: This document
+- `share/iiSocietyContainer/LICENSE`: Apache License 2.0
+- `share/iiSocietyContainer/NOTICE`: Copyright and attribution notice
+- `share/iiSocietyContainer/docs/License.md`: Korean statement of the same policy
 - `bin/iiSocietyContainerDriveTool`: Drive initialization, query, and area catalog CLI
 - macOS's `share/iiSocietyContainer/Society.app`: Native host and File Provider extension
 
@@ -347,11 +350,21 @@ Actual Finder connection tests are performed on explicitly registered verificati
 
 ## License
 
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
-Self-written code and documents of iiSocietyContainer are distributed under the MIT License. The full terms follow [LICENSE](LICENSE).
+iiSocietyContainer is an iiSDK module licensed under the
+[Apache License, Version 2.0](LICENSE) (SPDX `Apache-2.0`).
+The copyright notice is `Copyright (c) 2026 iisacc`. Attribution for this
+distribution is in [NOTICE](NOTICE). The Korean statement of the same policy
+is [docs/License.md](docs/License.md).
 
-External libraries including Qt and third-party code with separate notices maintain their own licenses. This project's license declaration does not replace the corresponding third-party license.
+Every iiSDK module under SDK is Apache-2.0. iisacc products under Product
+are licensed under the GNU Affero General Public License
+(AGPL-3.0-or-later).
+
+Third-party and vendored code, libraries, fonts, tools, and model weights
+keep their original licenses. External libraries, including Qt, keep the
+license of the installation or notice that accompanies them.
 
 <a id="ios--ipados-통합"></a>
 

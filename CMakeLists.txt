@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 project(iiSocietyContainer VERSION 0.16.2 LANGUAGES CXX)
+set(iiSocietyContainer_SPDX_LICENSE "Apache-2.0")
 # File creation is owned by iiFileProvider.
 find_package(iiFileProviderNative 0.7 CONFIG REQUIRED HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider")
 
@@ -588,7 +589,8 @@ install(FILES src/Models/ModelImportService.h src/Models/ModelImportSource.h src
 install(FILES src/Operations/FileJobService.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES platform/android/AndroidStorage.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES src/Store/StoreSection.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/src/Store)
-install(FILES README.md docs/FileLoading.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer COMPONENT Documentation)
+install(FILES README.md docs/FileLoading.md LICENSE NOTICE DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer COMPONENT Documentation)
+install(FILES docs/License.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiSocietyContainer/docs COMPONENT Documentation)
 if(BUILD_TESTING)
     add_test(NAME iiSocietyContainer.documentation_install COMMAND "${CMAKE_COMMAND}"
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}" "-DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}"
