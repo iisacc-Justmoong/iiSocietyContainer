@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "README.md",
-    "sha256": "3625d8b9d9c83732a2fc92d4333a707f25602b66564c698b9d25b62439c33b85",
-    "bytes": 40331,
+    "sha256": "4de6a84baa76bf846e9a89f0ae39e4629c0ea3b1e7925bdb4d67b41820b497c7",
+    "bytes": 40345,
     "line_count": 421,
     "encoding": "utf-8",
     "language": "ko"
@@ -1395,7 +1395,7 @@
       "kind": "paragraph",
       "start_line": 349,
       "end_line": 349,
-      "raw": "SPDX-License-Identifier: MIT\n"
+      "raw": "SPDX-License-Identifier: Apache-2.0\n"
     },
     {
       "id": "b000176",
@@ -1409,7 +1409,7 @@
       "kind": "paragraph",
       "start_line": 351,
       "end_line": 351,
-      "raw": "Self-written code and documents of iiSocietyContainer are distributed under the MIT License. The full terms follow [LICENSE](LICENSE).\n"
+      "raw": "Self-written code and documents of iiSocietyContainer are distributed under the Apache License 2.0. The full terms follow [LICENSE](LICENSE).\n"
     },
     {
       "id": "b000178",

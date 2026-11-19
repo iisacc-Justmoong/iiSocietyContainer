@@ -346,9 +346,9 @@ Actual Finder connection tests are performed on explicitly registered verificati
 
 ## License
 
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
-Self-written code and documents of iiSocietyContainer are distributed under the MIT License. The full terms follow [LICENSE](LICENSE).
+Self-written code and documents of iiSocietyContainer are distributed under the Apache License 2.0. The full terms follow [LICENSE](LICENSE).
 
 External libraries including Qt and third-party code with separate notices maintain their own licenses. This project's license declaration does not replace the corresponding third-party license.
 
